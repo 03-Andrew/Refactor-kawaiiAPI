@@ -1,0 +1,48 @@
+{% include "main.html" %}
+{% load static %}
+
+{% block content %}
+
+ <h1>Available Rooms</h1>
+    <!-- Display Pre-booking Data -->
+    <div class="pre-booking-info">
+        <h2>Booking Details</h2>
+        <p><strong>Check-in Date:</strong> {{ pre_booking_data.checkin }}</p>
+        <p><strong>Check-out Date:</strong> {{ pre_booking_data.checkout }}</p>
+        <p><strong>Adults:</strong> {{ pre_booking_data.adults }}</p>
+        <p><strong>Children:</strong> {{ pre_booking_data.children }}</p>
+    </div>
+
+    <!-- Display Available Rooms -->
+    <div class="available-rooms">
+        <h2>Available Rooms</h2>
+        
+        {% if available_rooms %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Room Type</th>
+                        <th>Price (per night)</th>
+                        <th>Description</th>
+                        <th>Max Guests</th>
+                        <th>Available Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for room_type, room_info in available_rooms.items %}
+                        <tr>
+                            <td>{{ room_type }}</td>
+                            <td>${{ room_info.price }}</td>
+                            <td>{{ room_info.description }}</td>
+                            <td>{{ room_info.max_guests }}</td>
+                            <td>{{ room_info.count }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No rooms are available for the selected dates.</p>
+        {% endif %}
+    </div>
+
+{% endblock content %}
