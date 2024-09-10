@@ -61,4 +61,9 @@ class Booking(models.Model):
 
     @property
     def total_cost(self):
-        return sum(booking.total_cost for booking in self.booking_set.all() if booking is not None)
+        # Implement the logic to calculate the total cost for this specific booking
+        # Example: return self.room_type.price * self.number_of_nights
+        return self.room_type.price * self.number_of_nights if self.room_type else 0
+
+    
+    

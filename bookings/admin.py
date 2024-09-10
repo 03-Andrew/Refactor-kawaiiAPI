@@ -8,17 +8,17 @@ class AllFieldsAdmin(admin.ModelAdmin):
         # Ensure 'total_cost' is included if it exists
         return fields
     
-    # def get_readonly_fields(self, request, obj=None):
-    #     # Optionally make fields read-only, e.g., 'total_cost'
-    #     readonly_fields = super().get_readonly_fields(request)
-    #     if hasattr(self, 'get_number_of_nights_field'):
-    #         readonly_fields += ('number_of_nights',)
+    def get_readonly_fields(self, request, obj=None):
+        # Optionally make fields read-only, e.g., 'total_cost'
+        readonly_fields = super().get_readonly_fields(request)
+        if hasattr(self, 'get_number_of_nights_field'):
+            readonly_fields += ('number_of_nights',)
         
-    #     if hasattr(self, 'get_total_cost_field'):
-    #         readonly_fields += ('total_cost',)
+        if hasattr(self, 'get_total_cost_field'):
+            readonly_fields += ('total_cost',)
         
 
-    #     return readonly_fields
+        return readonly_fields
 
 class BookingAdmin(AllFieldsAdmin):
     def get_total_cost_field(self):
@@ -40,6 +40,7 @@ admin.site.register(RoomType, AllFieldsAdmin)
 admin.site.register(Inclusions, AllFieldsAdmin)
 admin.site.register(BookingStatus, AllFieldsAdmin)
 admin.site.register(Booking, BookingAdmin)
+
 
 
 

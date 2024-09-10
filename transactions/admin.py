@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Transaction, Customer
+from .models import Transaction, Customer, FoodBill, Amenities, AmenitiesAvailed
 
 class AllFieldsAdmin(admin.ModelAdmin):
     def get_list_display(self, request):
@@ -33,3 +33,6 @@ class BookingAdmin(AllFieldsAdmin):
 # Register your models here.
 admin.site.register(Transaction, BookingAdmin)
 admin.site.register(Customer, AllFieldsAdmin)
+admin.site.register(FoodBill, AllFieldsAdmin)
+admin.site.register(Amenities, AllFieldsAdmin)
+admin.site.register(AmenitiesAvailed, AllFieldsAdmin)

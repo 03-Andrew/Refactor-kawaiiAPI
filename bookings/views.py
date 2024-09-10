@@ -1,12 +1,18 @@
 from datetime import datetime, timedelta
 from django.shortcuts import render
 from django.db.models import Count, Q
-from .models import Room, Booking
 from django.http import HttpResponse
+
+from .models import Room, Booking
+from .serializers import AvailableRoomSerializer, BookingSerializer
+
 from rest_framework.views import APIView
+from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from .serializers import AvailableRoomSerializer
+
+
+
 from datetime import datetime, timedelta
 
 def home(request):
@@ -106,7 +112,7 @@ def available_rooms(request):
     return render(request, 'base/booking_page.html', context)
 
 
-
+# API
 @api_view(['GET'])
 def available_rooms_api(request):
     """API to retrieve available rooms based on check-in and check-out dates."""
@@ -130,3 +136,9 @@ def available_rooms_api(request):
     }
 
     return Response(response_data)
+
+
+
+class BookingListCreate(generics.ListCreateAPIView):
+    queryset = Booking.objects.all()
+    serializer_class = BookingSerializer
