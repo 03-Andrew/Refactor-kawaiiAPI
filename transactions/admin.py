@@ -5,7 +5,7 @@ class AllFieldsAdmin(admin.ModelAdmin):
     def get_list_display(self, request):
         # Get all field names dynamically
         fields = [field.name for field in self.model._meta.fields]
-        # Ensure 'total_cost' and 'guest_list' are included if they exist
+        # Ensure 'total_cost', 'paid_amount', 'running_balance', and 'guest_list' are included if they exist
         if hasattr(self, 'get_total_cost_field'):
             fields.append('total_cost')
         if hasattr(self, 'get_paid_amount'):
@@ -15,18 +15,18 @@ class AllFieldsAdmin(admin.ModelAdmin):
         if hasattr(self, 'get_guest_list_field'):
             fields.append('guest_list')
         return fields
-    
+
     def get_readonly_fields(self, request, obj=None):
-        # Optionally make fields read-only, e.g., 'total_cost'
-        readonly_fields = super().get_readonly_fields(request)
+        # Optionally make fields read-only
+        readonly_fields = super().get_readonly_fields(request, obj)
         if hasattr(self, 'get_total_cost_field'):
-            readonly_fields += ('total_cost',)
+            readonly_fields = (*readonly_fields, 'total_cost')
         if hasattr(self, 'get_paid_amount'):
-            readonly_fields += ('paid_amount',)
+            readonly_fields = (*readonly_fields, 'paid_amount')
         if hasattr(self, 'get_running_balance'):
-            readonly_fields += ('running_balance')
+            readonly_fields = (*readonly_fields, 'running_balance')
         if hasattr(self, 'get_guest_list_field'):
-            readonly_fields += ('guest_list',)
+            readonly_fields = (*readonly_fields, 'guest_list')
         return readonly_fields
 
 class BookingAdmin(AllFieldsAdmin):
@@ -44,17 +44,15 @@ class BookingAdmin(AllFieldsAdmin):
     def paid_amount(self, obj):
         return obj.paid_amount
 
-    paid_amount.short_description = 'Paid amount'
+    paid_amount.short_description = 'Paid Amount'
     
-        
     def get_running_balance(self):
         return True
 
     def running_balance(self, obj):
         return obj.running_balance
 
-    running_balance.short_description = 'Running balance'
-    
+    running_balance.short_description = 'Running Balance'
     
     def get_guest_list_field(self):
         return True
@@ -63,7 +61,7 @@ class BookingAdmin(AllFieldsAdmin):
         return ', '.join(obj.guests)
 
     guest_list.short_description = 'Guests'
-    
+
     
 
     
