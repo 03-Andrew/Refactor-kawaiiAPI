@@ -16,7 +16,7 @@ from rest_framework.decorators import api_view
 from datetime import datetime, timedelta
 
 def home(request):
-    return HttpResponse("Hello, World!")
+    return render(request, 'base/home.html')
 
 
 def get_checkin_checkout_dates(request):
