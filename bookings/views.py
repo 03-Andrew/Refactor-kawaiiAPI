@@ -137,8 +137,6 @@ def available_rooms_api(request):
 
     return Response(response_data)
 
-
-
 class BookingListCreate(generics.ListCreateAPIView):
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
