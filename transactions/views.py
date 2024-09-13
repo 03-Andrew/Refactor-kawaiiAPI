@@ -13,7 +13,6 @@ class TransactionListCreate(generics.ListCreateAPIView):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
 
-
 class CustomerListCreate(generics.ListCreateAPIView):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
@@ -22,4 +21,3 @@ class PaymentListCreate(generics.ListCreateAPIView):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
 
-    
