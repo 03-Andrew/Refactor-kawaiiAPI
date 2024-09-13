@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Transaction, Customer, Payment
+from .models import Transaction, Customer, Payment, GuestList, Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed
 
 class TransactionSerializer(serializers.ModelSerializer):
     total_cost = serializers.SerializerMethodField()
