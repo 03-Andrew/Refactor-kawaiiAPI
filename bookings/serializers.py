@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Booking
+from .models import Booking, Room, RoomType, RoomStatus
 
 class BookingSerializer(serializers.ModelSerializer):
     number_of_nights = serializers.SerializerMethodField()
@@ -15,6 +15,23 @@ class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = ['transaction', 'room', 'room_type', 'check_in', 'check_out', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
+
+class RoomStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoomStatus
+        fields = ['id', 'name']
+
+class RoomTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoomType
+        fields = ['id', 'name', 'price', 'description', 'good_for', 'max_children', 'max_adult']
+
+class RoomSerializer(serializers.ModelSerializer):
+    status = RoomStatusSerializer()
+    type = RoomTypeSerializer()
+    class Meta:
+        model = Room
+        fields = ['id', 'number', 'type', 'status']
 
 
 class AvailableRoomSerializer(serializers.Serializer):

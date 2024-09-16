@@ -30,6 +30,7 @@ class Room(models.Model):
     number = models.CharField(max_length=100)
     type = models.ForeignKey(RoomType, on_delete=models.PROTECT)
     status = models.ForeignKey(RoomStatus, on_delete=models.PROTECT)
+    
 
     def __str__(self):
         return f"Room {self.number} - {self.type.name}"
