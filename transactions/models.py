@@ -92,6 +92,10 @@ class AmenitiesAvailed(models.Model):
     def __str__(self):
         return f"Amenities for Transaction {self.transaction.id}"
     
+    @property
+    def total_cost(self):
+        return self.amenity.rate_per_head * self.head_count if self.amenity else 0
+    
 class Activity(models.Model):
     activity = models.CharField(max_length=100)
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2)
@@ -106,7 +110,11 @@ class ActivitiesAvailed(models.Model):
     
     def __str__(self):
         return f"{self.transaction.id} {self.activity}"
- 
+    
+    @property
+    def total_cost(self):
+        return self.activity.hourly_rate * self.hours_availed if self.activity else 0
+    
 class PaymentMethod(models.Model):
     mode = models.CharField(max_length=100)
     
