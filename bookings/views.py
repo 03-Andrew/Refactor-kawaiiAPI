@@ -4,7 +4,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 
 from .models import Room, Booking
-from .serializers import AvailableRoomSerializer, BookingSerializer
+from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer
 
 from rest_framework.views import APIView
 from rest_framework import generics, status
@@ -140,3 +140,15 @@ def available_rooms_api(request):
 class BookingListCreate(generics.ListCreateAPIView):
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
+
+class RoomListCreateView(generics.ListCreateAPIView):
+    queryset = Room.objects.all()
+    serializer_class = RoomSerializer
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Room.objects.all()
+    serializer_class = RoomSerializer
