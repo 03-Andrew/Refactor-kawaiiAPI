@@ -4,6 +4,8 @@ from .models import Booking, Room, RoomType, RoomStatus
 class BookingSerializer(serializers.ModelSerializer):
     number_of_nights = serializers.SerializerMethodField()
     total_cost = serializers.SerializerMethodField()
+    customer_name = serializers.SerializerMethodField()
+
 
     def get_number_of_nights(self, obj):
         return (obj.check_out - obj.check_in).days
@@ -11,10 +13,14 @@ class BookingSerializer(serializers.ModelSerializer):
     def get_total_cost(self, obj):
         # Implement your logic to calculate total cost based on room_type.price and number_of_nights
         return obj.room_type.price * self.get_number_of_nights(obj) if obj.room_type else 0
-
+    
+    def get_customer_name(self, obj):
+        # Fetch the customer's full name via the related transaction
+        return f"{obj.transaction.customer.first_name} {obj.transaction.customer.last_name}"
+    
     class Meta:
         model = Booking
-        fields = ['transaction', 'room', 'room_type', 'check_in', 'check_out', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
+        fields = ['transaction', 'customer_name','room', 'room_type', 'check_in', 'check_out', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
 
 class RoomStatusSerializer(serializers.ModelSerializer):
     class Meta:
