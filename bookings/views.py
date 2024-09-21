@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
+from rest_framework.pagination import LimitOffsetPagination
 
 
 
@@ -138,12 +139,28 @@ def available_rooms_api(request):
     return Response(response_data)
 
 class BookingListCreate(generics.ListCreateAPIView):
-    queryset = Booking.objects.all()
     serializer_class = BookingSerializer
+    def get_queryset(self):
+        queryset = Booking.objects.all()
+        s = self.request.GET.get('s')
+        sort = self.request.GET.get('sort')
+        
+        if s:
+            queryset = queryset.filter(
+                Q(transaction__customer__first_name__icontains=s) | 
+                Q(transaction__customer__last_name__icontains=s)
+            )
+        
+        if sort == "asc":
+            queryset = queryset.order_by('check_in')
+        elif sort == "desc":
+            queryset = queryset.order_by('-check_in')
+        return queryset
 
 class RoomListCreateView(generics.ListCreateAPIView):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
+    pagination_class = LimitOffsetPagination
 
     def perform_create(self, serializer):
         serializer.save()
