@@ -158,9 +158,27 @@ class BookingListCreate(generics.ListCreateAPIView):
         return queryset
 
 class RoomListCreateView(generics.ListCreateAPIView):
-    queryset = Room.objects.all()
     serializer_class = RoomSerializer
     pagination_class = LimitOffsetPagination
+
+    def get_queryset(self):
+        queryset = Room.objects.all()
+        room_type = self.request.GET.get('type')  # Filter by type name
+        sort_order = self.request.GET.get('sort')  # Sort rooms by ID
+
+        # Filter by room type name if provided
+        if room_type:
+            queryset = queryset.filter(
+                type__name__icontains=room_type
+            )
+
+        # Sort rooms by ID if the sort order is provided
+        if sort_order == "asc":
+            queryset = queryset.order_by('id')
+        elif sort_order == "desc":
+            queryset = queryset.order_by('-id')
+
+        return queryset
 
     def perform_create(self, serializer):
         serializer.save()
