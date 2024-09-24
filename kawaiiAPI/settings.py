@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'django_filters',
+    "django_extensions",
 
     'bookings',
     'transactions',
@@ -152,4 +153,10 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend'
     ],
+}
+
+
+GRAPH_MODELS = {
+    'all_applications': True,
+    'group_models': True
 }

@@ -157,7 +157,7 @@ class BookingListCreate(generics.ListCreateAPIView):
             queryset = queryset.order_by('-check_in')
         return queryset
 
-class RoomListCreateView(generics.ListCreateAPIView):
+class RoomListCreateView(generics.ListAPIView):
     serializer_class = RoomSerializer
     pagination_class = LimitOffsetPagination
 
