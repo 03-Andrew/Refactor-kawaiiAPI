@@ -115,43 +115,35 @@ def get_roombookingqueryset(request):
     return queryset
 
 
-@api_view(['GET'])
-def room_list_status(request):
-    rooms = Room.objects.all()
-    serializer = RoomStatusListSerializer(rooms, many=True)
-    return Response(serializer.data)
+class RoomListStatus(generics.ListAPIView):
+    queryset = Room.objects.all()
+    serializer_class = RoomStatusListSerializer
 
 class RoomDetailStatus(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RoomStatusSerializer
     primary_key = 'pk'
     queryset = Room.objects.all()
 
-@api_view(['GET'])
-def room_booking_list(request):
-    queryset = get_roombookingqueryset(request)
-    pagination = LimitOffsetPagination()
-    paginated_queryset = pagination.paginate_queryset(queryset, request)
-    serializer = RoomBookingListSerializer(paginated_queryset, many=True)
-    return pagination.get_paginated_response(serializer.data)
+class RoomBookingList(generics.ListAPIView):
+    pagination_class = LimitOffsetPagination
+    serializer_class = RoomBookingListSerializer
+    def get_queryset(self):
+        return get_roombookingqueryset(self.request)
+
+class BookingListPending(generics.ListAPIView):
+    pagination_class = LimitOffsetPagination
+    serializer_class = BookingsListSerializer
+
+    def get_queryset(self):
+        return get_bookingqueryset(self.request).filter(status='1')  # Filters booking (pending only)
 
 
+class BookingListApproved(generics.ListAPIView):
+    pagination_class = LimitOffsetPagination
+    serializer_class = BookingsListSerializer
 
-
-@api_view(['GET'])
-def booking_list_pending(request):
-    queryset = get_bookingqueryset(request).filter(status='1')  # Filters booking (pending only)
-    pagination = LimitOffsetPagination()
-    paginated_queryset = pagination.paginate_queryset(queryset, request)
-    serializer = BookingsListSerializer(paginated_queryset, many=True)
-    return pagination.get_paginated_response(serializer.data)
-
-@api_view(['GET'])
-def booking_list_approved(request):
-    queryset = get_bookingqueryset(request).filter(status='2')  # Filters booking (approved only)
-    pagination = LimitOffsetPagination()
-    paginated_queryset = pagination.paginate_queryset(queryset, request)
-    serializer = BookingsListSerializer(paginated_queryset, many=True)
-    return pagination.get_paginated_response(serializer.data)
+    def get_queryset(self):
+        return get_bookingqueryset(self.request).filter(status='2')  # Filters booking (approved only)
 
 class BookingDetailPending(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = BookingsSerializer
@@ -161,11 +153,9 @@ class BookingDetailPending(generics.RetrieveUpdateDestroyAPIView):
     def get_object(self):
         return generics.get_object_or_404(self.queryset, **{self.primary_key: self.kwargs['pk']})
 
-@api_view(['GET'])
-def amenities_list(request):
-    amenities = Amenities.objects.all()
-    serializer = AmenitiesSerializer(amenities, many=True)
-    return Response(serializer.data)
+class AmenitiesList(generics.ListAPIView):
+    queryset = Amenities.objects.all()
+    serializer_class = AmenitiesSerializer
 
 class AmenitiesListAvailed(generics.ListCreateAPIView):
     queryset = AmenitiesAvailed.objects.all()
@@ -180,12 +170,9 @@ class AmenitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     primary_key = 'pk'
     queryset = AmenitiesAvailed.objects.all()
 
-
-@api_view(['GET'])
-def activities_list(request):
-    amenities = Activity.objects.all()
-    serializer = ActivitiesSerializer(amenities, many=True)
-    return Response(serializer.data)
+class ActivitiesList(generics.ListAPIView):
+    queryset = Activity.objects.all()
+    serializer_class = ActivitiesSerializer
 
 class ActivitiesListAvailed(generics.ListCreateAPIView):
     queryset = ActivitiesAvailed.objects.all()
