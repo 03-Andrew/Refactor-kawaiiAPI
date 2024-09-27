@@ -9,8 +9,15 @@ from rest_framework import generics
 from django.db.models import Count, Q, F, Subquery, OuterRef
 from datetime import date
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.pagination import PageNumberPagination
+
 
 # Create your views here.
+
+class BookingPagination(PageNumberPagination):
+    page_size = 10  # You can set a default page size
+    page_size_query_param = 'page_size'  # Allows dynamic page sizing by passing this in query params
+
 
 def get_bookingqueryset(request):
     queryset = Booking.objects.all()
@@ -126,6 +133,9 @@ def room_booking_list(request):
     paginated_queryset = pagination.paginate_queryset(queryset, request)
     serializer = RoomBookingListSerializer(paginated_queryset, many=True)
     return pagination.get_paginated_response(serializer.data)
+
+
+
 
 @api_view(['GET'])
 def booking_list_pending(request):

@@ -121,11 +121,25 @@ class PaymentMethod(models.Model):
     def __str__(self):
         return self.mode
     
+class PaymentFor(models.Model):
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.name
+
+class PaymentStatus(models.Model):
+    status = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.status
+    
 class Payment(models.Model):
     transaction = models.ForeignKey(Transaction, on_delete=models.PROTECT)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateTimeField()
     mop = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT)
-    
+    paymentFor = models.ForeignKey(PaymentFor, on_delete=models.PROTECT, null=True, blank=True)
+    status = models.ForeignKey(PaymentStatus, on_delete=models.PROTECT, null=True, blank=True)
+
     def __str__(self):
         return f"{self.transaction.id} {self.date}"

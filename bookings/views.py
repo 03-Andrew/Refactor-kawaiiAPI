@@ -4,7 +4,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 
 from .models import Room, Booking
-from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer
+from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2
 
 from rest_framework.views import APIView
 from rest_framework import generics, status
@@ -14,7 +14,8 @@ from rest_framework.pagination import LimitOffsetPagination
 
 
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+
 
 def home(request):
     return render(request, 'base/home.html')
@@ -115,7 +116,7 @@ def available_rooms(request):
 
 # API
 @api_view(['GET'])
-def available_rooms_api(request):
+def get_available_rooms1(request):
     """API to retrieve available rooms based on check-in and check-out dates."""
     # Step 1: Get check-in and check-out dates
     checkin, checkout = get_checkin_checkout_dates(request)
@@ -138,6 +139,44 @@ def available_rooms_api(request):
 
     return Response(response_data)
 
+@api_view(['GET'])
+def get_available_rooms2(request):
+    checkin, checkout = get_checkin_checkout_dates(request)
+    room_type_id = 1
+    
+    pass
+
+class AvailableRoomsView(generics.ListAPIView):
+    serializer_class = AvailableRoomSerializer2
+
+    def get_queryset(self):
+        check_in = self.request.query_params.get('check_in')
+        check_out = self.request.query_params.get('check_out')
+        room_type_id = self.request.query_params.get('room_type')  # Filter by room type
+
+        if not check_in or not check_out:
+            return Room.objects.none()  # Return an empty queryset if dates are not provided
+
+        # Convert string dates to date objects
+        try:
+            check_in_date = date.fromisoformat(check_in)
+            check_out_date = date.fromisoformat(check_out)
+        except ValueError:
+            return Room.objects.none()  # Return an empty queryset on date parsing error
+
+        # Condition to find rooms that overlap with the selected dates
+        booked_rooms_condition = Q(booking__check_in__lt=check_out_date) & Q(booking__check_out__gt=check_in_date)
+
+        # Get available rooms that are not booked in the given date range and have status = 1 (available)
+        available_rooms = Room.objects.filter(status=1).exclude(
+            id__in=Booking.objects.filter(booked_rooms_condition).values_list('room_id', flat=True)
+        )
+
+        # If room_type_id is provided, filter rooms by the selected room type
+        if room_type_id:
+            available_rooms = available_rooms.filter(type_id=room_type_id)
+
+        return available_rooms
 class BookingListCreate(generics.ListCreateAPIView):
     serializer_class = BookingSerializer
     def get_queryset(self):
@@ -159,8 +198,7 @@ class BookingListCreate(generics.ListCreateAPIView):
 
 class RoomListCreateView(generics.ListAPIView):
     serializer_class = RoomSerializer
-    pagination_class = LimitOffsetPagination
-
+ 
     def get_queryset(self):
         queryset = Room.objects.all()
         room_type = self.request.GET.get('type')  # Filter by type name

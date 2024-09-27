@@ -77,6 +77,21 @@ class BookingsListSerializer(ModelSerializer):
     room = RoomSerializer()
     room_type = RoomTypeSerializer()
 
+
+    def get_downpayment(self, obj):
+         # Get the first payment record with the same date as the booking's created_at (temporary?)
+        downpayment = Payment.objects.filter(date__date=TruncDate(obj.created_at)).order_by('date').first()
+        if downpayment:
+            return PaymentSerializer(downpayment).data
+        return 0
+
+    def get_total_cost(self, obj):
+        return obj.total_cost
+
+    def get_number_of_nights(self, obj):
+        return obj.number_of_nights
+    
+
     class Meta:
         model = Booking
         fields = [
@@ -95,19 +110,6 @@ class BookingsListSerializer(ModelSerializer):
             'created_at'
         ]
 
-    def get_downpayment(self, obj):
-         # Get the first payment record with the same date as the booking's created_at (temporary?)
-        downpayment = Payment.objects.filter(date__date=TruncDate(obj.created_at)).order_by('date').first()
-        if downpayment:
-            return PaymentSerializer(downpayment).data
-        return None
-
-    def get_total_cost(self, obj):
-        return obj.total_cost
-
-    def get_number_of_nights(self, obj):
-        return obj.number_of_nights
-    
 class RoomBookingListSerializer(ModelSerializer):
     today_booking = SerializerMethodField()
 
