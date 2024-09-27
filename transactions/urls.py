@@ -8,7 +8,9 @@ urlpatterns = [
     path("api/customer/", views.CustomerListCreate.as_view(), name="customers"),
     path("api/payment/", views.PaymentListCreate.as_view(), name="payment"),
     path("api/approve-billing-list/", views.ListBillingBooking.as_view()),
-    path("api/billing-guests/", views.GuestList.as_view(), name="guest_list"),
-    path("api/billing-guests-status/edit/", views.EditGuestListStatus.as_view(), name="edit_guest_list")
+    path("api/guests/", views.GuestListView.as_view(), name="guest_list"),
+    path("api/guests/add/", views.AddGuest.as_view(), name="add_guest_list"),
+    path("api/guests/<int:pk>/", views.GuestListPerBilling.as_view(), name="guest_list_per_billing"),
+    path("api/guests-status/edit/<int:pk>/", views.EditGuestListStatus.as_view(), name="edit_guest_list")
 
 ]

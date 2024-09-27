@@ -88,7 +88,7 @@ class AmenitiesAvailed(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
     amenity = models.ForeignKey(Amenities, on_delete=models.PROTECT)
     head_count = models.SmallIntegerField()
-
+    time = models.TimeField(null=True, blank=True)
     def __str__(self):
         return f"Amenities for bill {self.customer_bill.id}"
     

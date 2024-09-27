@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 
 from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList
-from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, ApproveBookings, BillingGuestList, GuestListSerializer
+from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, ApproveBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll
 
 from bookings.serializers import BookingSerializer
 
@@ -55,20 +55,21 @@ class ListBillingBooking(generics.ListAPIView):
 
         return queryset
     
-class GuestList(generics.ListCreateAPIView):
+class GuestListView(generics.ListCreateAPIView):
     queryset = Billing.objects.all()
     serializer_class = BillingGuestList
 
+class GuestListPerBilling(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Billing.objects.all()
+    serializer_class = BillingGuestList
+    lookup_field = 'pk'
+
+class AddGuest(generics.ListCreateAPIView):
+    queryset = GuestList.objects.all()
+    serializer_class = GuestListSerializerAll
+    
+    
 class EditGuestListStatus(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = GuestListSerializer  # Use the correct serializer for GuestList
-
-    def get_queryset(self):
-        Billing_pk = self.request.GET.get("pk")
-        guest_pk = self.request.GET.get("pk2")
-
-        # Fetching the GuestList item related to the specified Billing and guest
-        queryset = GuestList.objects.filter(
-            Q(Billing_id=Billing_pk) & Q(id=guest_pk)
-        )
-
-        return queryset
+    serializer_class = GuestListSerializer
+    queryset = GuestList.objects.all()
+    lookup_field = 'pk'

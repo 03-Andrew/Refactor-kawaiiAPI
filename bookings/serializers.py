@@ -82,6 +82,10 @@ class AvailableRoomSerializer2(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = ['id', 'number', 'type', 'status']
+        
+        
 
+
+     
 
 
