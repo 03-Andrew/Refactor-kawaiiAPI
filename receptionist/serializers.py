@@ -1,6 +1,6 @@
 from rest_framework.serializers import ModelSerializer,IntegerField, CharField, DateField, StringRelatedField, SerializerMethodField
 from bookings.models import Booking, BookingStatus, Room
-from transactions.models import Transaction, Payment, Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Customer
+from transactions.models import Billing, Payment, Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Customer
 from datetime import date
 from django.db.models.functions import TruncDate
 
@@ -39,7 +39,7 @@ class CustomerSerializer(ModelSerializer):
 class TransactionSerializer(ModelSerializer):
     customer = CustomerSerializer()
     class Meta:
-        model = Transaction
+        model = Billing
         fields = '__all__'
 
 class BookingsSerializer(ModelSerializer):
