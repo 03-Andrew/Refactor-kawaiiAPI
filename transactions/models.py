@@ -13,12 +13,12 @@ class Customer(models.Model):
     def __str__(self):
         return f"{self.last_name}, {self.first_name}"
 
-class Transaction(models.Model):
+class Billing(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Transaction {self.id} for {self.customer}"
+        return f"Bill {self.id} for {self.customer}"
 
     def total_booking_cost(self):
         # Calculate total cost for all related bookings
@@ -61,21 +61,21 @@ class GuestStatus(models.Model):
         return self.status
 
 class GuestList(models.Model):
-    transaction = models.ForeignKey(Transaction, on_delete=models.PROTECT)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
     guest = models.CharField(max_length=100)
     status = models.ForeignKey(GuestStatus, on_delete=models.PROTECT)
     
     def __str__(self):
-        return f"{self.transaction.id} {self.guest}"
+        return f"{self.customer_bill.id} {self.guest}"
     
 class FoodBill(models.Model):
-    transaction = models.ForeignKey(Transaction, on_delete=models.SET_NULL, null=True)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.SET_NULL, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     or_number = models.CharField(max_length=150, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.transaction.id} - {self.or_number}"
+        return f"{self.customer_bill.id} - {self.or_number}"
     
 class Amenities(models.Model):
     amenity = models.CharField(max_length=100)
@@ -85,12 +85,12 @@ class Amenities(models.Model):
         return f"{self.amenity}"
 
 class AmenitiesAvailed(models.Model):
-    transaction = models.ForeignKey(Transaction, on_delete=models.PROTECT)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
     amenity = models.ForeignKey(Amenities, on_delete=models.PROTECT)
     head_count = models.SmallIntegerField()
 
     def __str__(self):
-        return f"Amenities for Transaction {self.transaction.id}"
+        return f"Amenities for bill {self.customer_bill.id}"
     
     @property
     def total_cost(self):
@@ -104,12 +104,12 @@ class Activity(models.Model):
         return self.activity
 
 class ActivitiesAvailed(models.Model):
-    transaction = models.ForeignKey(Transaction, on_delete=models.PROTECT)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
     activity = models.ForeignKey(Activity, on_delete=models.PROTECT)
     hours_availed = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     
     def __str__(self):
-        return f"{self.transaction.id} {self.activity}"
+        return f"{self.customer_bill.id} {self.activity}"
     
     @property
     def total_cost(self):
@@ -134,7 +134,7 @@ class PaymentStatus(models.Model):
         return self.status
     
 class Payment(models.Model):
-    transaction = models.ForeignKey(Transaction, on_delete=models.PROTECT)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateTimeField()
     mop = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT)
@@ -142,4 +142,4 @@ class Payment(models.Model):
     status = models.ForeignKey(PaymentStatus, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.transaction.id} {self.date}"
+        return f"{self.customer_bill.id} {self.date}"
