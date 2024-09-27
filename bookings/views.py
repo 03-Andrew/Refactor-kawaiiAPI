@@ -186,8 +186,8 @@ class BookingListCreate(generics.ListCreateAPIView):
         
         if s:
             queryset = queryset.filter(
-                Q(transaction__customer__first_name__icontains=s) | 
-                Q(transaction__customer__last_name__icontains=s)
+                Q(billing__customer__first_name__icontains=s) | 
+                Q(billing__customer__last_name__icontains=s)
             )
         
         if sort == "asc":

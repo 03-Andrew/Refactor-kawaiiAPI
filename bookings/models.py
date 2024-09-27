@@ -1,5 +1,5 @@
 from django.db import models
-from transactions.models import Transaction
+from transactions.models import Billing
 
 class Inclusions(models.Model):
     inclusion = models.CharField(max_length=100)
@@ -43,7 +43,7 @@ class BookingStatus(models.Model):
         return self.name
 
 class Booking(models.Model):
-    transaction = models.ForeignKey(Transaction, on_delete=models.PROTECT)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
     room = models.ForeignKey(Room, on_delete=models.PROTECT, null=True, blank=True)
     room_type = models.ForeignKey(RoomType, on_delete=models.PROTECT)
     check_in = models.DateField()
