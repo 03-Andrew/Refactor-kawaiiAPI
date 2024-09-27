@@ -1,6 +1,16 @@
 asgiref==3.8.1
-Django==5.1.1
+certifi==2024.7.4
+distlib==0.3.8
+Django==5.0.7
 django-cors-headers==4.4.0
+django-extensions==3.2.3
+django-filter==24.3
 djangorestframework==3.15.2
+filelock==3.15.4
+numpy==2.1.1
+pipenv==2024.0.1
+platformdirs==4.2.2
+setuptools==71.1.0
 sqlparse==0.5.1
 tzdata==2024.1
+virtualenv==20.26.3

@@ -58,6 +58,12 @@ class GuestListSerializer(serializers.ModelSerializer):
     class Meta:
         model = GuestList
         fields = ['id', 'guest', 'status']
+        
+class GuestListSerializerAll(serializers.ModelSerializer):
+    status = GuestStatusSerializer
+    class Meta:
+        model = GuestList
+        fields = "__all__"
 
 class BillingGuestList(serializers.ModelSerializer):
     guests_list = serializers.SerializerMethodField()
@@ -85,12 +91,18 @@ class ApproveBookings(serializers.ModelSerializer):
         model = Billing
         fields = ['id', 'customer_name', 'bookings', 'total_booking_bill', 'availed_boat_transfer', 'booking_payment']
 
+
     def get_customer_name(self, obj):
         return f"{obj.customer.first_name} {obj.customer.last_name}"
     
     def get_availed_boat_transfer(self, obj):
-        # Check if any of the amenities availed for this Billing is 'Boat Transfer'
-        return AmenitiesAvailed.objects.filter(Billing=obj, amenity__amenity='boat transfer').exists()
+    # Get the AmenitiesAvailed object with 'boat transfer' amenity
+        boat_transfer = AmenitiesAvailed.objects.filter(
+            customer_bill=obj, amenity__amenity='boat transfer'
+        ).first()
+        
+        # If the boat transfer exists, return the time; otherwise return None
+        return boat_transfer.time if boat_transfer else "Not Availed"
 
     def get_booking_payment(self, obj):
         # Get the 'Down Payment' PaymentFor instance

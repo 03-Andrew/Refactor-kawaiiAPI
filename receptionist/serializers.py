@@ -36,7 +36,7 @@ class CustomerSerializer(ModelSerializer):
         model = Customer
         fields = '__all__'
 
-class TransactionSerializer(ModelSerializer):
+class BillingSerializer(ModelSerializer):
     customer = CustomerSerializer()
     class Meta:
         model = Billing
@@ -68,7 +68,7 @@ class AmenitiesAvailedSerializer(ModelSerializer):
         fields = '__all__'
 
 class BookingsListSerializer(ModelSerializer):
-    transaction=TransactionSerializer()
+    customer_bill=BillingSerializer()
     room_info = StringRelatedField(source='__str__', read_only=True)
     number_of_nights = SerializerMethodField()
     total_cost = SerializerMethodField()
@@ -106,7 +106,7 @@ class BookingsListSerializer(ModelSerializer):
             'room_type',
             'downpayment',
             'status',
-            'transaction',
+            'customer_bill',
             'created_at'
         ]
 
@@ -125,7 +125,7 @@ class RoomBookingListSerializer(ModelSerializer):
         return None
     
 class AmenitiesAvailedListSerializer(ModelSerializer):
-    transaction = TransactionSerializer()
+    customer_bill = BillingSerializer()
     amenity= AmenitiesSerializer()
     total_cost = SerializerMethodField()
 
@@ -136,14 +136,14 @@ class AmenitiesAvailedListSerializer(ModelSerializer):
             'total_cost',
             'head_count',
             'amenity',
-            'transaction',
+            'customer_bill',
         ]
     
     def get_total_cost(self, obj):
         return obj.total_cost
     
 class ActivitiesAvailedListSerializer(ModelSerializer):
-    transaction = TransactionSerializer()
+    customer_bill = BillingSerializer()
     activity = ActivitiesSerializer()
     total_cost = SerializerMethodField()
     
@@ -154,7 +154,7 @@ class ActivitiesAvailedListSerializer(ModelSerializer):
             'total_cost',
             'hours_availed',
             'activity',
-            'transaction',
+            'customer_bill',
         ]
     
     def get_total_cost(self, obj):
