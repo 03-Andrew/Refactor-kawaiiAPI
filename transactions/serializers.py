@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Transaction, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor
+from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor
 
 from django.db.models import Sum, F
 
@@ -11,19 +11,19 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = ['first_name', 'last_name']
 
-class TransactionSerialzerBase(serializers.ModelSerializer):
+class BillingSerialzerBase(serializers.ModelSerializer):
     class Meta:
-        model = Transaction
+        model = Billing
         fields = "__all__"
 
-class TransactionSerializer(serializers.ModelSerializer):
+class BillingSerializer(serializers.ModelSerializer):
     total_cost = serializers.SerializerMethodField()
     paid_amount = serializers.SerializerMethodField()
     running_balance = serializers.SerializerMethodField()
     customer = CustomerSerializer()
     
     class Meta:
-        model = Transaction
+        model = Billing
         fields = "__all__"
 
     def get_total_cost(self, obj):
@@ -59,16 +59,16 @@ class GuestListSerializer(serializers.ModelSerializer):
         model = GuestList
         fields = ['id', 'guest', 'status']
 
-class TransactionGuestList(serializers.ModelSerializer):
+class BillingGuestList(serializers.ModelSerializer):
     guests_list = serializers.SerializerMethodField()
 
     class Meta:
-        model = Transaction
+        model = Billing
         fields = ['id', 'customer', 'guests_list']
 
     def get_guests_list(self, obj):
-        # Fetch and serialize the guest list associated with this transaction
-        guest_list = GuestList.objects.filter(transaction=obj)
+        # Fetch and serialize the guest list associated with this Billing
+        guest_list = GuestList.objects.filter(Billing=obj)
         return GuestListSerializer(guest_list, many=True).data
 
 
@@ -82,22 +82,22 @@ class ApproveBookings(serializers.ModelSerializer):
 
 
     class Meta:
-        model = Transaction
+        model = Billing
         fields = ['id', 'customer_name', 'bookings', 'total_booking_bill', 'availed_boat_transfer', 'booking_payment']
 
     def get_customer_name(self, obj):
         return f"{obj.customer.first_name} {obj.customer.last_name}"
     
     def get_availed_boat_transfer(self, obj):
-        # Check if any of the amenities availed for this transaction is 'Boat Transfer'
-        return AmenitiesAvailed.objects.filter(transaction=obj, amenity__amenity='boat transfer').exists()
+        # Check if any of the amenities availed for this Billing is 'Boat Transfer'
+        return AmenitiesAvailed.objects.filter(Billing=obj, amenity__amenity='boat transfer').exists()
 
     def get_booking_payment(self, obj):
         # Get the 'Down Payment' PaymentFor instance
         downpayment_payment_for = PaymentFor.objects.filter(name__iexact='Down Payment').first()
 
         if downpayment_payment_for:
-            # Retrieve the first Payment linked to this transaction that is for down payment
+            # Retrieve the first Payment linked to this Billing that is for down payment
             payment = obj.payment_set.filter(paymentFor=downpayment_payment_for).first()  
             
             if payment:
