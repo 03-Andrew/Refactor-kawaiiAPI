@@ -66,6 +66,7 @@ class RoomSerializer(serializers.ModelSerializer):
         model = Room
         fields = ['id', 'number', 'type', 'status']
 
+
 class AvailableRoomSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     price = serializers.DecimalField(max_digits=10, decimal_places=2)

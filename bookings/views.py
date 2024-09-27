@@ -139,13 +139,6 @@ def get_available_rooms1(request):
 
     return Response(response_data)
 
-@api_view(['GET'])
-def get_available_rooms2(request):
-    checkin, checkout = get_checkin_checkout_dates(request)
-    room_type_id = 1
-    
-    pass
-
 class AvailableRoomsView(generics.ListAPIView):
     serializer_class = AvailableRoomSerializer2
 
@@ -177,6 +170,52 @@ class AvailableRoomsView(generics.ListAPIView):
             available_rooms = available_rooms.filter(type_id=room_type_id)
 
         return available_rooms
+    
+
+
+class AvailableRooms(generics.ListAPIView):
+    serializer_class = AvailableRoomSerializer2
+    
+    def get_queryset(self):
+        check_in = self.request.GET.get('check_in')
+        check_out = self.request.GET.get('check_out')
+        r_type = self.request.GET.get('type')
+        
+
+        # Set default dates if not provided
+        if not check_in or not check_out:
+            today = datetime.today().date()
+            check_in_date = today
+            check_out_date = today + timedelta(days=1)
+        else:
+            try:
+                check_in_date = datetime.strptime(check_in, "%Y-%m-%d").date()
+                check_out_date = datetime.strptime(check_out, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValueError("Invalid date format. Use YYYY-MM-DD.")
+
+        # Ensure that check-in is before check-out
+        if check_in_date >= check_out_date:
+            raise ValueError("Check-in date must be before check-out date.")
+
+        # Return available rooms
+        queryset = Room.objects.exclude(
+            Q(booking__check_in__lt=check_out_date) & Q(booking__check_out__gt=check_in_date)
+        ).distinct().filter(status__id=1).filter(type__id__exact=r_type)
+        
+
+        return queryset
+
+    def get(self, request):
+        try:
+            available_rooms = self.get_queryset()
+            # Serialize the available rooms
+            serializer = self.get_serializer(available_rooms, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class BookingListCreate(generics.ListCreateAPIView):
     serializer_class = BookingSerializer
     def get_queryset(self):
