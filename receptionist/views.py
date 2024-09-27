@@ -27,8 +27,8 @@ def get_bookingqueryset(request):
     # Filter by customer name
     if customer_name:
         queryset = queryset.filter(
-            Q(transaction__customer__first_name__icontains=customer_name) | 
-            Q(transaction__customer__last_name__icontains=customer_name)
+            Q(billing__customer__first_name__icontains=customer_name) | 
+            Q(billing__customer__last_name__icontains=customer_name)
         )
 
     # Sort bookings
@@ -46,9 +46,9 @@ def get_bookingqueryset(request):
 
     # Sorts by customer name
     elif sort_param == "name-asc":
-        queryset = queryset.order_by('transaction__customer__first_name', 'transaction__customer__last_name')
+        queryset = queryset.order_by('billing__customer__first_name', 'billing__customer__last_name')
     elif sort_param == "name-desc":
-        queryset = queryset.order_by('-transaction__customer__first_name', '-transaction__customer__last_name')
+        queryset = queryset.order_by('-billing__customer__first_name', '-billing__customer__last_name')
 
     # Sorts by id
     if sort_param == "id-asc":
@@ -58,9 +58,9 @@ def get_bookingqueryset(request):
 
     # Sort by downpayment (STILL BROKEN IDK HOOOW)
     if sort_param == "dp-asc":
-        queryset = queryset.annotate(downpayment=F('transaction__payment__payment_amount')).order_by('downpayment')
+        queryset = queryset.annotate(downpayment=F('billing__payment__payment_amount')).order_by('downpayment')
     elif sort_param == "dp-desc":
-        queryset = queryset.annotate(downpayment=F('transaction__payment__payment_amount')).order_by('-downpayment')
+        queryset = queryset.annotate(downpayment=F('billing__payment__payment_amount')).order_by('-downpayment')
 
     return queryset
 
@@ -72,20 +72,20 @@ def get_roombookingqueryset(request):
     # Filter by customer name
     if customer_name:
         queryset = queryset.filter(
-            Q(booking__transaction__customer__first_name__icontains=customer_name) | 
-            Q(booking__transaction__customer__last_name__icontains=customer_name)
+            Q(booking__billing__customer__first_name__icontains=customer_name) | 
+            Q(booking__billing__customer__last_name__icontains=customer_name)
         )
 
     # Sort by customer name 
     if sort_param == "name-asc":
         queryset = queryset.annotate(
-            first_name=F('booking__transaction__customer__first_name'),
-            last_name=F('booking__transaction__customer__last_name')
+            first_name=F('booking__billing__customer__first_name'),
+            last_name=F('booking__billing__customer__last_name')
         ).order_by('first_name', 'last_name')
     elif sort_param == "name-desc":
         queryset = queryset.annotate(
-            first_name=F('booking__transaction__customer__first_name'),
-            last_name=F('booking__transaction__customer__last_name')
+            first_name=F('booking__billing__customer__first_name'),
+            last_name=F('booking__billing__customer__last_name')
         ).order_by('-first_name', '-last_name')
 
     # Sort by room type
