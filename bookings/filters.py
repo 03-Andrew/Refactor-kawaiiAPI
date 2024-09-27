@@ -1,4 +1,2 @@
-import django_filters
-from .models import Room
 
-class RoomFilter
+from .models import Room
