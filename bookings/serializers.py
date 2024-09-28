@@ -16,11 +16,11 @@ class BookingSerializer(serializers.ModelSerializer):
     
     def get_customer_name(self, obj):
         # Fetch the customer's full name via the related transaction
-        return f"{obj.transaction.customer.first_name} {obj.transaction.customer.last_name}"
+        return f"{obj.customer_bill.customer.first_name} {obj.customer_bill.customer.last_name}"
     
     class Meta:
         model = Booking
-        fields = ['transaction', 'customer_name','room', 'room_type', 'check_in', 'check_out', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
+        fields = ['customer_bill', 'customer_name','room', 'room_type', 'check_in', 'check_out', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
 
 class RoomStatusSerializer(serializers.ModelSerializer):
     class Meta:
