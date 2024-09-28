@@ -73,3 +73,6 @@ class EditGuestListStatus(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = GuestListSerializer
     queryset = GuestList.objects.all()
     lookup_field = 'pk'
+    
+class T(generics.RetrieveAPIView):
+    pass
