@@ -30,10 +30,8 @@ class RoomStatusSerializer(serializers.ModelSerializer):
 class BookingSerializer2(serializers.ModelSerializer):
     number_of_nights = serializers.SerializerMethodField()
     total_cost = serializers.SerializerMethodField()
-    status_name = serializers.SerializerMethodField()
     
-    def get_status_name(self, obj):
-        return obj.status.name if obj.status else None  # Get only the status name
+
 
     def get_number_of_nights(self, obj):
         return (obj.check_out - obj.check_in).days
@@ -45,7 +43,7 @@ class BookingSerializer2(serializers.ModelSerializer):
     
     class Meta:
         model = Booking
-        fields = ['room', 'room_type', 'check_in', 'check_out', 'number_of_guests', 'status_name', 'created_at', 'number_of_nights', 'total_cost']
+        fields = ['room', 'room_type', 'check_in', 'check_out', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
 
 
 

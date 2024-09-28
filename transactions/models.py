@@ -22,21 +22,45 @@ class Billing(models.Model):
 
     def total_booking_cost(self):
         # Calculate total cost for all related bookings
-        return sum(booking.total_cost for booking in self.booking_set.all())
+        return sum(booking.total_cost for booking in self.bookings.all())
+
+    # def total_food_bill(self):
+    #     return sum(foodbill.price for foodbill in self.foodbill_set.all())
+    
+    # def total_amenities(self):
+    #     return self.amenitiesavailed_set.aggregate(
+    #         total=Sum(F('head_count') * F('amenity__rate_per_head'))
+    #     )['total'] or 0
+
+    # def total_activities(self):
+    #     return self.activitiesavailed_set.aggregate(
+    #         total=Sum(F('hours_availed') * F('activity__hourly_rate'))
+    #     )['total'] or 0
 
     def total_food_bill(self):
-        return sum(foodbill.price for foodbill in self.foodbill_set.all())
-    
+        # Calculate total food bill on the database side
+        return self.foodbill_set.aggregate(total=Sum('price'))['total'] or 0
+
     def total_amenities(self):
+        # Calculate total amenities cost using F expressions and aggregation
         return self.amenitiesavailed_set.aggregate(
             total=Sum(F('head_count') * F('amenity__rate_per_head'))
         )['total'] or 0
 
     def total_activities(self):
+        # Calculate total activities cost using F expressions and aggregation
         return self.activitiesavailed_set.aggregate(
             total=Sum(F('hours_availed') * F('activity__hourly_rate'))
         )['total'] or 0
 
+    @property
+    def total_cost(self):
+        # Aggregate the total cost by combining different totals
+        return (self.total_booking_cost() + 
+                self.total_food_bill() + 
+                self.total_amenities() + 
+                self.total_activities())
+    
     @property
     def total_cost(self):
         return self.total_booking_cost() + self.total_food_bill()  + self.total_amenities() + self.total_activities()
@@ -51,7 +75,6 @@ class Billing(models.Model):
 
     @property
     def guests(self):
-        # Get all guests from the GuestList associated with this transaction
         return [guest.guest for guest in self.guestlist_set.all()]
     
 class GuestStatus(models.Model):

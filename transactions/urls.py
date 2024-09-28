@@ -7,7 +7,7 @@ urlpatterns = [
     path("api/billings/edit/<int:pk>/", views.BillingUpdate.as_view(), name="edit-billing"),
     path("api/customer/", views.CustomerListCreate.as_view(), name="customers"),
     path("api/payment/", views.PaymentListCreate.as_view(), name="payment"),
-    path("api/approve-billing-list/", views.ListBillingBooking.as_view()),
+    path("api/pending-billing-list/", views.ListBillingBooking.as_view()),
     path("api/guests/", views.GuestListView.as_view(), name="guest_list"),
     path("api/guests/add/", views.AddGuest.as_view(), name="add_guest_list"),
     path("api/guests/<int:pk>/", views.GuestListPerBilling.as_view(), name="guest_list_per_billing"),
