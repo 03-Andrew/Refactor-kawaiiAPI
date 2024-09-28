@@ -74,12 +74,12 @@ class BillingGuestList(serializers.ModelSerializer):
 
     def get_guests_list(self, obj):
         # Fetch and serialize the guest list associated with this Billing
-        guest_list = GuestList.objects.filter(Billing=obj)
+        guest_list = GuestList.objects.filter(customer_bill=obj)
         return GuestListSerializer(guest_list, many=True).data
 
 
 
-class ApproveBookings(serializers.ModelSerializer):
+class PendingBookings(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
     bookings = BookingSerializer2(many=True, read_only=True, source='booking_set')
     availed_boat_transfer = serializers.SerializerMethodField()

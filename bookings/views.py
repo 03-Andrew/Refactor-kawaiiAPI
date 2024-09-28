@@ -181,6 +181,8 @@ class AvailableRooms(generics.ListAPIView):
         check_out = self.request.GET.get('check_out')
         r_type = self.request.GET.get('type')
         
+        if not r_type:
+            r_type = 1
 
         # Set default dates if not provided
         if not check_in or not check_out:

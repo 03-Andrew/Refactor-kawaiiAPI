@@ -1,5 +1,7 @@
 from django.db import models
 from transactions.models import Billing
+from django.core.exceptions import ValidationError
+
 
 class Inclusions(models.Model):
     inclusion = models.CharField(max_length=100)
@@ -27,7 +29,7 @@ class RoomType(models.Model):
         return self.name
 
 class Room(models.Model):
-    number = models.CharField(max_length=100)
+    number = models.CharField(max_length=100, unique=True)
     type = models.ForeignKey(RoomType, on_delete=models.PROTECT)
     status = models.ForeignKey(RoomStatus, on_delete=models.PROTECT)
     
@@ -43,15 +45,20 @@ class BookingStatus(models.Model):
         return self.name
 
 class Booking(models.Model):
-    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
-    room = models.ForeignKey(Room, on_delete=models.PROTECT, null=True, blank=True)
-    room_type = models.ForeignKey(RoomType, on_delete=models.PROTECT)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT,  related_name='bookings')
+    room = models.ForeignKey(Room, on_delete=models.PROTECT, null=True, blank=True, related_name='bookings')
+    room_type = models.ForeignKey(RoomType, on_delete=models.PROTECT, related_name='bookings')
     check_in = models.DateField()
     check_out = models.DateField()
     number_of_guests = models.PositiveSmallIntegerField()
     status = models.ForeignKey(BookingStatus, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['check_in'] 
+        unique_together = ('room', 'check_in', 'check_out')     
+        
+        
     def __str__(self):
         room_info = self.room.number if self.room else "No room assigned"
         return f"{room_info}: {self.check_in} - {self.check_out}"
@@ -62,9 +69,13 @@ class Booking(models.Model):
 
     @property
     def total_cost(self):
-        # Implement the logic to calculate the total cost for this specific booking
-        # Example: return self.room_type.price * self.number_of_nights
         return self.room_type.price * self.number_of_nights if self.room_type else 0
+    
+    def clean(self):
+        if self.check_in >= self.check_out:
+            raise ValidationError("Check-in date must be before check-out date.")
+        if self.number_of_guests > self.room_type.max_adult + (self.room_type.max_children or 0):
+            raise ValidationError("Number of guests exceeds the allowed limit for this room type.")
 
     
     
