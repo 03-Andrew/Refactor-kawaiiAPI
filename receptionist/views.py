@@ -114,6 +114,36 @@ def get_roombookingqueryset(request):
 
     return queryset
 
+def get_amenitiesavailedqueryset(request):
+    queryset = AmenitiesAvailed.objects.all()
+    customer_name = request.GET.get('customer')
+
+    if customer_name is not None:
+        # Filter by customer name
+        queryset = queryset.filter(
+            Q(customer_bill__customer__first_name__icontains=customer_name) | 
+            Q(customer_bill__customer__last_name__icontains=customer_name)
+        )
+    else:
+        queryset = AmenitiesAvailed.objects.all()
+
+    return queryset
+
+def get_activitiesavailedqueryset(request):
+    queryset = ActivitiesAvailed.objects.all()
+    customer_name = request.GET.get('customer')
+
+    # Filter by customer name
+    if customer_name is not None:
+        queryset = queryset.filter(
+            Q(customer_bill__customer__first_name__icontains=customer_name) | 
+            Q(customer_bill__customer__last_name__icontains=customer_name)
+        )
+
+    else:
+        queryset = ActivitiesAvailed.objects.all()
+
+    return queryset
 
 class RoomListStatus(generics.ListAPIView):
     queryset = Room.objects.all()
@@ -165,6 +195,9 @@ class AmenitiesListAvailed(generics.ListCreateAPIView):
             return AmenitiesAvailedSerializer
         return AmenitiesAvailedListSerializer
 
+    def get_queryset(self):
+        return get_amenitiesavailedqueryset(self.request)
+
 class AmenitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AmenitiesAvailedSerializer
     primary_key = 'pk'
@@ -181,6 +214,9 @@ class ActivitiesListAvailed(generics.ListCreateAPIView):
         if self.request.method == 'POST':
             return ActivitiesAvailedSerializer
         return ActivitiesAvailedListSerializer
+
+    def get_queryset(self):
+        return get_activitiesavailedqueryset(self.request)
 
 class ActivitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ActivitiesAvailedSerializer
