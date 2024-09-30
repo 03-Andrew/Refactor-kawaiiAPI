@@ -51,7 +51,7 @@ class PaymentListCreate(generics.ListCreateAPIView):
 class ListBillingBooking(generics.ListAPIView):
     serializer_class = PendingBookings
     def get_queryset(self):
-        queryset = Billing.objects.filter(booking__isnull=False).distinct()
+        queryset = Billing.objects.filter(bookings__isnull=False).distinct()
 
         return queryset
     
