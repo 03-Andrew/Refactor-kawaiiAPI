@@ -187,7 +187,7 @@ class BookingDetailPending(generics.RetrieveUpdateDestroyAPIView):
     def get_object(self):
         return generics.get_object_or_404(self.queryset, **{self.primary_key: self.kwargs['pk']})
 
-class AmenitiesList(generics.ListAPIView):
+class AmenitiesList(generics.ListCreateAPIView):
     queryset = Amenities.objects.all()
     serializer_class = AmenitiesSerializer
 

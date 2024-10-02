@@ -13,10 +13,17 @@ class Customer(models.Model):
     def __str__(self):
         return f"{self.last_name}, {self.first_name}"
 
+class BillingStatus(models.Model):
+    status = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.status
+
 class Billing(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    status = models.ForeignKey(BillingStatus, on_delete=models.PROTECT, null=True, blank=True)
+    
     def __str__(self):
         return f"Bill {self.id} for {self.customer}"
 

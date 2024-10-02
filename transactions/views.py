@@ -73,6 +73,13 @@ class EditGuestListStatus(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = GuestListSerializer
     queryset = GuestList.objects.all()
     lookup_field = 'pk'
+
+class ActiveBookings(generics.ListCreateAPIView):
+    serializer_class = BillingSerializer
     
+    def get_queryset(self):
+        return Billing.objects.filter(status=1)
+    
+
 class T(generics.RetrieveAPIView):
     pass
