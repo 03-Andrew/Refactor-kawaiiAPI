@@ -11,6 +11,10 @@ from datetime import date
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.pagination import PageNumberPagination
 
+from django.db import transaction
+
+from rest_framework import status
+
 
 # Create your views here.
 
@@ -114,6 +118,36 @@ def get_roombookingqueryset(request):
 
     return queryset
 
+def get_amenitiesavailedqueryset(request):
+    queryset = AmenitiesAvailed.objects.all()
+    customer_name = request.GET.get('customer')
+
+    if customer_name is not None:
+        # Filter by customer name
+        queryset = queryset.filter(
+            Q(customer_bill__customer__first_name__icontains=customer_name) | 
+            Q(customer_bill__customer__last_name__icontains=customer_name)
+        )
+    else:
+        queryset = AmenitiesAvailed.objects.all()
+
+    return queryset
+
+def get_activitiesavailedqueryset(request):
+    queryset = ActivitiesAvailed.objects.all()
+    customer_name = request.GET.get('customer')
+
+    # Filter by customer name
+    if customer_name is not None:
+        queryset = queryset.filter(
+            Q(customer_bill__customer__first_name__icontains=customer_name) | 
+            Q(customer_bill__customer__last_name__icontains=customer_name)
+        )
+
+    else:
+        queryset = ActivitiesAvailed.objects.all()
+
+    return queryset
 
 class RoomListStatus(generics.ListAPIView):
     queryset = Room.objects.all()
@@ -164,6 +198,30 @@ class AmenitiesListAvailed(generics.ListCreateAPIView):
         if self.request.method == 'POST':
             return AmenitiesAvailedSerializer
         return AmenitiesAvailedListSerializer
+    
+    def create(self, request, *args, **kwargs):
+        # Check if the request is coming from the built-in API form
+        if isinstance(request.data, dict):  # Single amenity
+            amenities_data = [request.data]
+        elif isinstance(request.data, list):  # Multiple amenities
+            amenities_data = request.data
+        else:
+            return Response({'error': 'Expected a list of amenities.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        created_amenities = []
+        
+        # Wrap in a transaction to ensure all-or-nothing behavior
+        with transaction.atomic():
+            for amenity_data in amenities_data:
+                serializer = self.get_serializer(data=amenity_data)
+                serializer.is_valid(raise_exception=True)
+                self.perform_create(serializer)
+                created_amenities.append(serializer.data)
+
+        return Response(created_amenities, status=status.HTTP_201_CREATED)
+
+    def get_queryset(self):
+        return get_amenitiesavailedqueryset(self.request)
 
 class AmenitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AmenitiesAvailedSerializer
@@ -181,6 +239,9 @@ class ActivitiesListAvailed(generics.ListCreateAPIView):
         if self.request.method == 'POST':
             return ActivitiesAvailedSerializer
         return ActivitiesAvailedListSerializer
+
+    def get_queryset(self):
+        return get_activitiesavailedqueryset(self.request)
 
 class ActivitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ActivitiesAvailedSerializer
