@@ -9,7 +9,7 @@ from bookings.serializers import BookingSerializer2
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
-        fields = ['first_name', 'last_name']
+        fields = ['id','first_name', 'last_name']
 
 class BillingSerialzerBase(serializers.ModelSerializer):
     class Meta:
@@ -37,7 +37,7 @@ class BillingSerializer(serializers.ModelSerializer):
 
 
 
-class CustomerSerializer(serializers.ModelSerializer):
+class CustomerSerializer2(serializers.ModelSerializer):
     class Meta:
         model = Customer
         fields = "__all__"
@@ -80,8 +80,8 @@ class BillingGuestList(serializers.ModelSerializer):
 
 
 class PendingBookings(serializers.ModelSerializer):
-    customer_name = serializers.SerializerMethodField()
-    bookings = BookingSerializer2(many=True, read_only=True, source='booking_set')
+    customer = CustomerSerializer()
+    booking = BookingSerializer2(many=True, read_only=True, source='bookings')
     availed_boat_transfer = serializers.SerializerMethodField()
     booking_payment = serializers.SerializerMethodField()
     total_booking_bill = serializers.SerializerMethodField()
@@ -89,11 +89,8 @@ class PendingBookings(serializers.ModelSerializer):
 
     class Meta:
         model = Billing
-        fields = ['id', 'customer_name', 'bookings', 'total_booking_bill', 'availed_boat_transfer', 'booking_payment']
+        fields = ['id', 'customer', 'booking', 'total_booking_bill', 'availed_boat_transfer', 'booking_payment']
 
-
-    def get_customer_name(self, obj):
-        return f"{obj.customer.first_name} {obj.customer.last_name}"
     
     def get_availed_boat_transfer(self, obj):
     # Get the AmenitiesAvailed object with 'boat transfer' amenity
