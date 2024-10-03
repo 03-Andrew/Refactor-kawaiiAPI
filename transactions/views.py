@@ -8,7 +8,6 @@ from rest_framework.decorators import api_view
 
 from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList
 from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll
-
 from bookings.serializers import BookingSerializer
 
 # 1. List View - for listing all Billings
@@ -57,7 +56,7 @@ class ListBillingBooking(generics.ListAPIView):
     
 class GuestListView(generics.ListCreateAPIView):
     queryset = Billing.objects.all()
-    serializer_class = BillingGuestList
+    serializer_class = GuestListSerializerAll
 
 class GuestListPerBilling(generics.RetrieveUpdateDestroyAPIView):
     queryset = Billing.objects.all()
