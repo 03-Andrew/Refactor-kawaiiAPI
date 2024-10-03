@@ -51,19 +51,19 @@ class PaymentSerializer(serializers.ModelSerializer):
 class GuestStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = GuestStatus
-        fields = "__all__"
+        fields = ['id','status']
 
 class GuestListSerializer(serializers.ModelSerializer):
-    status = GuestStatusSerializer
+    status = GuestStatusSerializer()
     class Meta:
         model = GuestList
         fields = ['id', 'guest', 'status']
         
 class GuestListSerializerAll(serializers.ModelSerializer):
-    status = GuestStatusSerializer
+    status = GuestStatusSerializer()
     class Meta:
         model = GuestList
-        fields = "__all__"
+        fields = ['id', 'guest', 'status']
 
 class BillingGuestList(serializers.ModelSerializer):
     guests_list = serializers.SerializerMethodField()
