@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 
 from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList
-from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll
+from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer
 
 from bookings.serializers import BookingSerializer
 
@@ -80,6 +80,17 @@ class ActiveBookings(generics.ListCreateAPIView):
     def get_queryset(self):
         return Billing.objects.filter(status=1)
     
+
+
+class BillingDetails(generics.RetrieveAPIView):
+    serializer_class = BillingDetailSerializer
+    queryset = Billing.objects.all()
+    lookup_field = 'pk'
+
+
+class CreateNewCustomerBilling(generics.CreateAPIView):
+    pass    
+
 
 class T(generics.RetrieveAPIView):
     pass
