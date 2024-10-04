@@ -63,7 +63,7 @@ class GuestListSerializerAll(serializers.ModelSerializer):
     status = GuestStatusSerializer()
     class Meta:
         model = GuestList
-        fields = ['id', 'guest', 'status']
+        fields = ['id', 'customer_bill', 'guest', 'status']
 
 class BillingGuestList(serializers.ModelSerializer):
     guests_list = serializers.SerializerMethodField()
