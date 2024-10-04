@@ -3,13 +3,15 @@ from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities
 
 from django.db.models import Sum, F
 
+from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer
+
 
 from bookings.serializers import BookingSerializer2
 
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
-        fields = ['id','first_name', 'last_name']
+        fields = '__all__'
 
 class BillingSerialzerBase(serializers.ModelSerializer):
     class Meta:
@@ -78,7 +80,6 @@ class BillingGuestList(serializers.ModelSerializer):
         return GuestListSerializer(guest_list, many=True).data
 
 
-
 class PendingBookings(serializers.ModelSerializer):
     customer = CustomerSerializer()
     booking = BookingSerializer2(many=True, read_only=True, source='bookings')
@@ -122,4 +123,33 @@ class PendingBookings(serializers.ModelSerializer):
         return obj.total_booking_cost()
     
 
+
+class BillingDetailSerializer(serializers.ModelSerializer):
+    customer = CustomerSerializer()
+    booking  =  BookingSerializer2(many=True, read_only=True, source='bookings')
+    amenitiesAvailed = AmenitiesAvailedSerializer2(many=True, read_only=True, source="amenities_availed")
+    activitiesAvailed = ActivitiesAvailedSerializer2(many=True, read_only=True, source="activities_availed")
+    foodBill = FoodBillSerializer(many=True, read_only=True, source="food_bill")
+    bookingTotal = serializers.SerializerMethodField()
+    amenityTotal = serializers.SerializerMethodField()
+    activityTotal = serializers.SerializerMethodField()
+    foodBillTotal = serializers.SerializerMethodField()
+    class Meta:
+        model = Billing
+        fields = ['id', 'customer','booking','bookingTotal','amenitiesAvailed','amenityTotal','activitiesAvailed','activityTotal','foodBill','foodBillTotal', 'total_cost'] 
+        
+    def get_bookingTotal(self, obj):
+        return obj.total_booking_cost()
+
+    def get_amenityTotal(self, obj):
+        return obj.total_amenities()
+    
+    def get_activityTotal(self, obj):
+        return obj.total_activities()
+
+    def get_foodBillTotal(seld, obj):
+        return obj.total_food_bill()
+    
+    
+    
     
