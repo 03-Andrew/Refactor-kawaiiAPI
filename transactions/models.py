@@ -60,17 +60,20 @@ class Billing(models.Model):
             total=Sum(F('hours_availed') * F('activity__hourly_rate'))
         )['total'] or 0
 
+    def total_additional(self):
+        return self.additional_payment.aggregate(
+            total=Sum(F('price'))
+        )['total'] or 0
+    
     @property
     def total_cost(self):
         # Aggregate the total cost by combining different totals
         return (self.total_booking_cost() + 
                 self.total_food_bill() + 
                 self.total_amenities() + 
-                self.total_activities())
-    
-    @property
-    def total_cost(self):
-        return self.total_booking_cost() + self.total_food_bill()  + self.total_amenities() + self.total_activities()
+                self.total_activities() + 
+                self.total_additional())
+
     
     @property
     def paid_amount(self):
@@ -144,7 +147,16 @@ class ActivitiesAvailed(models.Model):
     @property
     def total_cost(self):
         return self.activity.hourly_rate * self.hours_availed if self.activity else 0
+
+class AdditonalPayment(models.Model):
+    customer_bill = models.ForeignKey(Billing, on_delete=models.CASCADE, related_name="additional_payment")
+    reason = models.TextField()
+    price = models.DecimalField(max_digits=6, decimal_places=2)
     
+    def __str__(self):
+        return f"Additonal payments for {self.customer_bill.id} - {self.customer_bill.customer.last_name}, {self.customer_bill.customer.first_name}"
+
+
 class PaymentMethod(models.Model):
     mode = models.CharField(max_length=100)
     
