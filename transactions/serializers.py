@@ -3,7 +3,7 @@ from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities
 
 from django.db.models import Sum, F
 
-from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer, AdditionalPaymentSerializer
+from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer2, AdditionalPaymentSerializer
 
 
 from bookings.serializers import BookingSerializer2
@@ -129,7 +129,7 @@ class BillingDetailSerializer(serializers.ModelSerializer):
     booking  =  BookingSerializer2(many=True, read_only=True, source='bookings')
     amenitiesAvailed = AmenitiesAvailedSerializer2(many=True, read_only=True, source="amenities_availed")
     activitiesAvailed = ActivitiesAvailedSerializer2(many=True, read_only=True, source="activities_availed")
-    foodBill = FoodBillSerializer(many=True, read_only=True, source="food_bill")
+    foodBill = FoodBillSerializer2(many=True, read_only=True, source="food_bill")
     additonalPayment = AdditionalPaymentSerializer(many=True, read_only=True, source='additional_payment')
     bookingTotal = serializers.SerializerMethodField()
     amenityTotal = serializers.SerializerMethodField()
