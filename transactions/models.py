@@ -46,31 +46,34 @@ class Billing(models.Model):
 
     def total_food_bill(self):
         # Calculate total food bill on the database side
-        return self.foodbill_set.aggregate(total=Sum('price'))['total'] or 0
+        return self.food_bill.aggregate(total=Sum('price'))['total'] or 0
 
     def total_amenities(self):
         # Calculate total amenities cost using F expressions and aggregation
-        return self.amenitiesavailed_set.aggregate(
+        return self.amenities_availed.aggregate(
             total=Sum(F('head_count') * F('amenity__rate_per_head'))
         )['total'] or 0
 
     def total_activities(self):
         # Calculate total activities cost using F expressions and aggregation
-        return self.activitiesavailed_set.aggregate(
+        return self.activities_availed.aggregate(
             total=Sum(F('hours_availed') * F('activity__hourly_rate'))
         )['total'] or 0
 
+    def total_additional(self):
+        return self.additional_payment.aggregate(
+            total=Sum(F('price'))
+        )['total'] or 0
+    
     @property
     def total_cost(self):
         # Aggregate the total cost by combining different totals
         return (self.total_booking_cost() + 
                 self.total_food_bill() + 
                 self.total_amenities() + 
-                self.total_activities())
-    
-    @property
-    def total_cost(self):
-        return self.total_booking_cost() + self.total_food_bill()  + self.total_amenities() + self.total_activities()
+                self.total_activities() + 
+                self.total_additional())
+
     
     @property
     def paid_amount(self):
@@ -99,7 +102,7 @@ class GuestList(models.Model):
         return f"{self.customer_bill.id} {self.guest}"
     
 class FoodBill(models.Model):
-    customer_bill = models.ForeignKey(Billing, on_delete=models.SET_NULL, null=True)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.SET_NULL, null=True, related_name="food_bill")
     price = models.DecimalField(max_digits=10, decimal_places=2)
     or_number = models.CharField(max_length=150, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -115,7 +118,7 @@ class Amenities(models.Model):
         return f"{self.amenity}"
 
 class AmenitiesAvailed(models.Model):
-    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="amenities_availed")
     amenity = models.ForeignKey(Amenities, on_delete=models.PROTECT)
     head_count = models.SmallIntegerField()
     time = models.TimeField(null=True, blank=True)
@@ -134,7 +137,7 @@ class Activity(models.Model):
         return self.activity
 
 class ActivitiesAvailed(models.Model):
-    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="activities_availed")
     activity = models.ForeignKey(Activity, on_delete=models.PROTECT)
     hours_availed = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     
@@ -144,7 +147,16 @@ class ActivitiesAvailed(models.Model):
     @property
     def total_cost(self):
         return self.activity.hourly_rate * self.hours_availed if self.activity else 0
+
+class AdditonalPayment(models.Model):
+    customer_bill = models.ForeignKey(Billing, on_delete=models.CASCADE, related_name="additional_payment")
+    reason = models.TextField()
+    price = models.DecimalField(max_digits=6, decimal_places=2)
     
+    def __str__(self):
+        return f"Additonal payments for {self.customer_bill.id} - {self.customer_bill.customer.last_name}, {self.customer_bill.customer.first_name}"
+
+
 class PaymentMethod(models.Model):
     mode = models.CharField(max_length=100)
     

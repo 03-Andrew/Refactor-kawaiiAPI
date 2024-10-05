@@ -12,6 +12,6 @@ urlpatterns = [
     path("api/guests/", views.GuestListView.as_view(), name="guest_list"),
     path("api/guests/add/", views.AddGuest.as_view(), name="add_guest_list"),
     path("api/guests/<int:pk>/", views.GuestListPerBilling.as_view(), name="guest_list_per_billing"),
-    path("api/guests-status/edit/<int:pk>/", views.EditGuestListStatus.as_view(), name="edit_guest_list")
-
+    path("api/guests-status/edit/<int:pk>/", views.EditGuestListStatus.as_view(), name="edit_guest_list"),
+    path("api/billing-details/<int:pk>/", views.BillingDetails.as_view())
 ]

@@ -1,6 +1,6 @@
 from rest_framework.serializers import ModelSerializer,IntegerField, CharField, DateField, StringRelatedField, SerializerMethodField
 from bookings.models import Booking, BookingStatus, Room
-from transactions.models import Billing, Payment, Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Customer
+from transactions.models import Billing, Payment, Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Customer, FoodBill, AdditonalPayment
 from datetime import date
 from django.db.models.functions import TruncDate
 
@@ -56,16 +56,45 @@ class ActivitiesSerializer(ModelSerializer):
     class Meta:
         model = Activity
         fields = '__all__'
-    
+   
+   
 class ActivitiesAvailedSerializer(ModelSerializer):
     class Meta:
         model = ActivitiesAvailed
         fields = '__all__'
-
+    
+class ActivitiesAvailedSerializer2(ModelSerializer):
+    activity = ActivitiesSerializer()
+    class Meta:
+        model = ActivitiesAvailed
+        fields = ['id', 'hours_availed', 'activity']
+    
 class AmenitiesAvailedSerializer(ModelSerializer):
     class Meta:
         model = AmenitiesAvailed
         fields = '__all__'
+        
+class AmenitiesAvailedSerializer2(ModelSerializer):
+    amenity = AmenitiesSerializer()
+    class Meta:
+        model = AmenitiesAvailed
+        fields = ['id', 'head_count', 'amenity']
+
+class FoodBillSerializer(ModelSerializer):
+    class Meta:
+        model = FoodBill
+        fields = '__all__'
+        
+class FoodBillSerializer2(ModelSerializer):
+    class Meta:
+        model = FoodBill
+        fields = ['id', 'price', 'or_number']
+        
+           
+class AdditionalPaymentSerializer(ModelSerializer):
+    class Meta:
+        model = AdditonalPayment
+        fields = ['id', 'reason','price']
 
 class BookingsListSerializer(ModelSerializer):
     customer_bill=BillingSerializer()

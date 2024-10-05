@@ -224,6 +224,7 @@ class BookingListCreate(generics.ListCreateAPIView):
         queryset = Booking.objects.all()
         s = self.request.GET.get('s')
         sort = self.request.GET.get('sort')
+        status_filter = self.request.GET.get('status')
         
         if s:
             queryset = queryset.filter(
@@ -231,11 +232,19 @@ class BookingListCreate(generics.ListCreateAPIView):
                 Q(billing__customer__last_name__icontains=s)
             )
         
+        if status_filter:
+            if status_filter == 'a': 
+                queryset = queryset.filter(status__exact=2)
+            elif status_filter == 'p':
+                queryset = queryset.filter(status__exact=1)
+        
         if sort == "asc":
             queryset = queryset.order_by('check_in')
         elif sort == "desc":
             queryset = queryset.order_by('-check_in')
         return queryset
+    
+
 
 class RoomListCreateView(generics.ListAPIView):
     serializer_class = RoomSerializer
