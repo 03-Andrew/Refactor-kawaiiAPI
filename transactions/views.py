@@ -6,9 +6,13 @@ from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 
-from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList
+from django.views.decorators.csrf import csrf_protect
+from django.utils.decorators import method_decorator
+
+from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill
 from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer
 
+from receptionist.serializers import FoodBillSerializer
 from bookings.serializers import BookingSerializer
 
 # 1. List View - for listing all Billings
@@ -29,6 +33,8 @@ class BillingList(generics.ListAPIView):
 class BillingCreate(generics.ListCreateAPIView):
     queryset = Billing.objects.all()
     serializer_class = BillingSerialzerBase
+    
+    # @method_decorator(csrf_protect)
     def perform_create(self, serializer):
         # Add any custom logic for creation if necessary
         serializer.save()
@@ -88,6 +94,14 @@ class BillingDetails(generics.RetrieveAPIView):
     lookup_field = 'pk'
 
 
+class AddFoodBill(generics.ListCreateAPIView):
+    serializer_class = FoodBillSerializer
+    queryset = FoodBill.objects.all()
+    
+    # @method_decorator(csrf_protect)
+    def perform_create(self, serializer):
+        serializer.save()
+    
 class CreateNewCustomerBilling(generics.CreateAPIView):
     pass    
 
