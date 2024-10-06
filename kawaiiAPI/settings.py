@@ -171,4 +171,4 @@ GRAPH_MODELS = {
     'group_models': True
 }
 
-AUTH_USER_MODEL = "user.User"
+# AUTH_USER_MODEL = "user.CustomUser"
