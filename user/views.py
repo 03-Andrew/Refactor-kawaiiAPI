@@ -43,3 +43,21 @@ def signup(request):
 @permission_classes([IsAuthenticated])
 def test_token(request):
     return Response("passed!")
+
+
+@api_view(['GET'])
+@authentication_classes([SessionAuthentication, TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_user(request):
+    # Print the user to the console (for debugging purposes)
+    print(f"Authenticated user: {request.user}")
+
+    # Return the user's information as part of the response
+    user_data = {
+        "id": request.user.id,
+        "username": request.user.username,
+        "email": request.user.email,
+        # You can include other user-related fields as needed
+    }
+    
+    return Response(user_data)

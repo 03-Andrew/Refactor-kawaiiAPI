@@ -182,7 +182,7 @@ class AvailableRooms(generics.ListAPIView):
         r_type = self.request.GET.get('type')
         
         if not r_type:
-            r_type = 1
+            r_type = 'deluxe'
 
         # Set default dates if not provided
         if not check_in or not check_out:
@@ -202,8 +202,8 @@ class AvailableRooms(generics.ListAPIView):
 
         # Return available rooms
         queryset = Room.objects.exclude(
-            Q(booking__check_in__lt=check_out_date) & Q(booking__check_out__gt=check_in_date)
-        ).distinct().filter(status__id=1).filter(type__id__exact=r_type)
+            Q(bookings__check_in__lt=check_out_date) & Q(bookings__check_out__gt=check_in_date)
+        ).distinct().filter(status__id=1).filter(type__name__icontains=r_type)
         
 
         return queryset
