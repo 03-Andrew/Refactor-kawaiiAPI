@@ -65,7 +65,7 @@ class Booking(models.Model):
 
     @property
     def number_of_nights(self):
-        return (self.check_out - self.check_in).days
+        return (self.check_out - self.check_in).days if self.check_in and self.check_out else 0
 
     @property
     def total_cost(self):
