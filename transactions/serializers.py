@@ -3,7 +3,7 @@ from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities
 
 from django.db.models import Sum, F
 
-from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer2, AdditionalPaymentSerializer
+from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer2, AdditionalPaymentSerializer, FoodBillSerializer
 
 
 from bookings.serializers import BookingSerializer2

@@ -16,6 +16,10 @@ from django.db import transaction
 from rest_framework import status
 
 
+from django.views.decorators.csrf import csrf_protect
+from django.utils.decorators import method_decorator
+
+
 # Create your views here.
 
 class BookingPagination(PageNumberPagination):
@@ -199,6 +203,7 @@ class AmenitiesListAvailed(generics.ListCreateAPIView):
             return AmenitiesAvailedSerializer
         return AmenitiesAvailedListSerializer
     
+    # @method_decorator(csrf_protect)
     def create(self, request, *args, **kwargs):
         # Check if the request is coming from the built-in API form
         if isinstance(request.data, dict):  # Single amenity
