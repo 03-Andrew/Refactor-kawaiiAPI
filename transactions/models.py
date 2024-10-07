@@ -105,6 +105,8 @@ class FoodBill(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.SET_NULL, null=True, related_name="food_bill")
     price = models.DecimalField(max_digits=10, decimal_places=2)
     or_number = models.CharField(max_length=150, null=True, blank=True)
+    date = models.DateField(blank=True, null=True)
+    time = models.TimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
