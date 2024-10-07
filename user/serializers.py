@@ -16,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
     # role = serializers.SerializerMethodField()
     class Meta(object):
         model = User
-        fields = ['id', 'username', 'password', 'email', 'role']
+        fields = ['id', 'username', 'password', 'email']
 
     # def get_role(self, obj):
     #     return obj.user_profile.role if obj.user_profile and obj.user_profile.role else None
