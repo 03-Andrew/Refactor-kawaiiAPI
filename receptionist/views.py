@@ -3,7 +3,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view
 from bookings.models import Booking,Room
-from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment
+from payments.models import Payment 
+from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed
 from .serializers import BookingsSerializer,RoomStatusListSerializer, RoomBookingListSerializer, RoomStatusSerializer,BookingsListSerializer, AmenitiesSerializer,AmenitiesAvailedSerializer, AmenitiesAvailedListSerializer, ActivitiesSerializer,ActivitiesAvailedSerializer, ActivitiesAvailedListSerializer
 from rest_framework import generics
 from django.db.models import Count, Q, F, Subquery, OuterRef

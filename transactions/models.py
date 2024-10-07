@@ -1,7 +1,6 @@
 from django.db import models
 from django.db.models import Sum, F
 
-
 # Create your models here.
 class Customer(models.Model):
     first_name = models.CharField(max_length=100)
@@ -77,7 +76,7 @@ class Billing(models.Model):
     
     @property
     def paid_amount(self):
-        return sum(payment.amount for payment in self.payment_set.all())
+        return sum(p.amount for p in self.payment.all())
     
     @property
     def running_balance(self):
@@ -159,31 +158,3 @@ class AdditonalPayment(models.Model):
         return f"Additonal payments for {self.customer_bill.id} - {self.customer_bill.customer.last_name}, {self.customer_bill.customer.first_name}"
 
 
-class PaymentMethod(models.Model):
-    mode = models.CharField(max_length=100)
-    
-    def __str__(self):
-        return self.mode
-    
-class PaymentFor(models.Model):
-    name = models.CharField(max_length=100)
-
-    def __str__(self):
-        return self.name
-
-class PaymentStatus(models.Model):
-    status = models.CharField(max_length=100)
-
-    def __str__(self):
-        return self.status
-    
-class Payment(models.Model):
-    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    date = models.DateTimeField()
-    mop = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT)
-    paymentFor = models.ForeignKey(PaymentFor, on_delete=models.PROTECT, null=True, blank=True)
-    status = models.ForeignKey(PaymentStatus, on_delete=models.PROTECT, null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.customer_bill.id} {self.date}"

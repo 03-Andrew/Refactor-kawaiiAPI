@@ -9,7 +9,9 @@ from rest_framework.decorators import api_view
 from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
 
-from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill
+
+from payments.models import Payment
+from .models import Billing, Customer, AmenitiesAvailed, GuestList, FoodBill
 from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer
 
 from receptionist.serializers import FoodBillSerializer

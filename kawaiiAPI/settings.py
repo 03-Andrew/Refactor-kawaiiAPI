@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'bookings',
     'transactions',
     'receptionist',
+    'payments',
     'user',
 ]
 
@@ -171,4 +172,4 @@ GRAPH_MODELS = {
     'group_models': True
 }
 
-# AUTH_USER_MODEL = "user.CustomUser"
+AUTH_USER_MODEL = "user.User"

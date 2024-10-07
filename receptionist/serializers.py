@@ -1,6 +1,7 @@
 from rest_framework.serializers import ModelSerializer,IntegerField, CharField, DateField, StringRelatedField, SerializerMethodField
 from bookings.models import Booking, BookingStatus, Room
-from transactions.models import Billing, Payment, Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Customer, FoodBill, AdditonalPayment
+from transactions.models import Billing, Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Customer, FoodBill, AdditonalPayment
+from payments.models import Payment
 from datetime import date
 from django.db.models.functions import TruncDate
 

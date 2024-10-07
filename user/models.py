@@ -1,14 +1,32 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
 # Create your models here.
 
-class UserProfile(models.Model):
+class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = "ADMIN", 'Admin'
         RECEPTIONIST = "RECEPTIONIST", 'Receptionist'
         GUARD = "GUARD", 'Guard'
         
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='user_profile')
+    base_role = Role.ADMIN
     role = models.CharField(max_length=50, choices=Role.choices)
     
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            self.role = self.base_role
+            return super().save(*args, **kwargs)
+
+class Receptionist(User):
+    base_role = User.Role.RECEPTIONIST
+    
+    class Meta:
+        proxy = True
+        
+        
+class Guard(User):
+    base_role = User.Role.GUARD
+    
+    class Meta:
+        proxy = True
+        
     

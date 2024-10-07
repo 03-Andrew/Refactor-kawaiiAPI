@@ -20,8 +20,8 @@ class RoomType(models.Model):
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(null=True, blank=True)
-    good_for = models.PositiveSmallIntegerField(null=True)
-    max_children = models.PositiveSmallIntegerField(null = True)
+    good_for = models.PositiveSmallIntegerField()
+    max_children = models.PositiveSmallIntegerField()
     max_adult = models.PositiveSmallIntegerField()
     inclusions = models.ManyToManyField(Inclusions)
 
@@ -39,7 +39,7 @@ class Room(models.Model):
 
 
 class BookingStatus(models.Model):
-    name = models.CharField(max_length=50, null=True)
+    name = models.CharField(max_length=50)
 
     def __str__(self):
         return self.name

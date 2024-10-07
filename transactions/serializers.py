@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor
-
+from .models import Billing, Customer, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed
+from payments.models import Payment, PaymentFor
 from django.db.models import Sum, F
 
 from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer2, AdditionalPaymentSerializer, FoodBillSerializer
