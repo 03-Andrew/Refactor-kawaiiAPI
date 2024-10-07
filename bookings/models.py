@@ -30,8 +30,8 @@ class RoomType(models.Model):
 
 class Room(models.Model):
     number = models.CharField(max_length=100, unique=True)
-    type = models.ForeignKey(RoomType, on_delete=models.PROTECT)
-    status = models.ForeignKey(RoomStatus, on_delete=models.PROTECT)
+    type = models.ForeignKey(RoomType, on_delete=models.PROTECT, related_name="room")
+    status = models.ForeignKey(RoomStatus, on_delete=models.PROTECT, related_name="room")
     
 
     def __str__(self):
@@ -50,8 +50,9 @@ class Booking(models.Model):
     room_type = models.ForeignKey(RoomType, on_delete=models.PROTECT, related_name='bookings')
     check_in = models.DateField()
     check_out = models.DateField()
-    number_of_guests = models.PositiveSmallIntegerField()
-    status = models.ForeignKey(BookingStatus, on_delete=models.PROTECT)
+    adult_count = models.PositiveSmallIntegerField()
+    children_count = models.PositiveSmallIntegerField(default=0)
+    status = models.ForeignKey(BookingStatus, on_delete=models.PROTECT, related_name='bookings')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -64,8 +65,13 @@ class Booking(models.Model):
         return f"{room_info}: {self.check_in} - {self.check_out}"
 
     @property
-    def number_of_nights(self):
-        return (self.check_out - self.check_in).days
+    def number_of_guests(self):
+        return self.adult_count + self.children_count
+
+
+    @property
+    def number_of_nights(self): 
+        return (self.check_out - self.check_in).days if self.check_in and self.check_out else 0
 
     @property
     def total_cost(self):

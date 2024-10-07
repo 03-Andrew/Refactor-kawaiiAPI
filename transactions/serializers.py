@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor
+from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, BillingStatus
 
 from django.db.models import Sum, F
 
@@ -79,6 +79,10 @@ class BillingGuestList(serializers.ModelSerializer):
         guest_list = GuestList.objects.filter(customer_bill=obj)
         return GuestListSerializer(guest_list, many=True).data
 
+class BillingStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BillingStatus
+        fields = ['status']
 
 class PendingBookings(serializers.ModelSerializer):
     customer = CustomerSerializer()
@@ -86,11 +90,11 @@ class PendingBookings(serializers.ModelSerializer):
     availed_boat_transfer = serializers.SerializerMethodField()
     booking_payment = serializers.SerializerMethodField()
     total_booking_bill = serializers.SerializerMethodField()
-
-
+    status = BillingStatusSerializer()
+    total_guests = serializers.SerializerMethodField()
     class Meta:
         model = Billing
-        fields = ['id', 'customer', 'booking', 'total_booking_bill', 'availed_boat_transfer', 'booking_payment']
+        fields = ['id', 'customer', 'booking', 'total_guests','total_booking_bill', 'availed_boat_transfer', 'booking_payment', 'status']
 
     
     def get_availed_boat_transfer(self, obj):
@@ -112,16 +116,22 @@ class PendingBookings(serializers.ModelSerializer):
             
             if payment:
                 return {
-                    "amount": str(payment.amount),  # Convert amount to string if needed
+                    "amount": payment.amount,  # Convert amount to string if needed
                     "mode_of_payment": payment.mop.mode  # Return the mode of payment
                 }
         
-        return None
+        return {
+            "amount": 0,  # Convert amount to string if needed
+            "mode_of_payment": None  # Return the mode of payment
+        }
     
     def get_total_booking_bill(self, obj):
         # Utilize the existing total_booking_cost method
         return obj.total_booking_cost()
     
+    def get_total_guests(self, obj):
+        bookingss = obj.bookings.all()  # Use related_name if it's set
+        return sum(booking.number_of_guests for booking in bookingss)
 
 
 class BillingDetailSerializer(serializers.ModelSerializer):
