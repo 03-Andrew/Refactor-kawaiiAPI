@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     'transactions',
     'receptionist',
     'user',
-    'paymongo', #Added
+    'paymongo', #Added yeah
 ]
 
 
