@@ -146,6 +146,95 @@ class CardPayment(APIView):
             }
         }
         return requests.post(attach_url, json=attach_payload, headers=headers)
+
+#GCASH
+class GCashSource(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        url = "https://api.paymongo.com/v1/sources"
+        
+        # Payload to create a GCash source
+        payload = {
+            "data": {
+                "attributes": {
+                    "amount": data.get('amount'),
+                    "redirect": {
+                        "success": data.get('success_url'),
+                        "failed": data.get('failed_url'),
+                    },
+                    "billing": {
+                        "name": data.get('name'),
+                        "phone": data.get('phone'),
+                        "email": data.get('email'),
+                    },
+                    "currency": "PHP",
+                    "type": "gcash"
+                }
+            }
+        }
+
+        # Consistent header for creating a GCash source
+        headers = {
+            'accept': 'application/json',
+            'authorization': f'Basic {base64.b64encode(f"{settings.PAYMONGO_SECRET_KEY}:".encode()).decode()}',
+            'content-type': 'application/json',
+        }
+
+        # Send request to PayMongo to create a GCash source
+        response = requests.post(url, json=payload, headers=headers)
+        
+        if response.status_code == 200:
+            return Response(response.json(), status=status.HTTP_200_OK)
+        else:
+            return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
+
+
+class GCashPayment(APIView):
+    def post(self, request, *args, **kwargs):
+        payload = request.data
+        event_type = payload['data']['attributes']['type']
+
+
+        # Check for chargeable event
+        if event_type == 'source.chargeable':
+            source_data = payload['data']['attributes']['data']
+            source_id = source_data['id']
+            amount = source_data['attributes']['amount']
+            
+            # Proceed to create a payment using the chargeable source
+            self.create_payment(source_id, amount)
+
+        return Response({"status": "success"}, status=status.HTTP_200_OK)
+
+    def create_payment(self, source_id, amount):
+        url = "https://api.paymongo.com/v1/payments"
+        
+        # Payload to create a payment
+        payload = {
+            "data": {
+                "attributes": {
+                    "amount": amount,
+                    "source": {
+                        "id": source_id,
+                        "type": "source"
+                    },
+                    "currency": "PHP",
+                    "description": "GCash Payment"
+                }
+            }
+        }
+
+        # Consistent header for creating a payment
+        headers = {
+            'accept': 'application/json',
+            'authorization': f'Basic {base64.b64encode(f"{settings.PAYMONGO_SECRET_KEY}:".encode()).decode()}',
+            'content-type': 'application/json',
+        }
+
+        # Send request to PayMongo to create a payment
+        response = requests.post(url, json=payload, headers=headers)
+        return response.json()
     
 #TEST WEBHOOK 1
 class WebhookNotif(APIView):  
