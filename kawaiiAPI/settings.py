@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'transactions',
     'receptionist',
     'user',
+    'paymongo', #Added
 ]
 
 
@@ -172,3 +173,5 @@ GRAPH_MODELS = {
 }
 
 # AUTH_USER_MODEL = "user.CustomUser"
+
+PAYMONGO_SECRET_KEY = 'sk_test_BgfRTwhj8KST9FiBQJttyHbk'  # this is just a key for testing
