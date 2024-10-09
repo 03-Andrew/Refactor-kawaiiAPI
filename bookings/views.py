@@ -3,8 +3,10 @@ from django.shortcuts import render
 from django.db.models import Count, Q
 from django.http import HttpResponse
 
-from .models import Room, Booking
+from .models import Room, Booking, RoomType
 from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2
+
+from transactions.serializers import CustomerSerializer, BillingSerialzerBase
 
 from rest_framework.views import APIView
 from rest_framework import generics, status
@@ -277,3 +279,46 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RoomSerializer
 
 
+
+
+class CreateStayInBooking(APIView):
+    def post(self, request):
+        # Handle customer creation
+        customer_data = request.data.get('customer')
+        customer_serializer = CustomerSerializer(data=customer_data)
+
+        if customer_serializer.is_valid():
+            customer = customer_serializer.save()
+        else:
+            return Response(customer_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Handle billing creation
+        billing_data = request.data.get('billing')
+        billing_data['customer'] = customer.id
+        billing_serializer = BillingSerialzerBase(data=billing_data)
+
+        if billing_serializer.is_valid():
+            billing = billing_serializer.save()
+        else:
+            return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create bookings
+        booking_data = request.data.get('booking')
+        created_bookings = []
+
+        for rBooking in booking_data:
+            rBooking['billing'] = billing.id  # Connect booking to billing
+            booking_serializer = BookingSerializer(data=rBooking)
+            
+            if booking_serializer.is_valid():
+                booking = booking_serializer.save()
+                created_bookings.append(booking_serializer.data)  # Add to the list of created bookings
+            else:
+                return Response(booking_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Return the response after all bookings are processed
+        return Response({
+            'customer': customer_serializer.data,
+            'billing': billing_serializer.data,
+            'bookings': created_bookings  # Return all created bookings
+        }, status=status.HTTP_201_CREATED)

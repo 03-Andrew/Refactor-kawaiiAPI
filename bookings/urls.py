@@ -7,6 +7,7 @@ urlpatterns = [
     path("api/available-rooms/", views.get_available_rooms1, name="api_available_rooms"),
     path("api/available-rooms2/", views.AvailableRooms.as_view(), name="available_rooms2"),
     path("api/booking/", views.BookingListCreate.as_view(), name="booking"),
-    path('api/rooms/', views.RoomListCreateView.as_view(), name='room-list-create'),
-    path('api/rooms/<int:pk>/', views.RoomDetailView.as_view(), name='room-detail'),
+    path('api/rooms/', views.RoomListCreateView.as_view(), name='room-list_create'),
+    path('api/rooms/<int:pk>/', views.RoomDetailView.as_view(), name='room_detail'),
+    path('api/create-stayin-booking/', views.CreateStayInBooking.as_view(), name='create_stayin_booking')
 ]

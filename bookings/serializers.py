@@ -78,9 +78,13 @@ class AvailableRoomSerializer(serializers.Serializer):
 class AvailableRoomSerializer2(serializers.ModelSerializer):
     status = serializers.CharField(source='status.name', read_only=True)
     type = serializers.CharField(source='type.name', read_only=True)
+    type_id = serializers.IntegerField(source='type.id', read_only=True)
+    max_children = serializers.IntegerField(source='type.max_children', read_only=True)
+    max_adult = serializers.IntegerField(source='type.max_children', read_only=True)
+    price = serializers.FloatField(source='type.price', read_only=True)
     class Meta:
         model = Room
-        fields = ['id', 'number', 'type', 'status']
+        fields = ['id', 'number', 'type', 'type_id','max_children', 'max_adult','status', 'price']
         
         
 
