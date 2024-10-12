@@ -1,5 +1,5 @@
 from rest_framework import serializers
-#from .models import PaymentIntent
+from .models import WebhookEvent
 from transactions.models import Payment
 from rest_framework.serializers import ModelSerializer
 
@@ -18,3 +18,8 @@ class CardPaymentSerializer(serializers.Serializer):
     billing_email = serializers.EmailField()
     billing_phone = serializers.CharField(max_length=15)
     return_url = serializers.URLField()
+
+class WebhookEventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WebhookEvent
+        fields = ['event_type', 'payload', 'received_at']
