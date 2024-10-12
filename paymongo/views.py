@@ -6,7 +6,7 @@ from rest_framework import status
 from django.conf import settings
 import base64
 from rest_framework import generics
-from .serializers import CardPaymentSerializer
+from .serializers import CardPaymentSerializer, WebhookEventSerializer
 from transactions.models import Payment
 import logging
 import json
@@ -14,8 +14,8 @@ import requests
 import hmac
 import hashlib
 from django.http import JsonResponse
+from .models import WebhookEvent
 #from .serializers import PaymentSerializer, PaymentIntentListSerializer, CardPaymentSerializer
-#from .models import PaymentMethod, PaymentIntent, AttachedPaymentMethod
 #from .serializers import PaymentIntentSerializer, CardPaymentMethodSerializer, AttachPaymentMethodSerializer
 
 class CardPayment(APIView):
@@ -174,7 +174,6 @@ class GCashSource(APIView):
             }
         }
 
-        # Consistent header for creating a GCash source
         headers = {
             'accept': 'application/json',
             'authorization': f'Basic {base64.b64encode(f"{settings.PAYMONGO_SECRET_KEY}:".encode()).decode()}',
@@ -225,7 +224,6 @@ class GCashPayment(APIView):
             }
         }
 
-        # Consistent header for creating a payment
         headers = {
             'accept': 'application/json',
             'authorization': f'Basic {base64.b64encode(f"{settings.PAYMONGO_SECRET_KEY}:".encode()).decode()}',
@@ -240,132 +238,37 @@ class GCashPayment(APIView):
 class WebhookNotif(APIView):  
     def post(self, request, *args, **kwargs):
         try:
-            # Load and print the JSON payload
-            payload = json.loads(request.body)
-            print("Received Webhook Notification:", json.dumps(payload, indent=4))  # Pretty print JSON
+            # Load the JSON payload directly from request.data
+            payload = request.data  
 
-            event_type = payload['data']['attributes']['type']
+            # Extract the event type safely
+            event_type = payload.get('data', {}).get('attributes', {}).get('type')
 
-            if event_type == 'source.chargeable':
-                print("Source is chargeable!")
-                # Handle source authorization (GCash or GrabPay)
-
-            elif event_type == 'payment.paid':
-                print("Payment was successful!")
-                # Handle successful payment
-
-            elif event_type == 'payment.failed':
-                print("Payment failed.")
-                # Handle failed payment
-
-            elif event_type == 'link.payment.paid':
-                print("Link payment was successful!")
-                # Handle successful link payment
-
-            elif event_type == 'payment.refunded':
-                print("Payment was refunded successfully.")
-                # Handle successful payment refund
-
-            elif event_type == 'payment.refund.updated':
-                print("Payment refund was updated.")
-                # Handle refund update (successful or failed)
-
-            elif event_type == 'checkout_session.payment.paid':
-                print("Checkout session payment was successful!")
-                # Handle successful Checkout Session payment
-
+            # Check if event_type is available
+            if event_type:
+                # Save the payload and event type to the database
+                WebhookEvent.objects.create(
+                    event_type=event_type,
+                    payload=payload  # Save entire JSON object
+                )
+                return Response({'status': 'success'}, status=status.HTTP_200_OK)
             else:
-                print(f"Unhandled event type: {event_type}")
-                # Log unhandled events or take necessary actions
+                return Response({'status': 'event type missing'}, status=status.HTTP_400_BAD_REQUEST)
 
-            return Response({'status': 'success'}, status=status.HTTP_200_OK)
-
-        except json.JSONDecodeError:
-            # Handle case where the payload is not valid JSON
-            return Response({'status': 'invalid payload'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            # Handle any other exceptions that may arise
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def get(self, request, *args, **kwargs):
-        # Optional: Handle GET requests if necessary
-        return Response({'status': 'method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-
-#TEST WEBHOOK 2  
-class WebhookNotif2(APIView):  
-    def verify_signature(self, payload, received_signature, timestamp):
-        """
-        Verifies the Paymongo signature using HMAC and SHA256.
-        """
-        # Concatenate timestamp and the raw payload
-        signature_base_string = f"{timestamp}.{payload}"
-        
-        # Create a HMAC SHA256 signature using your webhook secret key from settings
-        computed_signature = hmac.new(
-            bytes(settings.PAYMONGO_SECRET_KEY, 'utf-8'),
-            bytes(signature_base_string, 'utf-8'),
-            hashlib.sha256
-        ).hexdigest()
-
-        return hmac.compare_digest(computed_signature, received_signature)
-
-    def post(self, request, *args, **kwargs):
-        # Capture Paymongo-Signature from headers
-        received_signature_header = request.headers.get('Paymongo-Signature', '')
-        if not received_signature_header:
-            return JsonResponse({'status': 'missing signature'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Extract signature values (timestamp, te or li signatures)
         try:
-            parts = {k: v for k, v in (part.split('=') for part in received_signature_header.split(','))}
-            timestamp = parts['t']
-            received_signature = parts.get('te') or parts.get('li')  # Use 'te' for test mode, 'li' for live mode
-        except ValueError:
-            return JsonResponse({'status': 'invalid signature format'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get the raw JSON payload (ensure you're getting the raw body)
-        payload = request.body.decode('utf-8')
+            # Retrieve all webhook events from the database
+            webhook_events = WebhookEvent.objects.all()
+            
+            # Serialize the data
+            serializer = WebhookEventSerializer(webhook_events, many=True)
+            
+            # Return the serialized data
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
-        # Verify the signature
-        if not self.verify_signature(payload, received_signature, timestamp):
-            return JsonResponse({'status': 'invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Print the received JSON payload in the terminal (for debugging purposes)
-        print(json.dumps(json.loads(payload), indent=4))
-
-        # Handle the event based on its type
-        try:
-            payload_data = json.loads(payload)
-            event_type = payload_data['data']['attributes']['type']
-
-            if event_type == 'source.chargeable':
-                # Handle GCash or GrabPay source authorization
-                print("Source is chargeable!")
-                # Perform actions like creating a payment
-            elif event_type == 'payment.paid':
-                # Handle successful payment
-                print("Payment was successful!")
-                # Perform actions like updating your database
-            elif event_type == 'payment.failed':
-                # Handle failed payment
-                print("Payment failed.")
-                # Perform actions like notifying the user
-            elif event_type == 'link.payment.paid':
-                # Handle Link payment
-                print("Link payment was successful!")
-            elif event_type == 'payment.refunded':
-                # Handle successful payment refund
-                print("Payment has been refunded.")
-            elif event_type == 'payment.refund.updated':
-                # Handle updated payment refund (including failures)
-                print("Payment refund status updated.")
-            elif event_type == 'checkout_session.payment.paid':
-                # Handle Checkout Session payment
-                print("Checkout Session payment was successful!")
-
-            return JsonResponse({'status': 'success'}, status=status.HTTP_200_OK)
-
-        except json.JSONDecodeError:
-            return JsonResponse({'status': 'invalid payload'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    def get(self, request, *args, **kwargs):
-        # Optional: Handle GET requests if necessary
-        return JsonResponse({'status': 'method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        except Exception as e:
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
