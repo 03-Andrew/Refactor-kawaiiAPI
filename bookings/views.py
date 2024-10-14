@@ -281,54 +281,67 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.db import transaction
+from datetime import datetime
+
 class CreateStayInBooking(APIView):
     def post(self, request):
-        # Handle customer creation
         customer_data = request.data.get('customer')
-        customer_serializer = CustomerSerializer(data=customer_data)
-
-        if customer_serializer.is_valid():
-            customer = customer_serializer.save()
-        else:
-            return Response(customer_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Handle billing creation
         billing_data = request.data.get('billing')
-        billing_data['customer'] = customer.id
-        billing_serializer = BillingSerialzerBase(data=billing_data)
-
-        if billing_serializer.is_valid():
-            billing = billing_serializer.save()
-        else:
-            return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Create bookings
         booking_data = request.data.get('booking')
-        created_bookings = []
-        print(booking_data)
-        for rBooking in booking_data:
-            rBooking['customer_bill'] = billing.id  # Connect booking to billing
-            rBooking['check_in'], rBooking['check_out'] = [datetime.fromisoformat(date.replace("Z", "+00:00")).strftime("%Y-%m-%d") for date in rBooking['dateRange']]
-            rBooking['status'] = 2
-            rBooking['room'] = int(rBooking['roomNumber'])
-            rBooking['room_type'] = int(rBooking['room_type'])
-            rBooking['children_count'] = int(rBooking['children_count'])
-            rBooking['adult_count'] = int(rBooking['adult_count'])
-            booking_serializer = BookingSerializer(data=rBooking)
-            print(rBooking      )
-            if booking_serializer.is_valid():
-                booking = booking_serializer.save()
-                created_bookings.append(booking_serializer.data)  # Add to the list of created bookings
+
+        # Using a transaction to ensure atomicity
+        with transaction.atomic():
+            # Handle customer creation
+            customer_serializer = CustomerSerializer(data=customer_data)
+            if customer_serializer.is_valid():
+                customer = customer_serializer.save()
             else:
-                return Response(booking_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                return Response(customer_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            # Handle billing creation
+            billing_data['customer'] = customer.id
+            billing_serializer = BillingSerialzerBase(data=billing_data)
+            if billing_serializer.is_valid():
+                billing = billing_serializer.save()
+            else:
+                return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            # Create bookings
+            created_bookings = []
+            for rBooking in booking_data:
+                self._prepare_booking_data(rBooking, billing.id)
+                booking_serializer = BookingSerializer(data=rBooking)
+                
+                if booking_serializer.is_valid():
+                    booking = booking_serializer.save()
+                    created_bookings.append(booking_serializer.data)
+                else:
+                    # If booking serializer is invalid, raise an exception to rollback
+                    raise Exception(booking_serializer.errors)
 
         # Return the response after all bookings are processed
         return Response({
             'customer': customer_serializer.data,
             'billing': billing_serializer.data,
-            'bookings': created_bookings  # Return all created bookings
+            'bookings': created_bookings
         }, status=status.HTTP_201_CREATED)
 
+    def _prepare_booking_data(self, rBooking, billing_id):
+        """Prepare booking data before serialization."""
+        rBooking['customer_bill'] = billing_id
+        rBooking['check_in'], rBooking['check_out'] = [
+            datetime.fromisoformat(date.replace("Z", "+00:00")).strftime("%Y-%m-%d")
+            for date in rBooking['dateRange']
+        ]
+        rBooking['status'] = 2
+        rBooking['room'] = int(rBooking['roomNumber'])
+        rBooking['room_type'] = int(rBooking['room_type'])
+        rBooking['children_count'] = int(rBooking['children_count'])
+        rBooking['adult_count'] = int(rBooking['adult_count'])
 
 class RoomTypes(generics.ListAPIView):
     serializer_class = RoomTypeSerializer
