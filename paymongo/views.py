@@ -15,11 +15,14 @@ import hmac
 import hashlib
 from django.http import JsonResponse
 from .models import WebhookEvent
+from django.views.decorators.csrf import csrf_protect
+from django.utils.decorators import method_decorator
 #from .serializers import PaymentSerializer, PaymentIntentListSerializer, CardPaymentSerializer
 #from .serializers import PaymentIntentSerializer, CardPaymentMethodSerializer, AttachPaymentMethodSerializer
 
 class CardPayment(APIView):
 
+    @method_decorator(csrf_protect)
     def post(self, request):
         # Step 1: Validate the incoming data using the combined serializer
         combined_serializer = CardPaymentSerializer(data=request.data)
@@ -149,7 +152,7 @@ class CardPayment(APIView):
 
 #GCASH
 class GCashSource(APIView):
-
+    @method_decorator(csrf_protect)
     def post(self, request, *args, **kwargs):
         data = request.data
         url = "https://api.paymongo.com/v1/sources"
@@ -236,6 +239,7 @@ class GCashPayment(APIView):
     
 #TEST WEBHOOK 1
 class WebhookNotif(APIView):  
+    @method_decorator(csrf_protect)
     def post(self, request, *args, **kwargs):
         try:
             # Load the JSON payload directly from request.data
