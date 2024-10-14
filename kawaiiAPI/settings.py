@@ -113,6 +113,15 @@ WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
 #    }
 # }
 # CSRF HEHE
+CSRF_TRUSTED_ORIGINS = [
+    'https://kawaii-api.vercel.app',  
+    'http://localhost:3000',             
+]
+
+CSRF_COOKIE_SECURE = True 
+CSRF_COOKIE_HTTPONLY = False  
+CSRF_USE_SESSIONS = False  
+
 DATABASES = {
    'default': {
        'ENGINE': 'django.db.backends.postgresql',
