@@ -9,5 +9,6 @@ urlpatterns = [
     path("api/booking/", views.BookingListCreate.as_view(), name="booking"),
     path('api/rooms/', views.RoomListCreateView.as_view(), name='room-list_create'),
     path('api/rooms/<int:pk>/', views.RoomDetailView.as_view(), name='room_detail'),
+    path('api/room-types/', views.RoomTypes.as_view()),
     path('api/create-stayin-booking/', views.CreateStayInBooking.as_view(), name='create_stayin_booking')
 ]

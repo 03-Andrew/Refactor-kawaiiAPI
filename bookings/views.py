@@ -4,7 +4,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 
 from .models import Room, Booking, RoomType
-from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2
+from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer
 
 from transactions.serializers import CustomerSerializer, BillingSerialzerBase
 
@@ -184,7 +184,7 @@ class AvailableRooms(generics.ListAPIView):
         r_type = self.request.GET.get('type')
         
         if not r_type:
-            r_type = 'deluxe'
+            r_type = 1
 
         # Set default dates if not provided
         if not check_in or not check_out:
@@ -205,7 +205,7 @@ class AvailableRooms(generics.ListAPIView):
         # Return available rooms
         queryset = Room.objects.exclude(
             Q(bookings__check_in__lt=check_out_date) & Q(bookings__check_out__gt=check_in_date)
-        ).distinct().filter(status__id=1).filter(type__name__icontains=r_type)
+        ).distinct().filter(status__id=1).filter(type__id=r_type)
         
 
         return queryset
@@ -305,11 +305,17 @@ class CreateStayInBooking(APIView):
         # Create bookings
         booking_data = request.data.get('booking')
         created_bookings = []
-
+        print(booking_data)
         for rBooking in booking_data:
-            rBooking['billing'] = billing.id  # Connect booking to billing
+            rBooking['customer_bill'] = billing.id  # Connect booking to billing
+            rBooking['check_in'], rBooking['check_out'] = [datetime.fromisoformat(date.replace("Z", "+00:00")).strftime("%Y-%m-%d") for date in rBooking['dateRange']]
+            rBooking['status'] = 2
+            rBooking['room'] = int(rBooking['roomNumber'])
+            rBooking['room_type'] = int(rBooking['room_type'])
+            rBooking['children_count'] = int(rBooking['children_count'])
+            rBooking['adult_count'] = int(rBooking['adult_count'])
             booking_serializer = BookingSerializer(data=rBooking)
-            
+            print(rBooking      )
             if booking_serializer.is_valid():
                 booking = booking_serializer.save()
                 created_bookings.append(booking_serializer.data)  # Add to the list of created bookings
@@ -322,3 +328,8 @@ class CreateStayInBooking(APIView):
             'billing': billing_serializer.data,
             'bookings': created_bookings  # Return all created bookings
         }, status=status.HTTP_201_CREATED)
+
+
+class RoomTypes(generics.ListAPIView):
+    serializer_class = RoomTypeSerializer
+    queryset = RoomType.objects.all()
