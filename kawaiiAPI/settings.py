@@ -112,7 +112,7 @@ WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
 #        'PORT': '5432',
 #    }
 # }
-
+# CSRF HEHE
 DATABASES = {
    'default': {
        'ENGINE': 'django.db.backends.postgresql',
