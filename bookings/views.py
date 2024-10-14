@@ -310,7 +310,7 @@ class CreateStayInBooking(APIView):
             else:
                 return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            # Create bookings
+            # Create bookings Hue
             created_bookings = []
             for rBooking in booking_data:
                 self._prepare_booking_data(rBooking, billing.id)
