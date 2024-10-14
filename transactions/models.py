@@ -22,7 +22,7 @@ class BillingStatus(models.Model):
 class Billing(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
-    status = models.ForeignKey(BillingStatus, on_delete=models.PROTECT, null=True, blank=True)
+    status = models.ForeignKey(BillingStatus, on_delete=models.PROTECT, default=1)
     
     def __str__(self):
         return f"Bill {self.id} for {self.customer}"
