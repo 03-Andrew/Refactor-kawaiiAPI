@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import WebhookEvent
 from transactions.models import Payment
 from rest_framework.serializers import ModelSerializer
+from transactions.models import Customer #test
 
 class CardPaymentSerializer(serializers.Serializer):
     amount = serializers.IntegerField()
@@ -23,3 +24,9 @@ class WebhookEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = WebhookEvent
         fields = ['event_type', 'payload', 'received_at']
+
+#TEST
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = '__all__'
