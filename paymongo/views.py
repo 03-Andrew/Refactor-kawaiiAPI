@@ -21,9 +21,8 @@ from django.utils.decorators import method_decorator
 #from .serializers import PaymentSerializer, PaymentIntentListSerializer, CardPaymentSerializer
 #from .serializers import PaymentIntentSerializer, CardPaymentMethodSerializer, AttachPaymentMethodSerializer
 
+@method_decorator(csrf_exempt, name='dispatch')
 class CardPayment(APIView):
-
-    @method_decorator(csrf_exempt)
     def post(self, request):
         # Step 1: Validate the incoming data using the combined serializer
         combined_serializer = CardPaymentSerializer(data=request.data)
