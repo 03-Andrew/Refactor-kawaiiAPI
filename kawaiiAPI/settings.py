@@ -115,7 +115,8 @@ WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
 # CSRF HEHE
 CSRF_TRUSTED_ORIGINS = [
     'https://kawaii-api.vercel.app',  
-    'http://localhost:3000',             
+    'http://localhost:3000', 
+    'https://kawaii-vj-fork.vercel.app',            
 ]
 
 CSRF_COOKIE_SECURE = True 
