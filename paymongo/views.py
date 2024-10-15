@@ -16,13 +16,14 @@ import hashlib
 from django.http import JsonResponse
 from .models import WebhookEvent
 from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 #from .serializers import PaymentSerializer, PaymentIntentListSerializer, CardPaymentSerializer
 #from .serializers import PaymentIntentSerializer, CardPaymentMethodSerializer, AttachPaymentMethodSerializer
 
 class CardPayment(APIView):
 
-    @method_decorator(csrf_protect)
+    @method_decorator(csrf_exempt)
     def post(self, request):
         # Step 1: Validate the incoming data using the combined serializer
         combined_serializer = CardPaymentSerializer(data=request.data)
