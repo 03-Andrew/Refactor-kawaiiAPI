@@ -22,7 +22,7 @@ from django.utils.decorators import method_decorator
 
 class CardPayment(APIView):
 
-    # @method_decorator(csrf_protect)
+    @method_decorator(csrf_protect)
     def post(self, request):
         # Step 1: Validate the incoming data using the combined serializer
         combined_serializer = CardPaymentSerializer(data=request.data)
@@ -152,7 +152,7 @@ class CardPayment(APIView):
 
 #GCASH
 class GCashSource(APIView):
-    # @method_decorator(csrf_protect)
+    @method_decorator(csrf_protect)
     def post(self, request, *args, **kwargs):
         data = request.data
         url = "https://api.paymongo.com/v1/sources"
@@ -239,7 +239,7 @@ class GCashPayment(APIView):
     
 #TEST WEBHOOK 1
 class WebhookNotif(APIView):  
-    # @method_decorator(csrf_protect)
+    @method_decorator(csrf_protect)
     def post(self, request, *args, **kwargs):
         try:
             # Load the JSON payload directly from request.data
