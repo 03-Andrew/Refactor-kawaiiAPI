@@ -68,6 +68,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'kawaiiAPI.urls'
+CORS_ALLOW_ALL_ORIGINS = True
 
 TEMPLATES = [
     {
