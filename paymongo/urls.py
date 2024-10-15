@@ -2,7 +2,6 @@ from django.urls import path
 #from .views import payment_page, AttachPaymentMethod,CreatePaymentIntent, CreateCardPaymentMethod, CreateGCashSource, GCashWebhook
 from .views import CardPayment, GCashSource, GCashPayment
 from .views import WebhookNotif
-from .views import CustomerListCreate
 
 #from .views import PaymentIntentList
 
@@ -17,6 +16,4 @@ urlpatterns = [
     # Webhook testing
     path('api/webhook-notif/', WebhookNotif.as_view(), name='view_webhook_notif'), #FOR TESTING
 
-    #TEST ONLYY
-    path("api/customer-test/", CustomerListCreate.as_view(), name="customers"),
 ]
