@@ -91,9 +91,9 @@ class CardPayment(APIView):
 
             # Step 6: Return success response with the payment intent and method data
             return Response({
-                "payment_intent": intent_response_data,
-                "payment_method": method_response_data,
-                "attached_method": attach_response_data
+                "payment_intent_id": intent_response_data['data']['id'],  
+                "payment_method_id": method_response_data['data']['id'], 
+                "attached_method": attach_response_data['data']['id']
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -151,8 +151,8 @@ class CardPayment(APIView):
         return requests.post(attach_url, json=attach_payload, headers=headers)
 
 #GCASH
+@method_decorator(csrf_exempt, name='dispatch')
 class GCashSource(APIView):
-    @method_decorator(csrf_protect)
     def post(self, request, *args, **kwargs):
         data = request.data
         url = "https://api.paymongo.com/v1/sources"
@@ -191,7 +191,7 @@ class GCashSource(APIView):
         else:
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class GCashPayment(APIView):
     def post(self, request, *args, **kwargs):
         payload = request.data
@@ -238,8 +238,8 @@ class GCashPayment(APIView):
         return response.json()
     
 #TEST WEBHOOK 1
+@method_decorator(csrf_exempt, name='dispatch')
 class WebhookNotif(APIView):  
-    @method_decorator(csrf_protect)
     def post(self, request, *args, **kwargs):
         try:
             # Load the JSON payload directly from request.data
