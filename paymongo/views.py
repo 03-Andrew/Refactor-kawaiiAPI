@@ -17,6 +17,8 @@ from django.http import JsonResponse
 from .models import WebhookEvent
 from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
+from transactions.models import Customer
+from .serializers import CustomerSerializer
 #from .serializers import PaymentSerializer, PaymentIntentListSerializer, CardPaymentSerializer
 #from .serializers import PaymentIntentSerializer, CardPaymentMethodSerializer, AttachPaymentMethodSerializer
 
@@ -276,3 +278,8 @@ class WebhookNotif(APIView):
 
         except Exception as e:
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+#TEST
+class CustomerListCreate(generics.ListCreateAPIView):
+    queryset = Customer.objects.all()
+    serializer_class = CustomerSerializer
