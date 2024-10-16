@@ -3,8 +3,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view
 from bookings.models import Booking,Room
-from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment
+from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing
+
+from transactions.serializers import BillingSerialzerBase
 from .serializers import BookingsSerializer,RoomStatusListSerializer, RoomBookingListSerializer, RoomStatusSerializer,BookingsListSerializer, AmenitiesSerializer,AmenitiesAvailedSerializer, AmenitiesAvailedListSerializer, ActivitiesSerializer,ActivitiesAvailedSerializer, ActivitiesAvailedListSerializer
+
+
 from rest_framework import generics
 from django.db.models import Count, Q, F, Subquery, OuterRef
 from datetime import date
@@ -317,4 +321,39 @@ class AddAmenitiesAndActivitiesAvailed(APIView):
         
         
 class UpadtePendingBookings(APIView):
-    pass
+    def patch(self, request, *args, **kwargs):
+        updatedRooms = request.data.get('booking', [])
+        updatedBilling = request.data.get('billing', None)
+
+        response_data = []
+        for data in updatedRooms:
+            booking_id = data.get('id')
+
+            try:
+                booking = Booking.objects.get(id=booking_id)
+            except Booking.DoesNotExist:
+                return Response({"detail": f"Booking {booking_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+            
+            serializer = BookingsSerializer(booking, data=data, partial=True)
+
+            if serializer.is_valid():
+                serializer.save()
+                response_data.append(serializer.data)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        if updatedBilling:
+            try:
+                billing = Billing.objects.get(id=updatedBilling['id'])
+            except Billing.DoesNotExist:
+                return Response({"detail", "Billing does not exist"}, status=status.HTTP_404_NOT_FOUND)
+            
+            billing_serializer = BillingSerialzerBase(billing, data=updatedBilling, partial=True)
+
+            if billing_serializer.is_valid():
+                billing_serializer.save()
+            else:
+                return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        return Response({"updated_rooms": response_data, 'billing':billing_serializer.data}, status=status.HTTP_200_OK)
+    
