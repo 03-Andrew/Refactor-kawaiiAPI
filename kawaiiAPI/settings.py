@@ -121,6 +121,7 @@ CSRF_TRUSTED_ORIGINS = [
 CSRF_COOKIE_SECURE = True 
 CSRF_COOKIE_HTTPONLY = False  
 CSRF_USE_SESSIONS = False  
+SECURE_SSL_REDIRECT = True
 
 DATABASES = {
    'default': {
@@ -198,5 +199,5 @@ GRAPH_MODELS = {
 
 # AUTH_USER_MODEL = "user.CustomUser"
 
-#PAYMONGO_SECRET_KEY = 'sk_test_BgfRTwhj8KST9FiBQJttyHbk'  # this is just a key for testing
-PAYMONGO_SECRET_KEY = os.getenv('PAYMONGO_SECRET_KEY')
+PAYMONGO_SECRET_KEY = 'sk_test_BgfRTwhj8KST9FiBQJttyHbk'  # this is just a key for testing
+#PAYMONGO_SECRET_KEY = os.getenv('PAYMONGO_SECRET_KEY')
