@@ -23,13 +23,13 @@ from rest_framework.permissions import IsAuthenticated
 #from .serializers import PaymentSerializer, PaymentIntentListSerializer, CardPaymentSerializer
 #from .serializers import PaymentIntentSerializer, CardPaymentMethodSerializer, AttachPaymentMethodSerializer
 
-class CsrfExemptSessionAuthentication(SessionAuthentication):
-    def enforce_csrf(self, request):
-        return  # To not perform the CSRF check
+# class CsrfExemptSessionAuthentication(SessionAuthentication):
+#     def enforce_csrf(self, request):
+#         return  # To not perform the CSRF check
 
 class CardPayment(APIView):
-    authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
-    permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
+    # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
+    # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
 
     def post(self, request):
         # Step 1: Validate the incoming data using the combined serializer
@@ -160,8 +160,8 @@ class CardPayment(APIView):
 
 #GCASH
 class GCashSource(APIView):
-    authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
-    permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
+    # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
+    # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
     def post(self, request, *args, **kwargs):
         data = request.data
         url = "https://api.paymongo.com/v1/sources"
@@ -201,8 +201,8 @@ class GCashSource(APIView):
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
 
 class GCashPayment(APIView):
-    authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
-    permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
+    # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
+    # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
     def post(self, request, *args, **kwargs):
         payload = request.data
         event_type = payload['data']['attributes']['type']
@@ -249,8 +249,8 @@ class GCashPayment(APIView):
     
 #TEST WEBHOOK 1
 class WebhookNotif(APIView):  
-    authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
-    permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
+    # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
+    # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
     def post(self, request, *args, **kwargs):
         try:
             # Load the JSON payload directly from request.data
