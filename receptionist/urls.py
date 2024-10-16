@@ -29,4 +29,7 @@ urlpatterns = [
     path('api/activities-availed/', views.ActivitiesListAvailed.as_view(), name="activities-availed"), 
     #For deleting/updating activities (not sure if this is needed?)
     path('api/activities-availed-detail/<str:pk>/',views.ActivitiesDetailAvailed.as_view(),name = "activities-detail-availed"), 
+    
+    # To add both amenities and activities availed
+    path('api/activites-amenities-availed/add', views.AddAmenitiesAndActivitiesAvailed.as_view(), name="add-amenity-activity-availed")
 ]   

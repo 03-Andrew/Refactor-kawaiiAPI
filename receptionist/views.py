@@ -26,7 +26,6 @@ class BookingPagination(PageNumberPagination):
     page_size = 10  # You can set a default page size
     page_size_query_param = 'page_size'  # Allows dynamic page sizing by passing this in query params
 
-
 def get_bookingqueryset(request):
     queryset = Booking.objects.all()
     customer_name = request.GET.get('customer')  
@@ -274,7 +273,48 @@ class ActivitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ActivitiesAvailedSerializer
     primary_key = 'pk'
     queryset = ActivitiesAvailed.objects.all()
-    
-    
 
+class AddAmenitiesAndActivitiesAvailed(APIView):
+     def get(self, request, format=None):
+        return Response({"message": "Use POST to submit amenities and activities."}, status=200)
     
+     def post(self, request, format=None):
+        amenities_data = request.data.get('amenities', [])
+        activities_data = request.data.get('activities', [])
+        
+        created_amenities = []
+        created_activities = []
+
+        # Wrap in a transaction to ensure all-or-nothing behavior
+        with transaction.atomic():
+            # Handle amenities if provided
+            if amenities_data:
+                if isinstance(amenities_data, dict):
+                    amenities_data = [amenities_data]  # Single amenity
+            
+                for amenity_data in amenities_data:
+                    amenity_serializer = AmenitiesAvailedSerializer(data=amenity_data)
+                    amenity_serializer.is_valid(raise_exception=True)
+                    amenity_serializer.save()
+                    created_amenities.append(amenity_serializer.data)
+
+            # Handle activities if provided
+            if activities_data:
+                if isinstance(activities_data, dict):
+                    activities_data = [activities_data]  # Single activity
+                
+                for activity_data in activities_data:
+                    activity_serializer = ActivitiesAvailedSerializer(data=activity_data)
+                    activity_serializer.is_valid(raise_exception=True)
+                    activity_serializer.save()
+                    created_activities.append(activity_serializer.data)
+
+        # Return combined response
+        return Response({
+            'created_amenities': created_amenities,
+            'created_activities': created_activities
+        }, status=status.HTTP_201_CREATED)
+        
+        
+class UpadtePendingBookings(APIView):
+    pass

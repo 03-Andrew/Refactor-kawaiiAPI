@@ -90,7 +90,8 @@ class FoodBillSerializer2(ModelSerializer):
         model = FoodBill
         fields = ['id', 'price', 'or_number']
         
-           
+
+
 class AdditionalPaymentSerializer(ModelSerializer):
     class Meta:
         model = AdditonalPayment
