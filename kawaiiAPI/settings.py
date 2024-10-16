@@ -11,8 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
-
-
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -199,4 +198,5 @@ GRAPH_MODELS = {
 
 # AUTH_USER_MODEL = "user.CustomUser"
 
-PAYMONGO_SECRET_KEY = 'sk_test_BgfRTwhj8KST9FiBQJttyHbk'  # this is just a key for testing
+#PAYMONGO_SECRET_KEY = 'sk_test_BgfRTwhj8KST9FiBQJttyHbk'  # this is just a key for testing
+PAYMONGO_SECRET_KEY = os.getenv('PAYMONGO_SECRET_KEY')
