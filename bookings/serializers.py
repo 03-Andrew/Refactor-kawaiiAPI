@@ -29,6 +29,7 @@ class RoomStatusSerializer(serializers.ModelSerializer):
 
 class BookingSerializer2(serializers.ModelSerializer):
     room_type = serializers.CharField(source='room_type.name', read_only=True)
+    room_type_id = serializers.IntegerField(source='room_type.id', read_only=True)
     number_of_nights = serializers.SerializerMethodField()
     total_cost = serializers.SerializerMethodField()
     status = serializers.CharField(source='status.name', read_only=True)
@@ -43,7 +44,7 @@ class BookingSerializer2(serializers.ModelSerializer):
     
     class Meta:
         model = Booking
-        fields = ['room', 'room_type', 'check_in', 'check_out','adult_count','children_count', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
+        fields = ['room', 'room_type', 'room_type_id', 'check_in', 'check_out','adult_count','children_count', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
 
 
 

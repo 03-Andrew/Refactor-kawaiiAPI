@@ -244,6 +244,28 @@ class ActivitiesListAvailed(generics.ListCreateAPIView):
         if self.request.method == 'POST':
             return ActivitiesAvailedSerializer
         return ActivitiesAvailedListSerializer
+        
+    def create(self, request, *args, **kwargs):
+        # Check if the request is coming from the built-in API form
+        if isinstance(request.data, dict):  # Single amenity
+            activities_data = [request.data]
+        elif isinstance(request.data, list):  # Multiple amenities
+            activities_data = request.data
+        else:
+            return Response({'error': 'Expected a list of amenities.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        created_amenities = []
+        
+        # Wrap in a transaction to ensure all-or-nothing behavior
+        with transaction.atomic():
+            for amenity_data in activities_data:
+                serializer = self.get_serializer(data=amenity_data)
+                serializer.is_valid(raise_exception=True)
+                self.perform_create(serializer)
+                created_amenities.append(serializer.data)
+
+        return Response(created_amenities, status=status.HTTP_201_CREATED)
+
 
     def get_queryset(self):
         return get_activitiesavailedqueryset(self.request)
