@@ -31,7 +31,6 @@ class CardPayment(APIView):
     # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
     # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
 
-    @csrf_exempt
     def post(self, request):
         # Step 1: Validate the incoming data using the combined serializer
         combined_serializer = CardPaymentSerializer(data=request.data)
@@ -108,7 +107,6 @@ class CardPayment(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @csrf_exempt
     def create_payment_intent(self, intent_data, headers):
         """Create a payment intent."""
         payment_intent_url = 'https://api.paymongo.com/v1/payment_intents'
@@ -124,7 +122,6 @@ class CardPayment(APIView):
         }
         return requests.post(payment_intent_url, json=intent_payload, headers=headers)
 
-    @csrf_exempt
     def create_payment_method(self, method_data, headers):
         """Create a payment method."""
         payment_method_url = 'https://api.paymongo.com/v1/payment_methods'
@@ -148,7 +145,6 @@ class CardPayment(APIView):
         }
         return requests.post(payment_method_url, json=method_payload, headers=headers)
 
-    @csrf_exempt
     def attach_payment_method(self, payment_intent_id, payment_method_id, attach_data, headers):
         """Attach the payment method to the payment intent."""
         attach_url = f'https://api.paymongo.com/v1/payment_intents/{payment_intent_id}/attach'
@@ -166,7 +162,7 @@ class CardPayment(APIView):
 class GCashSource(APIView):
     # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
     # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
-    @csrf_exempt
+
     def post(self, request, *args, **kwargs):
         data = request.data
         url = "https://api.paymongo.com/v1/sources"
@@ -209,7 +205,7 @@ class GCashSource(APIView):
 class GCashPayment(APIView):
     # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
     # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
-    @csrf_exempt
+
     def post(self, request, *args, **kwargs):
         payload = request.data
         event_type = payload['data']['attributes']['type']
@@ -226,7 +222,6 @@ class GCashPayment(APIView):
 
         return Response({"status": "success"}, status=status.HTTP_200_OK)
     
-    @csrf_exempt
     def create_payment(self, source_id, amount):
         url = "https://api.paymongo.com/v1/payments"
         
@@ -259,7 +254,6 @@ class GCashPayment(APIView):
 class WebhookNotif(APIView):  
     # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
     # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
-    @csrf_exempt
     def post(self, request, *args, **kwargs):
         try:
             # Load the JSON payload directly from request.data
@@ -282,7 +276,6 @@ class WebhookNotif(APIView):
         except Exception as e:
             # Handle any other exceptions that may arise
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    @csrf_exempt
     def get(self, request, *args, **kwargs):
         try:
             # Retrieve all webhook events from the database
