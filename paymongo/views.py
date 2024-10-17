@@ -251,31 +251,52 @@ class GCashPayment(APIView):
         return response.json()
     
 #TEST WEBHOOK 1
-class WebhookNotif(APIView):  
-    # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
-    # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
+class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
         try:
-            # Load the JSON payload directly from request.data
-            payload = request.data  
+            # Get the signature from the headers
+            paymongo_signature = request.headers.get('Paymongo-Signature', None)
+            
+            if not paymongo_signature:
+                return Response({'status': 'error', 'message': 'Signature missing'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Extract the event type safely
+            # Split the signature into components (timestamp, test signature, live signature)
+            parts = paymongo_signature.split(',')
+            timestamp = parts[0].split('=')[1]  # Extract the timestamp
+            test_signature = parts[1].split('=')[1]  # Extract the test mode signature
+
+            # Concatenate the timestamp and the request's raw body
+            raw_body = request.body
+            signature_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
+            
+            # Verify the HMAC signature using the webhook secret
+            webhook_secret = settings.PAYMONGO_WEBHOOK_SECRET
+            computed_signature = hmac.new(
+                webhook_secret.encode('utf-8'),
+                signature_payload.encode('utf-8'),
+                hashlib.sha256
+            ).hexdigest()
+
+            if computed_signature != test_signature:
+                return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Proceed with processing the event if signature is valid
+            payload = request.data
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
 
-            # Check if event_type is available
             if event_type:
                 # Save the payload and event type to the database
                 WebhookEvent.objects.create(
                     event_type=event_type,
-                    payload=payload  # Save entire JSON object
+                    payload=payload
                 )
                 return Response({'status': 'success'}, status=status.HTTP_200_OK)
             else:
                 return Response({'status': 'event type missing'}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            # Handle any other exceptions that may arise
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
     def get(self, request, *args, **kwargs):
         try:
             # Retrieve all webhook events from the database
@@ -289,4 +310,3 @@ class WebhookNotif(APIView):
 
         except Exception as e:
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
