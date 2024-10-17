@@ -14,8 +14,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework.pagination import LimitOffsetPagination
 
-
-
+from django.db import transaction
 from datetime import datetime, timedelta, date
 
 
@@ -279,14 +278,6 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RoomSerializer
 
 
-
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.db import transaction
-from datetime import datetime
-
 class CreateStayInBooking(APIView):
     def post(self, request):
         customer_data = request.data.get('customer')
@@ -346,3 +337,5 @@ class CreateStayInBooking(APIView):
 class RoomTypes(generics.ListAPIView):
     serializer_class = RoomTypeSerializer
     queryset = RoomType.objects.all()
+
+

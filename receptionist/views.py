@@ -8,7 +8,6 @@ from transactions.models import Amenities, AmenitiesAvailed, Activity,Activities
 from transactions.serializers import BillingSerialzerBase
 from .serializers import BookingsSerializer,RoomStatusListSerializer, RoomBookingListSerializer, RoomStatusSerializer,BookingsListSerializer, AmenitiesSerializer,AmenitiesAvailedSerializer, AmenitiesAvailedListSerializer, ActivitiesSerializer,ActivitiesAvailedSerializer, ActivitiesAvailedListSerializer
 
-
 from rest_framework import generics
 from django.db.models import Count, Q, F, Subquery, OuterRef
 from datetime import date
@@ -25,7 +24,6 @@ from django.utils.decorators import method_decorator
 
 
 # Create your views here.
-
 class BookingPagination(PageNumberPagination):
     page_size = 10  # You can set a default page size
     page_size_query_param = 'page_size'  # Allows dynamic page sizing by passing this in query params

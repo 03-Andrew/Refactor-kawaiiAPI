@@ -1,5 +1,7 @@
 from django.shortcuts import render
 from django.db.models import F, Sum, Q, Exists, OuterRef
+from datetime import date, timedelta
+from calendar import monthrange
 
 from rest_framework.views import APIView
 from rest_framework import generics
@@ -102,9 +104,29 @@ class AddFoodBill(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         serializer.save()
     
-class CreateNewCustomerBilling(generics.CreateAPIView):
-    pass    
 
+class GetWeeklyReports(APIView):
+     def get(self, request):
+        month = int(request.query_params.get('month', 1))  
+        year = int(request.query_params.get('year', 2024))
+        week = int(request.query_params.get('week', 1))
 
-class T(generics.RetrieveAPIView):
-    pass
+        # Calculate the first day of the month
+        first_day = date(year, month, 1)
+        start_of_week = first_day + timedelta(days=(week - 1) * 7)
+        days_in_month = monthrange(year, month)[1]
+
+        start_of_week = min(start_of_week, date(year, month, days_in_month))
+
+        end_of_week = start_of_week + timedelta(days=6)
+        if end_of_week.month != month:
+            end_of_week = date(year, month, days_in_month)
+
+        earnings = (Payment.objects
+                    .filter(date__range=[start_of_week, end_of_week])
+                    .values('date')
+                    .annotate(total_earnings=Sum('amount'))
+                    .order_by('date'))
+
+        return Response(earnings)
+    

@@ -20,5 +20,7 @@ urlpatterns = [
     path("api/guests-status/edit/<int:pk>/", views.EditGuestListStatus.as_view(), name="edit-guest-list"),
     
     path("api/foodbill/add/", views.AddFoodBill.as_view(), name="add-food-bill"),
+
+    path("api/weekly-earnings/", views.GetWeeklyReports.as_view(), name='weekly-report'),
     
 ]
