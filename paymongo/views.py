@@ -280,7 +280,7 @@ class WebhookNotif(APIView):
             if computed_signature != test_signature:
                 return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Proceed with processing the event if signature is validd
+            # Proceed with processing the event if signature is validdd
             payload = request.data
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
 
