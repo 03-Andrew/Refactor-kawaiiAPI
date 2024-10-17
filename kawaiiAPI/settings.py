@@ -11,8 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
-
-
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,12 +26,13 @@ SECRET_KEY = 'django-insecure-le41^5*zazcf%@9r2vmkip1%h#f)uba6osnt1_4-v2o9f$(bmb
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*'] # Added localhost
+ALLOWED_HOSTS = ['.vercel.app','127.0.0.1'] # Added localhost
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'whitenoise.runserver_nostatic',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -59,6 +59,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -113,14 +114,16 @@ DATABASES = {
 #    }
 # }
 # CSRF HEHE
-CSRF_TRUSTED_ORIGINS = [
-    'https://kawaii-api.vercel.app',  
-    'http://localhost:3000',             
-]
+# CSRF_TRUSTED_ORIGINS = [
+#     'https://kawaii-api.vercel.app',  
+#     'http://localhost:3000', 
+#     'https://kawaii-vj-fork.vercel.app',            
+# ]
 
-CSRF_COOKIE_SECURE = True 
-CSRF_COOKIE_HTTPONLY = False  
-CSRF_USE_SESSIONS = False  
+# CSRF_COOKIE_SECURE = True 
+# CSRF_COOKIE_HTTPONLY = False  
+# CSRF_USE_SESSIONS = False  
+# SECURE_SSL_REDIRECT = True
 
 # DATABASES = {
 #    'default': {
@@ -169,6 +172,9 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+STATIC_DIRS = [os.path.join(BASE_DIR, 'accounts/static')]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
 STATICFILES_DIRS = [
     BASE_DIR / 'static'
 ]
@@ -199,3 +205,4 @@ GRAPH_MODELS = {
 # AUTH_USER_MODEL = "user.CustomUser"
 
 PAYMONGO_SECRET_KEY = 'sk_test_BgfRTwhj8KST9FiBQJttyHbk'  # this is just a key for testing
+#PAYMONGO_SECRET_KEY = os.getenv('PAYMONGO_SECRET_KEY')

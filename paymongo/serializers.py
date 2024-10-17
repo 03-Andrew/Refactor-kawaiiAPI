@@ -3,6 +3,7 @@ from .models import WebhookEvent
 from transactions.models import Payment
 from rest_framework.serializers import ModelSerializer
 
+
 class CardPaymentSerializer(serializers.Serializer):
     amount = serializers.IntegerField()
     description = serializers.CharField(max_length=255)
