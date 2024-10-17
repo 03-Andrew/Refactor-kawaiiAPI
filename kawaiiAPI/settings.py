@@ -114,16 +114,16 @@ WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
 #    }
 # }
 # CSRF HEHE
-CSRF_TRUSTED_ORIGINS = [
-    'https://kawaii-api.vercel.app',  
-    'http://localhost:3000', 
-    'https://kawaii-vj-fork.vercel.app',            
-]
+# CSRF_TRUSTED_ORIGINS = [
+#     'https://kawaii-api.vercel.app',  
+#     'http://localhost:3000', 
+#     'https://kawaii-vj-fork.vercel.app',            
+# ]
 
-CSRF_COOKIE_SECURE = True 
-CSRF_COOKIE_HTTPONLY = False  
-CSRF_USE_SESSIONS = False  
-SECURE_SSL_REDIRECT = True
+# CSRF_COOKIE_SECURE = True 
+# CSRF_COOKIE_HTTPONLY = False  
+# CSRF_USE_SESSIONS = False  
+# SECURE_SSL_REDIRECT = True
 
 DATABASES = {
    'default': {
