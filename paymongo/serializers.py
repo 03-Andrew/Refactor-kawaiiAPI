@@ -15,9 +15,7 @@ class CardPaymentSerializer(serializers.Serializer):
     exp_month = serializers.IntegerField()
     exp_year = serializers.IntegerField()
     cvc = serializers.CharField(max_length=4)
-    billing_name = serializers.CharField(max_length=100)
-    billing_email = serializers.EmailField()
-    billing_phone = serializers.CharField(max_length=15)
+    billing_id = serializers.IntegerField()
     return_url = serializers.URLField()
 
 class WebhookEventSerializer(serializers.ModelSerializer):

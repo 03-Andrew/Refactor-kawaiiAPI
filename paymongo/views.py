@@ -7,7 +7,7 @@ from django.conf import settings
 import base64
 from rest_framework import generics
 from .serializers import CardPaymentSerializer, WebhookEventSerializer
-from transactions.models import Payment
+from transactions.models import Billing
 import logging
 import json
 import requests
@@ -42,22 +42,38 @@ class CardPayment(APIView):
         # Extract validated data from the combined serializer
         validated_data = combined_serializer.validated_data
 
+        # Extract billing_id from the request
+        billing_id = validated_data.get('billing_id')
+
+        try:
+            # Step 3: Retrieve the Billing instance and associated customer
+            billing = Billing.objects.get(id=billing_id)
+            customer = billing.customer
+
+            # Extract customer details (using __str__ method for name)
+            customer_name = str(customer)
+            customer_email = customer.email
+            customer_phone = customer.contact_number
+
+        except Billing.DoesNotExist:
+            return Response({"error": "Invalid billing ID"}, status=status.HTTP_400_BAD_REQUEST)
+
         # Separate validated data for clarity
         intent_data = {
             "amount": validated_data['amount'],
             "description": validated_data['description'],
             "payment_method_allowed": validated_data['payment_method_allowed'],
         }
-        
+
         method_data = {
             "payment_type": validated_data['payment_type'],
             "card_number": validated_data['card_number'],
             "exp_month": validated_data['exp_month'],
             "exp_year": validated_data['exp_year'],
             "cvc": validated_data['cvc'],
-            "billing_name": validated_data['billing_name'],
-            "billing_email": validated_data['billing_email'],
-            "billing_phone": validated_data['billing_phone'],
+            "billing_name": customer_name,
+            "billing_email": customer_email,
+            "billing_phone": customer_phone,
         }
 
         attach_data = {
@@ -74,7 +90,7 @@ class CardPayment(APIView):
                 'Content-Type': 'application/json',
             }
 
-            # Step 3: Create Payment Intent
+            # Step 4: Create Payment Intent
             payment_intent_response = self.create_payment_intent(intent_data, headers)
             if payment_intent_response.status_code != 200:
                 return Response(payment_intent_response.json(), status=payment_intent_response.status_code)
@@ -82,7 +98,7 @@ class CardPayment(APIView):
             intent_response_data = payment_intent_response.json()
             payment_intent_id = intent_response_data['data']['id']
 
-            # Step 4: Create Card Payment Method
+            # Step 5: Create Card Payment Method
             payment_method_response = self.create_payment_method(method_data, headers)
             if payment_method_response.status_code != 200:
                 return Response(payment_method_response.json(), status=payment_method_response.status_code)
@@ -90,14 +106,14 @@ class CardPayment(APIView):
             method_response_data = payment_method_response.json()
             payment_method_id = method_response_data['data']['id']
 
-            # Step 5: Attach Payment Method to Payment Intent
+            # Step 6: Attach Payment Method to Payment Intent
             attach_response = self.attach_payment_method(payment_intent_id, payment_method_id, attach_data, headers)
             if attach_response.status_code != 200:
                 return Response(attach_response.json(), status=attach_response.status_code)
 
             attach_response_data = attach_response.json()
 
-            # Step 6: Return success response with the payment intent and method data
+            # Step 7: Return success response with the payment intent and method data
             return Response({
                 "payment_intent_id": intent_response_data['data']['id'],  
                 "payment_method_id": method_response_data['data']['id'], 
