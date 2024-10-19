@@ -59,15 +59,10 @@ class CardPayment(APIView):
             return Response({"error": "Invalid billing ID"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Separate validated data for clarity
-        metadata = {
-            "billing_id": validated_data.pop('billing_id')
-        }
-        
         intent_data = {
             "amount": validated_data['amount'],
             "description": validated_data['description'],
             "payment_method_allowed": validated_data['payment_method_allowed'],
-            "metadata": metadata 
         }
 
         method_data = {
@@ -79,12 +74,10 @@ class CardPayment(APIView):
             "billing_name": customer_name,
             "billing_email": customer_email,
             "billing_phone": customer_phone,
-            "metadata": metadata 
         }
 
         attach_data = {
-            "return_url": validated_data['return_url'],
-            "metadata": metadata 
+            "return_url": validated_data['return_url']
         }
 
         try:
@@ -140,7 +133,6 @@ class CardPayment(APIView):
                     "currency": "PHP",
                     "description": intent_data['description'],
                     "payment_method_allowed": intent_data['payment_method_allowed'],
-                    "metadata": intent_data.get('metadata'),
                 }
             }
         }
@@ -163,8 +155,7 @@ class CardPayment(APIView):
                         "name": method_data['billing_name'],
                         "email": method_data['billing_email'],
                         "phone": method_data['billing_phone'],
-                    },
-                    "metadata": method_data.get('metadata'),
+                    }
                 }
             }
         }
@@ -177,8 +168,7 @@ class CardPayment(APIView):
             "data": {
                 "attributes": {
                     "payment_method": payment_method_id,
-                    "return_url": attach_data['return_url'],
-                    "metadata": attach_data.get('metadata'),
+                    "return_url": attach_data['return_url']
                 }
             }
         }
