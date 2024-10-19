@@ -356,7 +356,10 @@ class UpadtePendingBookings(APIView):
         return Response({"updated_rooms": response_data, 'billing':billing_serializer.data}, status=status.HTTP_200_OK)
     
 
-class GetPayments(generics.ListAPIView):
+class GetPayments(generics.ListCreateAPIView):
     serializer_class = PaymentSerializer
-    queryset = Payment.objects.all()
+
+    def get_queryset(self):
+        queryset = Payment.objects.all()
     
+        return queryset.order_by('-date')

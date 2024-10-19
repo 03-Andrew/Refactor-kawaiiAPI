@@ -14,10 +14,11 @@ from django.utils.decorators import method_decorator
 from django.db.models.functions import ExtractMonth
 
 from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill
-from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer
+from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking
 
 from receptionist.serializers import FoodBillSerializer
 from bookings.serializers import BookingSerializer
+from bookings.models import Booking
 
 # 1. List View - for listing all Billings
 class BillingList(generics.ListAPIView):
@@ -64,6 +65,12 @@ class ListBillingBooking(generics.ListAPIView):
         queryset = Billing.objects.filter(Q(bookings__isnull=False) & Q(bookings__status__exact=1)).distinct()
 
         return queryset
+
+class ListConfirmedBooking(generics.ListAPIView):
+    serializer_class = ConfirmedBooking
+    def get_queryset(self):
+        queryset = Booking.objects.filter(status=2).order_by("-check_out")
+        return queryset
     
 class GuestListView(generics.ListCreateAPIView):
     queryset = GuestList.objects.all()
@@ -106,6 +113,10 @@ class AddFoodBill(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         serializer.save()
     
+class ModifyFoodBill(generics.RetrieveUpdateAPIView):
+    serializer_class = FoodBillSerializer
+    queryset = FoodBill.objects.all()
+    lookup_field = 'pk'
 
 class GetWeeklyReports(APIView):
     def get(self, request):
