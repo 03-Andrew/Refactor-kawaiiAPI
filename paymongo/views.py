@@ -27,6 +27,16 @@ from rest_framework.permissions import IsAuthenticated
 #     def enforce_csrf(self, request):
 #         return  # To not perform the CSRF check
 
+import base64
+import requests
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .models import Billing  # Make sure you import your Billing model
+from .serializers import CardPaymentSerializer  # Adjust the import based on your structure
+from django.conf import settings
+
+
 class CardPayment(APIView):
     # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
     # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
@@ -67,7 +77,7 @@ class CardPayment(APIView):
             "amount": validated_data['amount'],
             "description": validated_data['description'],
             "payment_method_allowed": validated_data['payment_method_allowed'],
-            "metadata": metadata 
+            "metadata": metadata  
         }
 
         method_data = {
@@ -79,7 +89,7 @@ class CardPayment(APIView):
             "billing_name": customer_name,
             "billing_email": customer_email,
             "billing_phone": customer_phone,
-            "metadata": metadata 
+            "metadata": metadata  
         }
 
         attach_data = {
@@ -140,7 +150,7 @@ class CardPayment(APIView):
                     "currency": "PHP",
                     "description": intent_data['description'],
                     "payment_method_allowed": intent_data['payment_method_allowed'],
-                    "metadata": intent_data.get('metadata'),
+                    "metadata": intent_data['metadata'],  
                 }
             }
         }
@@ -164,7 +174,7 @@ class CardPayment(APIView):
                         "email": method_data['billing_email'],
                         "phone": method_data['billing_phone'],
                     },
-                    "metadata": method_data.get('metadata'),
+                    "metadata": method_data['metadata'], 
                 }
             }
         }
@@ -178,7 +188,7 @@ class CardPayment(APIView):
                 "attributes": {
                     "payment_method": payment_method_id,
                     "return_url": attach_data['return_url'],
-                    "metadata": attach_data.get('metadata'),
+                    "metadata": attach_data['metadata'], 
                 }
             }
         }
