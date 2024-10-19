@@ -63,6 +63,7 @@ class CardPayment(APIView):
             "amount": validated_data['amount'],
             "description": validated_data['description'],
             "payment_method_allowed": validated_data['payment_method_allowed'],
+            "billing_id": billing_id, 
         }
 
         method_data = {
@@ -74,10 +75,12 @@ class CardPayment(APIView):
             "billing_name": customer_name,
             "billing_email": customer_email,
             "billing_phone": customer_phone,
+            "billing_id": billing_id, 
         }
 
         attach_data = {
-            "return_url": validated_data['return_url']
+            "return_url": validated_data['return_url'],
+            "billing_id": billing_id,  
         }
 
         try:
@@ -133,6 +136,9 @@ class CardPayment(APIView):
                     "currency": "PHP",
                     "description": intent_data['description'],
                     "payment_method_allowed": intent_data['payment_method_allowed'],
+                },
+                "metadata": {
+                        "billing_id": intent_data['billing_id'],
                 }
             }
         }
@@ -155,7 +161,10 @@ class CardPayment(APIView):
                         "name": method_data['billing_name'],
                         "email": method_data['billing_email'],
                         "phone": method_data['billing_phone'],
-                    }
+                    },
+                },
+                "metadata": {
+                        "billing_id": method_data['billing_id'],
                 }
             }
         }
@@ -168,7 +177,10 @@ class CardPayment(APIView):
             "data": {
                 "attributes": {
                     "payment_method": payment_method_id,
-                    "return_url": attach_data['return_url']
+                    "return_url": attach_data['return_url'],
+                },
+                "metadata": {
+                        "billing_id": attach_data['billing_id'],
                 }
             }
         }
