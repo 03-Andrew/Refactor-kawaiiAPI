@@ -27,16 +27,6 @@ from rest_framework.permissions import IsAuthenticated
 #     def enforce_csrf(self, request):
 #         return  # To not perform the CSRF check
 
-import base64
-import requests
-from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from .models import Billing  # Make sure you import your Billing model
-from .serializers import CardPaymentSerializer  # Adjust the import based on your structure
-from django.conf import settings
-
-
 class CardPayment(APIView):
     # authentication_classes = (CsrfExemptSessionAuthentication, BasicAuthentication)
     # permission_classes = (IsAuthenticated,)  # Modify this as per your requirements
