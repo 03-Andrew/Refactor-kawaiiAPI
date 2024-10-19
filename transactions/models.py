@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Sum, F
-
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 
 # Create your models here.
 class Customer(models.Model):
@@ -185,5 +186,8 @@ class Payment(models.Model):
     paymentFor = models.ForeignKey(PaymentFor, on_delete=models.PROTECT, null=True, blank=True)
     status = models.ForeignKey(PaymentStatus, on_delete=models.PROTECT, null=True, blank=True)
 
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    paid_for = GenericForeignKey('content_type', 'object_id')
     def __str__(self):
         return f"{self.customer_bill.id} {self.date}"

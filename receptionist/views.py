@@ -6,7 +6,7 @@ from bookings.models import Booking,Room
 from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing
 
 from transactions.serializers import BillingSerialzerBase
-from .serializers import BookingsSerializer,RoomStatusListSerializer, RoomBookingListSerializer, RoomStatusSerializer,BookingsListSerializer, AmenitiesSerializer,AmenitiesAvailedSerializer, AmenitiesAvailedListSerializer, ActivitiesSerializer,ActivitiesAvailedSerializer, ActivitiesAvailedListSerializer
+from .serializers import BookingsSerializer,RoomStatusListSerializer, RoomBookingListSerializer, RoomStatusSerializer,BookingsListSerializer, AmenitiesSerializer,AmenitiesAvailedSerializer, AmenitiesAvailedListSerializer, ActivitiesSerializer,ActivitiesAvailedSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
 
 from rest_framework import generics
 from django.db.models import Count, Q, F, Subquery, OuterRef
@@ -354,4 +354,9 @@ class UpadtePendingBookings(APIView):
                 return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
         return Response({"updated_rooms": response_data, 'billing':billing_serializer.data}, status=status.HTTP_200_OK)
+    
+
+class GetPayments(generics.ListAPIView):
+    serializer_class = PaymentSerializer
+    queryset = Payment.objects.all()
     

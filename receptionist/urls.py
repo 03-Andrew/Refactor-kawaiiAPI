@@ -35,5 +35,9 @@ urlpatterns = [
 
 
     # Update pending bookings
-    path('api/update-pending-bookings', views.UpadtePendingBookings.as_view(), name="update-pending-bookings")
+    path('api/update-pending-bookings', views.UpadtePendingBookings.as_view(), name="update-pending-bookings"),
+
+
+    # Test modified Payment if it works
+    path('api/all-payments', views.GetPayments.as_view(), name='get-payments')
 ]   
