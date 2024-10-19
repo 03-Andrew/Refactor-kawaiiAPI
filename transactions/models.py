@@ -179,12 +179,12 @@ class PaymentStatus(models.Model):
         return self.status
     
 class Payment(models.Model):
-    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="payment")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateTimeField()
-    mop = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT)
-    paymentFor = models.ForeignKey(PaymentFor, on_delete=models.PROTECT, null=True, blank=True)
-    status = models.ForeignKey(PaymentStatus, on_delete=models.PROTECT, null=True, blank=True)
+    mop = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT, related_name="payment")
+    paymentFor = models.ForeignKey(PaymentFor, on_delete=models.PROTECT, null=True, blank=True, related_name="payment")
+    status = models.ForeignKey(PaymentStatus, on_delete=models.PROTECT, null=True, blank=True, related_name="payment")
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
