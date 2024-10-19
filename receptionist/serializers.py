@@ -26,11 +26,6 @@ class RoomStatusSerializer(ModelSerializer):
         model = Room
         fields = '__all__'
 
-class PaymentSerializer(ModelSerializer):
-    class Meta:
-        model = Payment
-        fields = '__all__'
-
 class CustomerSerializer(ModelSerializer):
     class Meta:
         model = Customer
@@ -46,6 +41,11 @@ class BookingsSerializer(ModelSerializer):
     class Meta:
         model = Booking
         fields = '__all__'
+
+class BookingsSerializer2(ModelSerializer):
+    class Meta:
+        model = Booking
+        fields = ['room']
 
 class AmenitiesSerializer(ModelSerializer):
     class Meta:
@@ -205,3 +205,23 @@ class RoomStatusListSerializer(ModelSerializer):
     # Get today's check out (if there is)
         today_booking = Booking.objects.filter(room=obj, check_in__lte=date.today(), check_out__gte=date.today()).order_by('check_in').first()
         return today_booking.check_out if today_booking else None
+    
+
+
+class PaymentSerializer(ModelSerializer):
+    paid_for = SerializerMethodField()
+    class Meta:
+        model = Payment
+        fields = '__all__'
+    
+    def get_paid_for(self, obj):
+        if isinstance(obj.paid_for, Booking):
+            return BookingsSerializer2(obj.paid_for).data
+        elif isinstance(obj.paid_for, AmenitiesAvailed):
+            return AmenitiesAvailedSerializer2(obj.paid_for).data
+        elif isinstance(obj.paid_for, ActivitiesAvailed):
+            return ActivitiesAvailedSerializer2(obj.paid_for).data
+        elif isinstance(obj.paid_for, FoodBill):
+            return FoodBillSerializer(obj.paid_for).data
+        else:
+            return None

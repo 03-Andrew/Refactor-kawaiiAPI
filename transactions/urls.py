@@ -22,5 +22,7 @@ urlpatterns = [
     path("api/foodbill/add/", views.AddFoodBill.as_view(), name="add-food-bill"),
 
     path("api/weekly-earnings/", views.GetWeeklyReports.as_view(), name='weekly-report'),
+    path("api/monthly-report/", views.GetMonthlyReports.as_view(), name='monthly-report'),
+    path("api/total-per-month/", views.GetTotalEarningsPerMonth.as_view(), name='total-per-month')
     
 ]

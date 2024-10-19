@@ -334,8 +334,14 @@ class CreateStayInBooking(APIView):
         rBooking['children_count'] = int(rBooking['children_count'])
         rBooking['adult_count'] = int(rBooking['adult_count'])
 
-class RoomTypes(generics.ListAPIView):
-    serializer_class = RoomTypeSerializer
-    queryset = RoomType.objects.all()
+# class RoomTypes(generics.ListAPIView):
+#     serializer_class = RoomTypeSerializer
+#     queryset = RoomType.objects.all()
 
 
+class RoomTypes(APIView):
+    def get(self, request):
+        types = RoomType.objects.all()
+        serializer = RoomTypeSerializer(types, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+      
