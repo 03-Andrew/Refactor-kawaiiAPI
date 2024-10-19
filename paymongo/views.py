@@ -250,129 +250,67 @@ class GCashSource(APIView):
         else:
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
         
-# class WebhookNotif(APIView):
-#     def post(self, request, *args, **kwargs):
-#         try:
-#             # Get the signature from the headers
-#             paymongo_signature = request.headers.get('Paymongo-Signature', None)
-
-#             if not paymongo_signature:
-#                 return Response({'status': 'error', 'message': 'Signature missing'}, status=status.HTTP_200_OK)
-
-#             parts = paymongo_signature.split(',')
-#             timestamp = parts[0].split('=')[1]
-#             test_signature = parts[1].split('=')[1]
-
-#             raw_body = request.body
-#             signature_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
-
-#             webhook_secret = settings.PAYMONGO_WEBHOOK_SECRET
-#             computed_signature = hmac.new(
-#                 webhook_secret.encode('utf-8'),
-#                 signature_payload.encode('utf-8'),
-#                 hashlib.sha256
-#             ).hexdigest()
-
-#             if computed_signature != test_signature:
-#                 return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_200_OK)
-
-#             # Proceed with processing the event if signature is valid
-#             payload = request.data
-#             event_type = payload.get('data', {}).get('attributes', {}).get('type')
-#             status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
-#             source_type = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('type')
-
-#             is_chargeable = status == 'chargeable'
-#             is_gcash = source_type == 'gcash'
-            
-#             if is_chargeable and is_gcash:
-#                 # Extract relevant details from the payload
-#                 source_data = payload['data']['attributes']['data']
-#                 source_id = source_data['id']
-#                 amount = source_data['attributes']['amount']
-#                 billing_info = source_data['attributes']['billing']
-#                 description = source_data['attributes'].get('description', "GCash Payment")  # Use default if not provided
-
-#                 # Create GCash payment
-#                 self.create_gcash_payment(source_id, amount, billing_info, description)
-
-#             # Save the payload and event type to the database
-#             WebhookEvent.objects.create(
-#                 event_type=event_type,
-#                 payload=payload
-#             )
-#             return Response({'status': 'success'}, status=status.HTTP_200_OK)
-
-#         except Exception as e:
-#             logging.error(f"Error processing webhook: {str(e)}")
-#             # Return a 200 status even in case of an error
-#             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_200_OK)
-
-#     def create_gcash_payment(self, source_id, amount, billing_info, description):
-#         url = "https://api.paymongo.com/v1/payments"
-
-#         # Payload to create a payment
-#         payload = {
-#             "data": {
-#                 "attributes": {
-#                     "amount": amount,
-#                     "source": {
-#                         "id": source_id,
-#                         "type": "source"
-#                     },
-#                     "currency": "PHP",
-#                     "description": description,
-#                     "billing": {
-#                         "name": billing_info['name'],
-#                         "email": billing_info['email'],
-#                         "phone": billing_info['phone']
-#                     }
-#                 }
-#             }
-#         }
-
-#         headers = {
-#             'accept': 'application/json',
-#             'authorization': f'Basic {base64.b64encode(f"{settings.PAYMONGO_SECRET_KEY}:".encode()).decode()}',
-#             'content-type': 'application/json',
-#         }
-
-#         # Send request to PayMongo to create a payment
-#         response = requests.post(url, json=payload, headers=headers)
-#         return response.json()
-
-#     def get(self, request, *args, **kwargs):
-#         try:
-#             webhook_events = WebhookEvent.objects.all()
-#             serializer = WebhookEventSerializer(webhook_events, many=True)
-#             return Response(serializer.data, status=status.HTTP_200_OK)
-
-#         except Exception as e:
-#             logging.error(f"Error retrieving webhook events: {str(e)}")
-#             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_200_OK)
-
-        
-
-class GCashPayment(APIView):
+class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
-        payload = request.data
-        event_type = payload['data']['attributes']['type']
+        try:
+            # Get the signature from the headers
+            paymongo_signature = request.headers.get('Paymongo-Signature', None)
 
+            if not paymongo_signature:
+                return Response({'status': 'error', 'message': 'Signature missing'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check for chargeable event
-        if event_type == 'source.chargeable':
-            source_data = payload['data']['attributes']['data']
-            source_id = source_data['id']
-            amount = source_data['attributes']['amount']
+            parts = paymongo_signature.split(',')
+            timestamp = parts[0].split('=')[1]
+            test_signature = parts[1].split('=')[1]
+
+            raw_body = request.body
+            signature_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
+
+            webhook_secret = settings.PAYMONGO_WEBHOOK_SECRET
+            computed_signature = hmac.new(
+                webhook_secret.encode('utf-8'),
+                signature_payload.encode('utf-8'),
+                hashlib.sha256
+            ).hexdigest()
+
+            if computed_signature != test_signature:
+                return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
+
+            # Proceed with processing the event if signature is valid
+            payload = request.data
+            event_type = payload.get('data', {}).get('attributes', {}).get('type')
+            status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
+            source_type = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('type')
+
+            is_chargeable = status == 'chargeable'
+            is_gcash = source_type == 'gcash'
             
-            # Proceed to create a payment using the chargeable source
-            self.create_payment(source_id, amount)
+            if is_chargeable and is_gcash:
+                # Extract relevant details from the payload
+                source_data = payload['data']['attributes']['data']
+                source_id = source_data['id']
+                amount = source_data['attributes']['amount']
+                billing_info = source_data['attributes']['billing']
+                description = source_data['attributes'].get('description', "GCash Payment")  # Use default if not provided
 
-        return Response({"status": "success"}, status=status.HTTP_200_OK)
-    
-    def create_payment(self, source_id, amount):
+                # Create GCash payment
+                self.create_gcash_payment(source_id, amount, billing_info, description)
+
+            # Save the payload and event type to the database
+            WebhookEvent.objects.create(
+                event_type=event_type,
+                payload=payload
+            )
+            return Response({'status': 'success'}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logging.error(f"Error processing webhook: {str(e)}")
+            # Return an error with appropriate status code
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def create_gcash_payment(self, source_id, amount, billing_info, description):
         url = "https://api.paymongo.com/v1/payments"
-        
+
         # Payload to create a payment
         payload = {
             "data": {
@@ -383,7 +321,12 @@ class GCashPayment(APIView):
                         "type": "source"
                     },
                     "currency": "PHP",
-                    "description": "GCash Payment"
+                    "description": description,
+                    "billing": {
+                        "name": billing_info['name'],
+                        "email": billing_info['email'],
+                        "phone": billing_info['phone']
+                    }
                 }
             }
         }
@@ -398,49 +341,6 @@ class GCashPayment(APIView):
         response = requests.post(url, json=payload, headers=headers)
         return response.json()
 
-class WebhookNotif(APIView):
-    def post(self, request, *args, **kwargs):
-        try:
-            # Get the signature from the headers
-            paymongo_signature = request.headers.get('Paymongo-Signature', None)
-            
-            if not paymongo_signature:
-                return Response({'status': 'error', 'message': 'Signature missing'}, status=status.HTTP_400_BAD_REQUEST)
-
-            parts = paymongo_signature.split(',')
-            timestamp = parts[0].split('=')[1]  
-            test_signature = parts[1].split('=')[1]  
-
-            raw_body = request.body
-            signature_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
-            
-            webhook_secret = settings.PAYMONGO_WEBHOOK_SECRET
-            computed_signature = hmac.new(
-                webhook_secret.encode('utf-8'),
-                signature_payload.encode('utf-8'),
-                hashlib.sha256
-            ).hexdigest()
-
-            if computed_signature != test_signature:
-                return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Proceed with processing the event if signature is validdd
-            payload = request.data
-            event_type = payload.get('data', {}).get('attributes', {}).get('type')
-
-            if event_type:
-                # Save the payload and event type to the database
-                WebhookEvent.objects.create(
-                    event_type=event_type,
-                    payload=payload
-                )
-                return Response({'status': 'success'}, status=status.HTTP_200_OK)
-            else:
-                return Response({'status': 'event type missing'}, status=status.HTTP_400_BAD_REQUEST)
-
-        except Exception as e:
-            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
     def get(self, request, *args, **kwargs):
         try:
             webhook_events = WebhookEvent.objects.all()
@@ -448,5 +348,104 @@ class WebhookNotif(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            logging.error(f"Error retrieving webhook events: {str(e)}")
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# class GCashPayment(APIView):
+#     def post(self, request, *args, **kwargs):
+#         payload = request.data
+#         event_type = payload['data']['attributes']['type']
+
+
+#         # Check for chargeable event
+#         if event_type == 'source.chargeable':
+#             source_data = payload['data']['attributes']['data']
+#             source_id = source_data['id']
+#             amount = source_data['attributes']['amount']
+            
+#             # Proceed to create a payment using the chargeable source
+#             self.create_payment(source_id, amount)
+
+#         return Response({"status": "success"}, status=status.HTTP_200_OK)
+    
+#     def create_payment(self, source_id, amount):
+#         url = "https://api.paymongo.com/v1/payments"
+        
+#         # Payload to create a payment
+#         payload = {
+#             "data": {
+#                 "attributes": {
+#                     "amount": amount,
+#                     "source": {
+#                         "id": source_id,
+#                         "type": "source"
+#                     },
+#                     "currency": "PHP",
+#                     "description": "GCash Payment"
+#                 }
+#             }
+#         }
+
+#         headers = {
+#             'accept': 'application/json',
+#             'authorization': f'Basic {base64.b64encode(f"{settings.PAYMONGO_SECRET_KEY}:".encode()).decode()}',
+#             'content-type': 'application/json',
+#         }
+
+#         # Send request to PayMongo to create a payment
+#         response = requests.post(url, json=payload, headers=headers)
+#         return response.json()
+
+# class WebhookNotif(APIView):
+#     def post(self, request, *args, **kwargs):
+#         try:
+#             # Get the signature from the headers
+#             paymongo_signature = request.headers.get('Paymongo-Signature', None)
+            
+#             if not paymongo_signature:
+#                 return Response({'status': 'error', 'message': 'Signature missing'}, status=status.HTTP_400_BAD_REQUEST)
+
+#             parts = paymongo_signature.split(',')
+#             timestamp = parts[0].split('=')[1]  
+#             test_signature = parts[1].split('=')[1]  
+
+#             raw_body = request.body
+#             signature_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
+            
+#             webhook_secret = settings.PAYMONGO_WEBHOOK_SECRET
+#             computed_signature = hmac.new(
+#                 webhook_secret.encode('utf-8'),
+#                 signature_payload.encode('utf-8'),
+#                 hashlib.sha256
+#             ).hexdigest()
+
+#             if computed_signature != test_signature:
+#                 return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
+
+#             # Proceed with processing the event if signature is validdd
+#             payload = request.data
+#             event_type = payload.get('data', {}).get('attributes', {}).get('type')
+
+#             if event_type:
+#                 # Save the payload and event type to the database
+#                 WebhookEvent.objects.create(
+#                     event_type=event_type,
+#                     payload=payload
+#                 )
+#                 return Response({'status': 'success'}, status=status.HTTP_200_OK)
+#             else:
+#                 return Response({'status': 'event type missing'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         except Exception as e:
+#             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+#     def get(self, request, *args, **kwargs):
+#         try:
+#             webhook_events = WebhookEvent.objects.all()
+#             serializer = WebhookEventSerializer(webhook_events, many=True)
+#             return Response(serializer.data, status=status.HTTP_200_OK)
+
+#         except Exception as e:
+#             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
