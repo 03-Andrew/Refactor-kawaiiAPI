@@ -57,7 +57,6 @@ class GuestStatusSerializer(serializers.ModelSerializer):
         fields = ['id','status']
 
 class GuestListSerializer(serializers.ModelSerializer):
-    status = GuestStatusSerializer()
     class Meta:
         model = GuestList
         fields = ['id', 'guest', 'status']
@@ -130,7 +129,7 @@ class PendingBookings(serializers.ModelSerializer):
 
         if downpayment_payment_for:
             # Retrieve the first Payment linked to this Billing that is for down payment
-            payment = obj.payment_set.filter(paymentFor=downpayment_payment_for).first()  
+            payment = obj.payment.filter(paymentFor=downpayment_payment_for).first()  
             
             if payment:
                 return {
