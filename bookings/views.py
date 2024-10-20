@@ -182,8 +182,6 @@ class AvailableRooms(generics.ListAPIView):
         check_out = self.request.GET.get('check_out')
         r_type = self.request.GET.get('type')
         
-        if not r_type:
-            r_type = 1
 
         # Set default dates if not provided
         if not check_in or not check_out:
@@ -204,8 +202,10 @@ class AvailableRooms(generics.ListAPIView):
         # Return available rooms
         queryset = Room.objects.exclude(
             Q(bookings__check_in__lt=check_out_date) & Q(bookings__check_out__gt=check_in_date)
-        ).distinct().filter(status__id=1).filter(type__id=r_type)
+        ).distinct().filter(status__id=1)
         
+        if r_type:
+            queryset.filter(type__id=r_type)
 
         return queryset
 
@@ -358,14 +358,14 @@ class GetBookedNow(APIView):
 
         data ={}
         for room in rooms:
-            booking = Booking.objects.filter(room=room, check_in__lte=today, check_out__gte=today)
+        # Get the booking for today
+            booking = Booking.objects.filter(room=room, check_in__lte=today, check_out__gte=today).first()  # Get the first booking if it exists
+            if booking:  # If a booking exists for today
+                serialized_data = CurrentRoomBookings(booking)  # Serialize the booking
+                data[room.id] = serialized_data.data  # Store serialized data in response
+            else:
+                data[room.id] = None  # No bookings for this room today
             
-            
-            if booking:
-                serializedData = BookingSerializer(booking) 
-                print(serializedData)
-                print(booking)
-        
         return Response(data)
 
 
