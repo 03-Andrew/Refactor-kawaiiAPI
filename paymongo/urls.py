@@ -10,7 +10,7 @@ urlpatterns = [
     path('api/payment-card/', CardPayment.as_view(), name='create_payment_card'), #FINAL
 
     # For GCASH
-    path('api/source-gcash/', GCashSource.as_view(), name='create_source_gcash'),
+    path('api/payment-gcash/', GCashSource.as_view(), name='create_source_gcash'),
     # path('api/payment-gcash/', GCashPayment.as_view(), name='create_payment_gcash'),
 
     # Webhook testing
