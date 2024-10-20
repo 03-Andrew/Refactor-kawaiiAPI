@@ -47,7 +47,7 @@ class CardPayment(APIView):
             billing = Billing.objects.get(id=billing_id)
             customer = billing.customer
 
-            # Extract customer details (using __str__ method for name)
+            # Extract customer details
             customer_name = str(customer)
             customer_email = customer.email
             customer_phone = customer.contact_number
@@ -55,12 +55,18 @@ class CardPayment(APIView):
         except Billing.DoesNotExist:
             return Response({"error": "Invalid billing ID"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Separate validated data for clarity
+        # New fields to include in the description
+        payment_for = validated_data.get('payment_for')
+        payment_status = validated_data.get('payment_status')
+        content_type = validated_data.get('content_type')
+        object_id = validated_data.get('object_id')
+
+        # Construct the description with all necessary fields
         intent_data = {
             "amount": validated_data['amount'],
-            "description": f"{billing_id} - {validated_data['description']}",
+            "description": f"{billing_id} - {payment_for} - {payment_status} - {content_type} - {object_id} - {validated_data['description']}",
             "payment_method_allowed": validated_data['payment_method_allowed'],
-            "billing_id": billing_id, 
+            "billing_id": billing_id,
         }
 
         method_data = {
@@ -72,12 +78,12 @@ class CardPayment(APIView):
             "billing_name": customer_name,
             "billing_email": customer_email,
             "billing_phone": customer_phone,
-            "billing_id": billing_id, 
+            "billing_id": billing_id,
         }
 
         attach_data = {
             "return_url": validated_data['return_url'],
-            "billing_id": billing_id,  
+            "billing_id": billing_id,
         }
 
         try:
@@ -115,8 +121,8 @@ class CardPayment(APIView):
 
             # Step 7: Return success response with the payment intent and method data
             return Response({
-                "payment_intent_id": intent_response_data['data']['id'],  
-                "payment_method_id": method_response_data['data']['id'], 
+                "payment_intent_id": intent_response_data['data']['id'],
+                "payment_method_id": method_response_data['data']['id'],
                 "attached_method": attach_response_data['data']['id']
             }, status=status.HTTP_200_OK)
 
@@ -134,9 +140,6 @@ class CardPayment(APIView):
                     "description": intent_data['description'],
                     "payment_method_allowed": intent_data['payment_method_allowed'],
                 },
-                "metadata": {
-                        "billing_id": intent_data['billing_id'],
-                }
             }
         }
         return requests.post(payment_intent_url, json=intent_payload, headers=headers)
@@ -160,9 +163,6 @@ class CardPayment(APIView):
                         "phone": method_data['billing_phone'],
                     },
                 },
-                "metadata": {
-                        "billing_id": method_data['billing_id'],
-                }
             }
         }
         return requests.post(payment_method_url, json=method_payload, headers=headers)
@@ -176,9 +176,6 @@ class CardPayment(APIView):
                     "payment_method": payment_method_id,
                     "return_url": attach_data['return_url'],
                 },
-                "metadata": {
-                        "billing_id": attach_data['billing_id'],
-                }
             }
         }
         return requests.post(attach_url, json=attach_payload, headers=headers)
@@ -211,10 +208,16 @@ class GCashSource(APIView):
         except Billing.DoesNotExist:
             return Response({"error": "Invalid billing ID"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # New fields to include in the description
+        payment_for = validated_data.get('payment_for')
+        payment_status = validated_data.get('payment_status')  # Default to 'pending' if not provided
+        content_type = validated_data.get('content_type')  # Get content type from validated data
+        object_id = validated_data.get('object_id')  # Using object_id from input or default to billing_id
+
         # Step 4: Prepare the payload for creating a GCash source
         url = "https://api.paymongo.com/v1/sources"
         custom_description = validated_data.get('description')  # Get the custom description
-        description = f"{billing_id} - {custom_description}"  # Combine billing_id and custom description
+        description = f"{billing_id} - {payment_for} - {payment_status} - {content_type} - {object_id} - {custom_description}"
 
         payload = {
             "data": {
@@ -225,9 +228,9 @@ class GCashSource(APIView):
                         "failed": validated_data['failed_url'],
                     },
                     "billing": {
-                        "name": customer_name,  # Use customer name from the Billing instance
-                        "phone": customer_phone,  # Use customer phone from the Billing instance
-                        "email": customer_email,  # Use customer email from the Billing instance
+                        "name": customer_name,
+                        "phone": customer_phone,
+                        "email": customer_email,
                     },
                     "currency": "PHP",
                     "type": "gcash",
