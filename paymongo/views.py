@@ -278,20 +278,14 @@ class WebhookNotif(APIView):
 
             # Proceed with processing the event if signature is valid
             payload = request.data
-            event_id = payload.get('data', {}).get('id')  # Get the unique event ID
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
-            description = payload.get('data', {}).get('attributes', {}).get('description', "")
-            billing_id = description.split(" - ")[0] if description else None  # Extract billing ID from description
             status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
+            source_type = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('type')
+
             is_chargeable = status == 'chargeable'
-
-            # Check if the event ID already exists
-            if WebhookEvent.objects.filter(event_id=event_id).exists():
-                logging.info(f"Duplicate event detected: {event_id}")
-                return Response({'status': 'success', 'message': 'Duplicate event ignored'}, status=status.HTTP_200_OK)
-
-            # If the event is chargeable, proceed with payment creation
-            if is_chargeable:
+            is_gcash = source_type == 'gcash'
+            
+            if is_chargeable and is_gcash:
                 # Extract relevant details from the payload
                 source_data = payload['data']['attributes']['data']
                 source_id = source_data['id']
@@ -302,17 +296,8 @@ class WebhookNotif(APIView):
                 # Create GCash payment
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
-            # Retrieve the billing object
-            try:
-                billing = Billing.objects.get(id=billing_id)
-            except Billing.DoesNotExist:
-                logging.error(f"Billing record not found for ID: {billing_id}")
-                return Response({'status': 'error', 'message': 'Billing record not found'}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Save the payload and event type to the database with event_id
+            # Save the payload and event type to the database
             WebhookEvent.objects.create(
-                event_id=event_id,
-                billing=billing,
                 event_type=event_type,
                 payload=payload
             )
@@ -320,6 +305,7 @@ class WebhookNotif(APIView):
 
         except Exception as e:
             logging.error(f"Error processing webhook: {str(e)}")
+            # Return an error with appropriate status code
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def create_gcash_payment(self, source_id, amount, billing_info, description):
@@ -364,7 +350,6 @@ class WebhookNotif(APIView):
         except Exception as e:
             logging.error(f"Error retrieving webhook events: {str(e)}")
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 
 # class GCashPayment(APIView):
