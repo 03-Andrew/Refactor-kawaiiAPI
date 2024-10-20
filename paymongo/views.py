@@ -307,39 +307,49 @@ class WebhookNotif(APIView):
                 self.create_gcash_payment(source_id, amount, billing_info, description)
             
             elif is_paid:
-                # Extract relevant details from the payload
+                logging.info(f"Processing paid event for source: {source_id}")
                 source_data = payload['data']['attributes']['data']
-                source_id = source_data['id']
-                amount = source_data['attributes']['amount']
-                billing_info = source_data['attributes']['billing']
-                description = source_data['attributes'].get('description', "GCash Payment")  # Use default if not provided
-                payment_type = source_data['attributes']['source']['type']  # card type, e.g., 'visa'
                 
-                # Split description to get additional fields (e.g. payment_for, payment_status, content_type, object_id)
-                description_parts = description.split("\\")
+                try:
+                    source_id = source_data['id']
+                    amount = source_data['attributes']['amount']
+                    billing_info = source_data['attributes']['billing']
+                    description = source_data['attributes'].get('description', "GCash Payment")
+                    payment_type = source_data['attributes']['source']['type']
+                    
+                    # Logging the description parts for debugging
+                    description_parts = description.split("\\")
+                    logging.info(f"Description parts: {description_parts}")
 
-                if len(description_parts) >= 5:
-                    payment_for_name = description_parts[1]
-                    payment_status_name = description_parts[2]
-                    content_type_name = description_parts[3]
-                    object_id = description_parts[4]
+                    if len(description_parts) >= 5:
+                        payment_for_name = description_parts[1]
+                        payment_status_name = description_parts[2]
+                        content_type_name = description_parts[3]
+                        object_id = description_parts[4]
 
-                    # Fetch related models
-                    payment_for = PaymentFor.objects.get(name=payment_for_name)
-                    payment_status = PaymentStatus.objects.get(name=payment_status_name)
-                    content_type = ContentType.objects.get(model=content_type_name)
+                        # Fetch related models
+                        payment_for = PaymentFor.objects.get(name=payment_for_name)
+                        payment_status = PaymentStatus.objects.get(name=payment_status_name)
+                        content_type = ContentType.objects.get(model=content_type_name)
 
-                    # Create a Payment model
-                    Payment.objects.create(
-                        customer_bill=billing_id,
-                        amount=amount / 100,  # assuming amount is in cents
-                        date=timezone.now(),
-                        mop=payment_type,  # type of card or method of payment
-                        paymentFor=payment_for,
-                        status=payment_status,
-                        content_type=content_type,
-                        object_id=object_id,
-                    )
+                        # Create a Payment model
+                        Payment.objects.create(
+                            customer_bill=billing_id,
+                            amount=amount / 100,
+                            date=timezone.now(),
+                            mop=payment_type,
+                            paymentFor=payment_for,
+                            status=payment_status,
+                            content_type=content_type,
+                            object_id=object_id,
+                        )
+
+                        logging.info(f"Payment created successfully for billing ID: {billing_id}")
+                    else:
+                        logging.warning(f"Description does not have enough parts: {description_parts}")
+                except Exception as e:
+                    logging.error(f"Error processing paid event: {str(e)}")
+                    return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             # Save the payload and event type to the database
             WebhookEvent.objects.create(
