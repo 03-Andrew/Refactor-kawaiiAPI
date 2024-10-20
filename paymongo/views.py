@@ -7,7 +7,7 @@ from django.conf import settings
 import base64
 from rest_framework import generics
 from .serializers import CardPaymentSerializer, GCashSourceSerializer, WebhookEventSerializer
-from transactions.models import Billing
+from transactions.models import Billing,PaymentFor,Payment,PaymentStatus
 import logging
 import json
 import requests
@@ -15,11 +15,9 @@ import hmac
 import hashlib
 from django.http import JsonResponse
 from .models import WebhookEvent
-from django.views.decorators.csrf import csrf_protect
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from django.contrib.contenttypes.models import ContentType
 #from .serializers import PaymentSerializer, PaymentIntentListSerializer, CardPaymentSerializer
 #from .serializers import PaymentIntentSerializer, CardPaymentMethodSerializer, AttachPaymentMethodSerializer
 
@@ -300,6 +298,42 @@ class WebhookNotif(APIView):
 
                 # Create GCash payment
                 self.create_gcash_payment(source_id, amount, billing_info, description)
+
+            # Check if the event is 'payment.paid'
+            if event_type == 'payment.paid' and billing_id and event_id:
+                # Extract relevant details from the payload
+                source_data = payload['data']['attributes']['data']
+                source_id = source_data['id']
+                amount = source_data['attributes']['amount']
+                billing_info = source_data['attributes']['billing']
+                description = source_data['attributes'].get('description', "GCash Payment")  # Use default if not provided
+                payment_type = source_data['attributes']['source']['type']  # card type, e.g., 'visa'
+                
+                # Split description to get additional fields (e.g. payment_for, payment_status, content_type, object_id)
+                description_parts = description.split(" - ")
+
+                if len(description_parts) >= 5:
+                    payment_for_name = description_parts[1]
+                    payment_status_name = description_parts[2]
+                    content_type_name = description_parts[3]
+                    object_id = description_parts[4]
+
+                    # Fetch related models
+                    payment_for = PaymentFor.objects.get(name=payment_for_name)
+                    payment_status = PaymentStatus.objects.get(name=payment_status_name)
+                    content_type = ContentType.objects.get(model=content_type_name)
+
+                    # Create a Payment model
+                    Payment.objects.create(
+                        customer_bill=billing_id,
+                        amount=amount / 100,  # assuming amount is in cents
+                        date=timezone.now(),
+                        mop=payment_type,  # type of card or method of payment
+                        paymentFor=payment_for,
+                        status=payment_status,
+                        content_type=content_type,
+                        object_id=object_id,
+                    )
 
             # Save the payload and event type to the database
             WebhookEvent.objects.create(
