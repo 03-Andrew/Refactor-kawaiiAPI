@@ -59,4 +59,5 @@ class GCashSourceSerializer(serializers.Serializer):
 class WebhookEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = WebhookEvent
-        fields = ['event_type', 'payload', 'received_at']
+        fields = '__all__'  # Include all fields from the WebhookEvent model
+
