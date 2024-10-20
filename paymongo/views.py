@@ -276,26 +276,17 @@ class WebhookNotif(APIView):
             if computed_signature != test_signature:
                 return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
 
-            # Proceed with processing the event if the signature is valid
+            # Proceed with processing the event if signature is valid
             payload = request.data
             event_id = payload.get('data', {}).get('id')
             billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
-            billing_split = billing_description.split(" - ")[0] if billing_description else None
-
-            if not billing_split:
-                return Response({'status': 'error', 'message': 'Billing ID not found in description'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-            
-            try:
-                billing = Billing.objects.get(id=billing_split)
-            except Billing.DoesNotExist:
-                return Response({'status': 'error', 'message': 'Billing record not found'}, status=status.HTTP_404_NOT_FOUND)
-
-            # Get event type and status
+            billing_split = billing_description.split(" - ")[0] if billing_description else None 
+            billing_id = Billing.objects.get(id=billing_split)
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
             status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
 
             is_chargeable = status == 'chargeable'
-
+            
             if is_chargeable:
                 # Extract relevant details from the payload
                 source_data = payload['data']['attributes']['data']
@@ -310,19 +301,15 @@ class WebhookNotif(APIView):
             # Save the payload and event type to the database
             WebhookEvent.objects.create(
                 event_id=event_id,
-                billing=billing,
+                billing=billing_id,
                 event_type=event_type,
                 payload=payload
             )
-
-            return Response({'status': 'success', 'message': 'Webhook processed successfully'}, status=status.HTTP_200_OK)
-
-        except KeyError as ke:
-            logging.error(f"KeyError processing webhook: {str(ke)}")
-            return Response({'status': 'error', 'message': f'Missing field: {str(ke)}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
         except Exception as e:
             logging.error(f"Error processing webhook: {str(e)}")
+            # Return an error with appropriate status code
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def create_gcash_payment(self, source_id, amount, billing_info, description):
@@ -367,7 +354,6 @@ class WebhookNotif(APIView):
         except Exception as e:
             logging.error(f"Error retrieving webhook events: {str(e)}")
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 
 # class GCashPayment(APIView):
