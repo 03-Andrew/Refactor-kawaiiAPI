@@ -78,7 +78,7 @@ class Billing(models.Model):
     
     @property
     def paid_amount(self):
-        return sum(payment.amount for payment in self.payment_set.all())
+        return sum(payment.amount for payment in self.payment.all())
     
     @property
     def running_balance(self):

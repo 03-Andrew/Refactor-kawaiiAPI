@@ -4,7 +4,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 
 from .models import Room, Booking, RoomType
-from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer
+from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings
 
 from transactions.serializers import CustomerSerializer, BillingSerialzerBase
 
@@ -337,6 +337,36 @@ class CreateStayInBooking(APIView):
 class RoomTypes(generics.ListAPIView):
     serializer_class = RoomTypeSerializer
     queryset = RoomType.objects.all()
+
+
+class GetBookedRoomsNow(generics.ListAPIView):
+    serializer_class = BookingSerializer
+
+    def get_queryset(self):
+        today = datetime.now().date()
+        print(today)
+        queryset = Booking.objects.filter(
+            Q(status=2) & Q(check_in__lte=today) & Q(check_out__gte=today)
+        )
+        
+        return queryset
+
+class GetBookedNow(APIView):
+    def get(self, request):
+        today = datetime.now().date()
+        rooms = Room.objects.all()
+
+        data ={}
+        for room in rooms:
+            booking = Booking.objects.filter(room=room, check_in__lte=today, check_out__gte=today)
+            
+            
+            if booking:
+                serializedData = BookingSerializer(booking) 
+                print(serializedData)
+                print(booking)
+        
+        return Response(data)
 
 
 # class RoomTypes(APIView):

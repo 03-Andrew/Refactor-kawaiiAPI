@@ -20,7 +20,7 @@ class BookingSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Booking
-        fields = ['customer_bill', 'customer_name','room', 'room_type', 'check_in', 'check_out', 'adult_count', 'children_count', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
+        fields = ['id', 'customer_bill', 'customer_name','room', 'room_type', 'check_in', 'check_out', 'adult_count', 'children_count', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
 
 class RoomStatusSerializer(serializers.ModelSerializer):
     class Meta:
@@ -89,7 +89,11 @@ class AvailableRoomSerializer2(serializers.ModelSerializer):
         
         
 
+class CurrentRoomBookings(serializers.ModelSerializer):
+    room_type = serializers.CharField(source='room_type.name', read_only=True)
 
-     
+    class Meta:
+        model = Booking
+        fields = '__all__'
 
 

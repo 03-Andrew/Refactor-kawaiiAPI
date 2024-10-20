@@ -319,6 +319,7 @@ class AddAmenitiesAndActivitiesAvailed(APIView):
         
         
 class UpadtePendingBookings(APIView):
+
     def patch(self, request, *args, **kwargs):
         updatedRooms = request.data.get('booking', [])
         updatedBilling = request.data.get('billing', None)
