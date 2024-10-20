@@ -14,6 +14,6 @@ urlpatterns = [
     # path('api/payment-gcash/', GCashPayment.as_view(), name='create_payment_gcash'),
 
     # Webhook testing
-    path('api/webhook-notif/', WebhookNotif.as_view(), name='view_webhook_notif'), #FOR TESTING
+    path('api/webhook/', WebhookNotif.as_view(), name='view_webhook_notif'), #FOR TESTING
 
 ]

@@ -207,4 +207,4 @@ GRAPH_MODELS = {
 PAYMONGO_SECRET_KEY = 'sk_test_GkBLfuAdwtp77tPbBjhf8iag'  # this is just a key for testing
 #PAYMONGO_SECRET_KEY = os.getenv('PAYMONGO_SECRET_KEY')
 #PAYMONGO_WEBHOOK_SECRET = 'whsk_2oKw1JfVMTmkjCU9YAvkd3Mh' # For andrei's repo
-PAYMONGO_WEBHOOK_SECRET = 'whsk_Fa4wCMmRM9SZnXJX8DoNnxjq' # For my fork
+PAYMONGO_WEBHOOK_SECRET = '' # For my fork
