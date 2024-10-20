@@ -5,7 +5,7 @@ from .models import WebhookEvent
 
 @admin.register(WebhookEvent)
 class WebhookEventAdmin(admin.ModelAdmin):
-    list_display = ('id', 'event_id', 'billing', 'event_type', 'formatted_payload', 'received_at')  
+    list_display = ('id','event_type', 'formatted_payload', 'received_at')  
     search_fields = ('event_type',)  
     ordering = ('-received_at',)
 
