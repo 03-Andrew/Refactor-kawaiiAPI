@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     "django_extensions",
+    'background_task',
 
     'bookings',
     'transactions',
