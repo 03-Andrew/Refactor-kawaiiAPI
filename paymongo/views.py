@@ -286,9 +286,9 @@ class WebhookNotif(APIView):
             billing_split = billing_description.split(" - ")[0] if billing_description else None 
             billing_id = Billing.objects.get(id=billing_split)
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
-            status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
+            payment_status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
 
-            is_chargeable = status == 'chargeable'
+            is_chargeable = payment_status == 'chargeable'
             
             if is_chargeable:
                 # Extract relevant details from the payload
