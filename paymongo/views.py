@@ -288,7 +288,7 @@ class WebhookNotif(APIView):
 
             if is_paid:
                 # Create payment record
-                self.create_payment(source_id, amount, billing_id, payment_type, description)
+                self.create_payment(amount, billing_id, payment_type, description)
 
             # Create webhook event
             self.create_webhook_event(event_id, billing_id, event_type, payload)
@@ -330,7 +330,7 @@ class WebhookNotif(APIView):
             payload=payload
         )
 
-    def create_payment(source_id, amount, billing_id, payment_type, description):
+    def create_payment(self, amount, billing_id, payment_type, description):
     # Split description to get additional fields (e.g. payment_for, payment_status, content_type, object_id)
         description_parts = description.split(" - ")
 
