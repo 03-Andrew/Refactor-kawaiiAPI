@@ -256,27 +256,8 @@ class GCashSource(APIView):
 class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
         try:
-            # Get the signature from the headers
-            paymongo_signature = request.headers.get('Paymongo-Signature', None)
-
-            if not paymongo_signature:
-                return Response({'status': 'error', 'message': 'Signature missing'}, status=status.HTTP_400_BAD_REQUEST)
-
-            parts = paymongo_signature.split(',')
-            timestamp = parts[0].split('=')[1]
-            test_signature = parts[1].split('=')[1]
-
-            raw_body = request.body
-            signature_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
-
-            webhook_secret = settings.PAYMONGO_WEBHOOK_SECRET
-            computed_signature = hmac.new(
-                webhook_secret.encode('utf-8'),
-                signature_payload.encode('utf-8'),
-                hashlib.sha256
-            ).hexdigest()
-
-            if computed_signature != test_signature:
+            # Signature validation
+            if not self.validate_signature(request):
                 return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
 
             # Proceed with processing the event if signature is valid
@@ -301,19 +282,45 @@ class WebhookNotif(APIView):
                 # Create GCash payment
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
-            # Save the payload and event type to the database
-            WebhookEvent.objects.create(
-                event_id=event_id,
-                billing=billing_id,
-                event_type=event_type,
-                payload=payload
-            )
+            # Create webhook event
+            self.create_webhook_event(event_id, billing_id, event_type, payload)
+
             return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
         except Exception as e:
             logging.error(f"Error processing webhook: {str(e)}")
             # Return an error with appropriate status code
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def validate_signature(self, request):
+        # Get the signature from the headers
+        paymongo_signature = request.headers.get('Paymongo-Signature', None)
+        if not paymongo_signature:
+            return False
+
+        parts = paymongo_signature.split(',')
+        timestamp = parts[0].split('=')[1]
+        test_signature = parts[1].split('=')[1]
+
+        raw_body = request.body
+        signature_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
+
+        webhook_secret = settings.PAYMONGO_WEBHOOK_SECRET
+        computed_signature = hmac.new(
+            webhook_secret.encode('utf-8'),
+            signature_payload.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+
+        return computed_signature == test_signature
+
+    def create_webhook_event(self, event_id, billing_id, event_type, payload):
+        WebhookEvent.objects.create(
+            event_id=event_id,
+            billing=billing_id,
+            event_type=event_type,
+            payload=payload
+        )
 
     def create_gcash_payment(self, source_id, amount, billing_info, description):
         url = "https://api.paymongo.com/v1/payments"
@@ -357,7 +364,6 @@ class WebhookNotif(APIView):
         except Exception as e:
             logging.error(f"Error retrieving webhook events: {str(e)}")
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # class GCashPayment(APIView):
 #     def post(self, request, *args, **kwargs):
