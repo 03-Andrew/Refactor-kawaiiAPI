@@ -59,7 +59,7 @@ class BookingsSerializer(ModelSerializer):
 class BookingsSerializer2(ModelSerializer):
     class Meta:
         model = Booking
-        fields = ['room']
+        fields = ['room', 'adult_count', 'children_count']
 
 class AmenitiesSerializer(ModelSerializer):
     class Meta:

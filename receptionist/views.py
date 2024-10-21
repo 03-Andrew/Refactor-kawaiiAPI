@@ -360,7 +360,8 @@ class UpadtePendingBookings(APIView):
 class GetPayments(generics.ListCreateAPIView):
     serializer_class = PaymentSerializer
 
-    def get_queryset(self):
+    def get_queryset(self): 
         queryset = Payment.objects.all()
+
     
         return queryset.order_by('-date')

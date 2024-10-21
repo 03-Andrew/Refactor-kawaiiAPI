@@ -122,7 +122,7 @@ class Amenities(models.Model):
 
 class AmenitiesAvailed(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="amenities_availed")
-    amenity = models.ForeignKey(Amenities, on_delete=models.PROTECT)
+    amenity = models.ForeignKey(Amenities, on_delete=models.PROTECT, related_name="amenities_availed")
     head_count = models.SmallIntegerField()
     time = models.TimeField(null=True, blank=True)
     def __str__(self):
@@ -150,6 +150,20 @@ class ActivitiesAvailed(models.Model):
     @property
     def total_cost(self):
         return self.activity.hourly_rate * self.hours_availed if self.activity else 0
+
+
+class ExtraItems(models.Model):
+    item = models.CharField(max_length=100)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return self.item
+    
+class ExtraItemsAvailed(models.Model):
+    customer_bill = models.ForeignKey(Billing, on_delete=models.CASCADE, related_name="extra_items")
+    extraItem = models.ForeignKey(ExtraItems, on_delete=models.CASCADE, related_name="extra_items")
+    count = models.SmallIntegerField()
+
 
 class AdditonalPayment(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.CASCADE, related_name="additional_payment")
