@@ -264,6 +264,8 @@ class WebhookNotif(APIView):
 
             # Proceed with processing the event if signature is valid
             payload = request.data
+            logging.info("Payload data: %s", payload)  # Log the entire payload for debugging
+
             event_id = payload.get('data', {}).get('id')
             billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
             billing_split = billing_description.split(" - ")[0] if billing_description else None 
@@ -275,20 +277,28 @@ class WebhookNotif(APIView):
             is_paid = payment_status == 'paid'
             
             # Extract relevant details from the payload
-            source_data = payload['data']['attributes']['data']
-            source_id = source_data['id']
-            amount = source_data['attributes']['amount']
-            billing_info = source_data['attributes']['billing']
-            description = source_data['attributes'].get('description', "")  # Use default if not provided
-            payment_type = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('type')
+            source_data = payload.get('data', {}).get('attributes', {}).get('data', {})
+            if not source_data:
+                logging.error("Source data is missing from the payload.")
+                return Response({'status': 'error', 'message': 'Source data not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+            source_id = source_data.get('id')
+            amount = source_data.get('attributes', {}).get('amount')
+            billing_info = source_data.get('attributes', {}).get('billing', {})
+            description = source_data.get('attributes', {}).get('description', "")  # Use default if not provided
             
+            payment_type = source_data.get('attributes', {}).get('type')
+            if payment_type is None:
+                logging.error("Payment type is None.")
+                return Response({'status': 'error', 'message': 'Payment type not found'}, status=status.HTTP_400_BAD_REQUEST)
+
             if is_chargeable:
                 # Create GCash payment
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
             if is_paid:
                 # Create payment record
-                self.create_payment(amount, billing_id, payment_type, description)
+                self.create_payment(source_id, amount, billing_id, payment_type, description)
 
             # Create webhook event
             self.create_webhook_event(event_id, billing_id, event_type, payload)
