@@ -20,7 +20,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from rest_framework.permissions import IsAuthenticated
-import threading
 #from .serializers import PaymentSerializer, PaymentIntentListSerializer, CardPaymentSerializer
 #from .serializers import PaymentIntentSerializer, CardPaymentMethodSerializer, AttachPaymentMethodSerializer
 
@@ -65,7 +64,7 @@ class CardPayment(APIView):
         # Construct the description with all necessary fields
         intent_data = {
             "amount": validated_data['amount'],
-            "description": f"{billing_id}\{payment_for}\{payment_status}\{content_type}\{object_id}\{validated_data['description']}",
+            "description": f"{billing_id} - {payment_for} - {payment_status} - {content_type} - {object_id} - {validated_data['description']}",
             "payment_method_allowed": validated_data['payment_method_allowed'],
             "billing_id": billing_id,
         }
@@ -280,38 +279,25 @@ class WebhookNotif(APIView):
             if computed_signature != test_signature:
                 return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
 
-            # Respond immediately after validating the payload to let PayMongo know the webhook was received successfully
-            response = Response({'status': 'success'}, status=status.HTTP_200_OK)
-
-            # Proceed with processing the event in the background
+            # Proceed with processing the event if signature is valid
             payload = request.data
             event_id = payload.get('data', {}).get('id')
             billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
-            billing_split = billing_description.split("\\")[0] if billing_description else None
+            billing_split = billing_description.split(" - ")[0] if billing_description else None 
             billing_id = Billing.objects.get(id=billing_split)
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
             status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
 
-            # Extract relevant details from the payload
-            source_data = payload['data']['attributes']['data']
-            source_id = source_data['id']
-            amount = source_data['attributes']['amount']
-            billing_info = source_data['attributes']['billing']
-            description = source_data['attributes'].get('description', "GCash Payment")  # Use default if not provided
-
-            # Process event in the background using threading
-            threading.Thread(target=self.process_webhook_event, args=(event_id, billing_id, event_type, source_id, amount, billing_info, description, status, payload)).start()
-
-            return response  # Return success early
-
-        except Exception as e:
-            logging.error(f"Error processing webhook: {str(e)}")
-            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    def process_webhook_event(self, event_id, billing_id, event_type, source_id, amount, billing_info, description, status, payload):
-        try:
             is_chargeable = status == 'chargeable'
+            
             if is_chargeable:
+                # Extract relevant details from the payload
+                source_data = payload['data']['attributes']['data']
+                source_id = source_data['id']
+                amount = source_data['attributes']['amount']
+                billing_info = source_data['attributes']['billing']
+                description = source_data['attributes'].get('description', "GCash Payment")  # Use default if not provided
+
                 # Create GCash payment
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
@@ -322,9 +308,12 @@ class WebhookNotif(APIView):
                 event_type=event_type,
                 payload=payload
             )
+            return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            logging.error(f"Error processing webhook event in background: {str(e)}")
+            logging.error(f"Error processing webhook: {str(e)}")
+            # Return an error with appropriate status code
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def create_gcash_payment(self, source_id, amount, billing_info, description):
         url = "https://api.paymongo.com/v1/payments"
