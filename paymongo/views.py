@@ -7,7 +7,7 @@ from django.conf import settings
 import base64
 from rest_framework import generics
 from .serializers import CardPaymentSerializer, GCashSourceSerializer, WebhookEventSerializer
-from transactions.models import Billing
+from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus,PaymentFor
 import logging
 import json
 import requests
@@ -20,6 +20,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from django.contrib.contenttypes.models import ContentType
 #from .serializers import PaymentSerializer, PaymentIntentListSerializer, CardPaymentSerializer
 #from .serializers import PaymentIntentSerializer, CardPaymentMethodSerializer, AttachPaymentMethodSerializer
 
@@ -270,17 +272,23 @@ class WebhookNotif(APIView):
             payment_status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
 
             is_chargeable = payment_status == 'chargeable'
+            is_paid = payment_status == 'paid'
+            
+            # Extract relevant details from the payload
+            source_data = payload['data']['attributes']['data']
+            source_id = source_data['id']
+            amount = source_data['attributes']['amount']
+            billing_info = source_data['attributes']['billing']
+            description = source_data['attributes'].get('description', "")  # Use default if not provided
+            payment_type = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('type')
             
             if is_chargeable:
-                # Extract relevant details from the payload
-                source_data = payload['data']['attributes']['data']
-                source_id = source_data['id']
-                amount = source_data['attributes']['amount']
-                billing_info = source_data['attributes']['billing']
-                description = source_data['attributes'].get('description', "GCash Payment")  # Use default if not provided
-
                 # Create GCash payment
                 self.create_gcash_payment(source_id, amount, billing_info, description)
+
+            if is_paid:
+                # Create payment record
+                self.create_payment(source_id, amount, billing_id, payment_type, description)
 
             # Create webhook event
             self.create_webhook_event(event_id, billing_id, event_type, payload)
@@ -321,6 +329,34 @@ class WebhookNotif(APIView):
             event_type=event_type,
             payload=payload
         )
+
+    def create_payment(source_id, amount, billing_id, payment_type, description):
+    # Split description to get additional fields (e.g. payment_for, payment_status, content_type, object_id)
+        description_parts = description.split(" - ")
+
+        if len(description_parts) >= 5:
+            payment_for_name = description_parts[1]
+            payment_status_name = description_parts[2]
+            content_type_name = description_parts[3]
+            object_id = description_parts[4]
+
+            # Fetch related models
+            payment_for = PaymentFor.objects.get(name=payment_for_name)
+            payment_status = PaymentStatus.objects.get(name=payment_status_name)
+            payment_type = PaymentMethod.objects.get(name=payment_type)
+            content_type = ContentType.objects.get(model=content_type_name)
+
+            # Create a Payment model
+            Payment.objects.create(
+                customer_bill=billing_id,
+                amount=amount / 100,  # assuming amount is in cents
+                date=timezone.now(),
+                mop=payment_type,  # type of card or method of payment
+                paymentFor=payment_for,
+                status=payment_status,
+                content_type=content_type,
+                object_id=object_id,
+            )
 
     def create_gcash_payment(self, source_id, amount, billing_info, description):
         url = "https://api.paymongo.com/v1/payments"
