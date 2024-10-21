@@ -26,5 +26,6 @@ urlpatterns = [
     path('api-auth/', include('rest_framework.urls')),
     path('', include('receptionist.urls')),
     path('', include('user.urls')),
-    path('', include('paymongo.urls'))
+    path('', include('paymongo.urls')),
+    path('', include('reports.urls'))
 ]
