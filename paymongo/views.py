@@ -331,7 +331,6 @@ class WebhookNotif(APIView):
         )
 
     def create_payment(self, amount, billing_id, payment_type, description):
-    # Split description to get additional fields (e.g. payment_for, payment_status, content_type, object_id)
         description_parts = description.split(" - ")
 
         if len(description_parts) >= 5:
@@ -340,18 +339,39 @@ class WebhookNotif(APIView):
             content_type_name = description_parts[3]
             object_id = description_parts[4]
 
-            # Fetch related models
-            payment_for = PaymentFor.objects.get(name=payment_for_name)
-            payment_status = PaymentStatus.objects.get(status=payment_status_name)
-            payment_type = PaymentMethod.objects.get(mode=payment_type)
-            content_type = ContentType.objects.get(model=content_type_name)
+            try:
+                payment_for = PaymentFor.objects.get(name=payment_for_name)
+            except PaymentFor.DoesNotExist:
+                logging.error(f"PaymentFor with name '{payment_for_name}' does not exist.")
+                return
+
+            try:
+                payment_status = PaymentStatus.objects.get(status=payment_status_name)
+            except PaymentStatus.DoesNotExist:
+                logging.error(f"PaymentStatus with status '{payment_status_name}' does not exist.")
+                return
+
+            # Log the payment_type for debugging
+            logging.info(f"Attempting to find PaymentMethod with mode '{payment_type}'")
+            
+            try:
+                payment_method = PaymentMethod.objects.get(mode=payment_type)
+            except PaymentMethod.DoesNotExist:
+                logging.error(f"PaymentMethod with mode '{payment_type}' does not exist.")
+                return
+
+            try:
+                content_type = ContentType.objects.get(model=content_type_name)
+            except ContentType.DoesNotExist:
+                logging.error(f"ContentType with model '{content_type_name}' does not exist.")
+                return
 
             # Create a Payment model
             Payment.objects.create(
                 customer_bill=billing_id,
                 amount=amount / 100,  # assuming amount is in cents
                 date=timezone.now(),
-                mop=payment_type,  # type of card or method of payment
+                mop=payment_method,  # type of card or method of payment
                 paymentFor=payment_for,
                 status=payment_status,
                 content_type=content_type,
