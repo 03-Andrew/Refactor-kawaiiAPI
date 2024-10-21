@@ -313,7 +313,7 @@ class WebhookNotif(APIView):
         except Exception as e:
             logging.error(f"Error processing webhook: {str(e)}")
             # Return an error with appropriate status code
-            return Response({'status': 'success'}, status=status.HTTP_200_OK)
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def create_gcash_payment(self, source_id, amount, billing_info, description):
         url = "https://api.paymongo.com/v1/payments"
