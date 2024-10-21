@@ -278,6 +278,9 @@ class WebhookNotif(APIView):
 
             if computed_signature != test_signature:
                 return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
+            
+            # Respond immediately after validating the payload
+            response = Response({'status': 'success'}, status=status.HTTP_200_OK)
 
             # Proceed with processing the event if signature is valid
             payload = request.data
@@ -308,7 +311,7 @@ class WebhookNotif(APIView):
                 event_type=event_type,
                 payload=payload
             )
-            return Response({'status': 'success'}, status=status.HTTP_200_OK)
+            return response
 
         except Exception as e:
             logging.error(f"Error processing webhook: {str(e)}")
