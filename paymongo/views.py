@@ -342,8 +342,8 @@ class WebhookNotif(APIView):
 
             # Fetch related models
             payment_for = PaymentFor.objects.get(name=payment_for_name)
-            payment_status = PaymentStatus.objects.get(name=payment_status_name)
-            payment_type = PaymentMethod.objects.get(name=payment_type)
+            payment_status = PaymentStatus.objects.get(status=payment_status_name)
+            payment_type = PaymentMethod.objects.get(mode=payment_type)
             content_type = ContentType.objects.get(model=content_type_name)
 
             # Create a Payment model
