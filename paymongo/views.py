@@ -67,7 +67,6 @@ class CardPayment(APIView):
         intent_data = {
             "amount": validated_data['amount'],
             "description": f"{billing_id} - {payment_for} - {payment_status} - {content_type} - {object_id} - {validated_data['description']}",
-            "payment_method_allowed": validated_data['payment_method_allowed'],
             "billing_id": billing_id,
         }
 
