@@ -331,6 +331,8 @@ class WebhookNotif(APIView):
         )
 
     def create_payment(self, amount, billing_id, payment_type, description):
+        logging.info(f"Creating payment with amount: {amount}, billing_id: {billing_id}, payment_type: {payment_type}, description: {description}")
+        
         description_parts = description.split(" - ")
 
         if len(description_parts) >= 5:
@@ -351,8 +353,7 @@ class WebhookNotif(APIView):
                 logging.error(f"PaymentStatus with status '{payment_status_name}' does not exist.")
                 return
 
-            # Log the payment_type for debugging
-            logging.info(f"Attempting to find PaymentMethod with mode '{payment_type}'")
+            logging.info(f"PaymentMethod mode '{payment_type}'")
             
             try:
                 payment_method = PaymentMethod.objects.get(mode=payment_type)
@@ -367,6 +368,7 @@ class WebhookNotif(APIView):
                 return
 
             # Create a Payment model
+            logging.info(f"Creating Payment record for billing_id: {billing_id}")
             Payment.objects.create(
                 customer_bill=billing_id,
                 amount=amount / 100,  # assuming amount is in cents
@@ -377,6 +379,8 @@ class WebhookNotif(APIView):
                 content_type=content_type,
                 object_id=object_id,
             )
+        else:
+            logging.error("Description format is invalid.")
 
     def create_gcash_payment(self, source_id, amount, billing_info, description):
         url = "https://api.paymongo.com/v1/payments"
