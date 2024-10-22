@@ -140,7 +140,7 @@ class CardPayment(APIView):
                     "amount": intent_data['amount'],
                     "currency": "PHP",
                     "description": intent_data['description'],
-                    "payment_method_allowed": intent_data['payment_method_allowed'],
+                    "payment_method_allowed": ["card"],
                 },
             }
         }
@@ -152,7 +152,7 @@ class CardPayment(APIView):
         method_payload = {
             "data": {
                 "attributes": {
-                    "type": method_data['payment_type'],
+                    "type": "card",
                     "details": {
                         "card_number": method_data['card_number'],
                         "exp_month": method_data['exp_month'],
