@@ -12,8 +12,6 @@ class CardPaymentSerializer(serializers.Serializer):
     cvc = serializers.CharField(max_length=4)
     billing_id = serializers.IntegerField()
     return_url = serializers.URLField()
-
-    # New fields for the payment record
     payment_for = serializers.CharField(required=False) 
     payment_status = serializers.CharField(required=False)
     content_type = serializers.CharField(required=False) 
