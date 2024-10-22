@@ -115,6 +115,7 @@ class CardPayment(APIView):
 
             # Step 7: Return success response with the payment intent and method data
             return Response({
+                'status': 'success',
                 "payment_intent_id": intent_response_data['data']['id'],
                 "payment_method_id": method_response_data['data']['id'],
                 "attached_method": attach_response_data['data']['id']
