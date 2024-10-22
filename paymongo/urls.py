@@ -7,13 +7,13 @@ from .views import WebhookNotif
 
 urlpatterns = [
     # For posting card payments
-    path('api/payment-card/', CardPayment.as_view(), name='create_payment_card'), #FINAL
+    path('api/payment-card-disabled/', CardPayment.as_view(), name='create_payment_card'), #FINAL
 
     # For GCASH
-    path('api/payment-gcash/', GCashSource.as_view(), name='create_source_gcash'),
+    path('api/payment-gcash-disabled/', GCashSource.as_view(), name='create_source_gcash'),
     # path('api/payment-gcash/', GCashPayment.as_view(), name='create_payment_gcash'),
 
     # Webhook testing
-    path('api/webhook/', WebhookNotif.as_view(), name='view_webhook_notif'), #FOR TESTING
+    path('api/webhook-disabled/', WebhookNotif.as_view(), name='view_webhook_notif'), #FOR TESTING
 
 ]
