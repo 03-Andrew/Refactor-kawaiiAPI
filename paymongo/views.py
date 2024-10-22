@@ -280,7 +280,7 @@ class WebhookNotif(APIView):
             amount = source_data['attributes']['amount']
             billing_info = source_data['attributes']['billing']
             description = source_data['attributes'].get('description', "")  # Use default if not provided
-            payment_type = payload['data']['attributes']['data']['attributes']['source']['type']
+            payment_type = source_data['attributes'].get('source', {}).get('type', "")  # Use default value if 'source' or 'type' is not found
             
             if is_chargeable:
                 # Create GCash payment
