@@ -71,7 +71,6 @@ class CardPayment(APIView):
         }
 
         method_data = {
-            "payment_type": validated_data['payment_type'],
             "card_number": validated_data['card_number'],
             "exp_month": validated_data['exp_month'],
             "exp_year": validated_data['exp_year'],
