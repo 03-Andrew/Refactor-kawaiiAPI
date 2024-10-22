@@ -22,12 +22,6 @@ from rest_framework.authentication import SessionAuthentication, BasicAuthentica
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
-#from .serializers import PaymentSerializer, PaymentIntentListSerializer, CardPaymentSerializer
-#from .serializers import PaymentIntentSerializer, CardPaymentMethodSerializer, AttachPaymentMethodSerializer
-
-# class CsrfExemptSessionAuthentication(SessionAuthentication):
-#     def enforce_csrf(self, request):
-#         return  # To not perform the CSRF check
 
 class CardPayment(APIView):
     def post(self, request):
@@ -180,7 +174,6 @@ class CardPayment(APIView):
         }
         return requests.post(attach_url, json=attach_payload, headers=headers)
 
-#GCASH
 class GCashSource(APIView):
     def post(self, request, *args, **kwargs):
         # Step 1: Validate the incoming data using the serializer
@@ -208,15 +201,14 @@ class GCashSource(APIView):
         except Billing.DoesNotExist:
             return Response({"error": "Invalid billing ID"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # New fields to include in the description
         payment_for = validated_data.get('payment_for')
-        payment_status = validated_data.get('payment_status')  # Default to 'pending' if not provided
-        content_type = validated_data.get('content_type')  # Get content type from validated data
-        object_id = validated_data.get('object_id')  # Using object_id from input or default to billing_id
+        payment_status = validated_data.get('payment_status')  
+        content_type = validated_data.get('content_type') 
+        object_id = validated_data.get('object_id')  
 
         # Step 4: Prepare the payload for creating a GCash source
         url = "https://api.paymongo.com/v1/sources"
-        custom_description = validated_data.get('description')  # Get the custom description
+        custom_description = validated_data.get('description') 
         description = f"{billing_id} - {payment_for} - {payment_status} - {content_type} - {object_id} - {custom_description}"
 
         payload = {
@@ -234,7 +226,7 @@ class GCashSource(APIView):
                     },
                     "currency": "PHP",
                     "type": "gcash",
-                    "description": description  # Use the formatted description
+                    "description": description 
                 }
             }
         }
