@@ -241,7 +241,9 @@ class GCashSource(APIView):
         response = requests.post(url, json=payload, headers=headers)
 
         if response.status_code == 200:
-            return Response(response.json(), status=status.HTTP_200_OK)
+            checkout_url = response.json().get('data', {}).get('attributes', {}).get('redirect', {}).get('checkout_url')
+            src_id =  response.json().get('data', {}).get('id')
+            return Response({'status': 'success', 'src_id': src_id,'checkout_url': checkout_url}, status=status.HTTP_200_OK)
         else:
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
         
