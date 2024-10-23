@@ -32,6 +32,7 @@ ALLOWED_HOSTS = ['.vercel.app','127.0.0.1'] # Added localhost
 # Application definition
 
 INSTALLED_APPS = [
+    'channels',
     'whitenoise.runserver_nostatic',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -88,7 +89,17 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
+#WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
+ASGI_APPLICATION = 'kawaiiAPI.asgi.application'
 
 
 # Database
