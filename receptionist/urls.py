@@ -29,4 +29,15 @@ urlpatterns = [
     path('api/activities-availed/', views.ActivitiesListAvailed.as_view(), name="activities-availed"), 
     #For deleting/updating activities (not sure if this is needed?)
     path('api/activities-availed-detail/<str:pk>/',views.ActivitiesDetailAvailed.as_view(),name = "activities-detail-availed"), 
+    
+    # To add both amenities and activities availed
+    path('api/activites-amenities-availed/add/', views.AddAmenitiesAndActivitiesAvailed.as_view(), name="add-amenity-activity-availed"),
+
+
+    # Update pending bookings
+    path('api/update-pending-bookings/', views.UpadtePendingBookings.as_view(), name="update-pending-bookings"),
+
+
+    # Test modified Payment if it works
+    path('api/all-payments/', views.GetPayments.as_view(), name='get-payments')
 ]   

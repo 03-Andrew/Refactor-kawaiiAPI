@@ -5,6 +5,20 @@ from datetime import date
 from django.db.models.functions import TruncDate
 
 
+
+class CustomerSerializer2(ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ['first_name', 'last_name']
+
+class BillingSerializer(ModelSerializer):
+    customer = CustomerSerializer2()
+    
+    class Meta:
+        model = Billing
+        fields = ['customer']
+
+
 class BookingStatusSerializer(ModelSerializer):
     class Meta:
         model = BookingStatus
@@ -26,11 +40,6 @@ class RoomStatusSerializer(ModelSerializer):
         model = Room
         fields = '__all__'
 
-class PaymentSerializer(ModelSerializer):
-    class Meta:
-        model = Payment
-        fields = '__all__'
-
 class CustomerSerializer(ModelSerializer):
     class Meta:
         model = Customer
@@ -46,6 +55,11 @@ class BookingsSerializer(ModelSerializer):
     class Meta:
         model = Booking
         fields = '__all__'
+
+class BookingsSerializer2(ModelSerializer):
+    class Meta:
+        model = Booking
+        fields = ['room', 'adult_count', 'children_count']
 
 class AmenitiesSerializer(ModelSerializer):
     class Meta:
@@ -90,7 +104,8 @@ class FoodBillSerializer2(ModelSerializer):
         model = FoodBill
         fields = ['id', 'price', 'or_number']
         
-           
+
+
 class AdditionalPaymentSerializer(ModelSerializer):
     class Meta:
         model = AdditonalPayment
@@ -204,3 +219,29 @@ class RoomStatusListSerializer(ModelSerializer):
     # Get today's check out (if there is)
         today_booking = Booking.objects.filter(room=obj, check_in__lte=date.today(), check_out__gte=date.today()).order_by('check_in').first()
         return today_booking.check_out if today_booking else None
+    
+
+
+class PaymentSerializer(ModelSerializer):
+    paid_for = SerializerMethodField()
+    paymentFor = CharField(source="paymentFor.name")
+    mop = CharField(source="mop.mode")
+    customer_bill = SerializerMethodField()
+    class Meta:
+        model = Payment
+        fields = '__all__'
+    
+    def get_paid_for(self, obj):
+        if isinstance(obj.paid_for, Booking):
+            return BookingsSerializer2(obj.paid_for).data
+        elif isinstance(obj.paid_for, AmenitiesAvailed):
+            return AmenitiesAvailedSerializer2(obj.paid_for).data
+        elif isinstance(obj.paid_for, ActivitiesAvailed):
+            return ActivitiesAvailedSerializer2(obj.paid_for).data
+        elif isinstance(obj.paid_for, FoodBill):
+            return FoodBillSerializer2(obj.paid_for).data
+        else:
+            return None
+        
+    def get_customer_bill(self, obj):
+        return f"{obj.customer_bill.customer.last_name}, {obj.customer_bill.customer.first_name}"

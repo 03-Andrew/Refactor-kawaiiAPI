@@ -4,7 +4,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 
 from .models import Room, Booking, RoomType
-from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer
+from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings
 
 from transactions.serializers import CustomerSerializer, BillingSerialzerBase
 
@@ -14,8 +14,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework.pagination import LimitOffsetPagination
 
-
-
+from django.db import transaction
 from datetime import datetime, timedelta, date
 
 
@@ -183,8 +182,6 @@ class AvailableRooms(generics.ListAPIView):
         check_out = self.request.GET.get('check_out')
         r_type = self.request.GET.get('type')
         
-        if not r_type:
-            r_type = 1
 
         # Set default dates if not provided
         if not check_in or not check_out:
@@ -205,8 +202,10 @@ class AvailableRooms(generics.ListAPIView):
         # Return available rooms
         queryset = Room.objects.exclude(
             Q(bookings__check_in__lt=check_out_date) & Q(bookings__check_out__gt=check_in_date)
-        ).distinct().filter(status__id=1).filter(type__id=r_type)
+        ).distinct().filter(status__id=1)
         
+        if r_type:
+            queryset.filter(type__id=r_type)
 
         return queryset
 
@@ -279,14 +278,6 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RoomSerializer
 
 
-
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.db import transaction
-from datetime import datetime
-
 class CreateStayInBooking(APIView):
     def post(self, request):
         customer_data = request.data.get('customer')
@@ -346,3 +337,47 @@ class CreateStayInBooking(APIView):
 class RoomTypes(generics.ListAPIView):
     serializer_class = RoomTypeSerializer
     queryset = RoomType.objects.all()
+
+
+class GetBookedRoomsNow(generics.ListAPIView):
+    serializer_class = BookingSerializer
+
+    def get_queryset(self):
+        today = datetime.now().date()
+        print(today)
+        queryset = Booking.objects.filter(
+            Q(status=2) & Q(check_in__lte=today) & Q(check_out__gte=today)
+        )
+        
+        return queryset
+
+class GetBookedNow(APIView):
+    def get(self, request):
+        today = datetime.now().date()
+        rooms = Room.objects.all()
+
+        data ={}
+        for room in rooms:
+        # Get the booking for today
+            booking = Booking.objects.filter(room=room, check_in__lte=today, check_out__gte=today).first()  # Get the first booking if it exists
+            if booking:  # If a booking exists for today
+                serialized_data = CurrentRoomBookings(booking)  # Serialize the booking
+                data[room.id] = serialized_data.data  # Store serialized data in response
+            else:
+                data[room.id] = None  # No bookings for this room today
+            
+        return Response(data)
+
+
+# class RoomTypes(APIView):
+#     def get(self, request):
+#         types = RoomType.objects.all()
+#         serializer = RoomTypeSerializer(types, many=True)
+#         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+# class ConfirmedBookings(generics.ListAPIView):
+#     serializer_class = BookingSerializer
+#     def get_queryset(self):
+#         return super().get_queryset()
+      

@@ -3,8 +3,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view
 from bookings.models import Booking,Room
-from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment
-from .serializers import BookingsSerializer,RoomStatusListSerializer, RoomBookingListSerializer, RoomStatusSerializer,BookingsListSerializer, AmenitiesSerializer,AmenitiesAvailedSerializer, AmenitiesAvailedListSerializer, ActivitiesSerializer,ActivitiesAvailedSerializer, ActivitiesAvailedListSerializer
+from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing
+
+from transactions.serializers import BillingSerialzerBase
+from .serializers import BookingsSerializer,RoomStatusListSerializer, RoomBookingListSerializer, RoomStatusSerializer,BookingsListSerializer, AmenitiesSerializer,AmenitiesAvailedSerializer, AmenitiesAvailedListSerializer, ActivitiesSerializer,ActivitiesAvailedSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
+
 from rest_framework import generics
 from django.db.models import Count, Q, F, Subquery, OuterRef
 from datetime import date
@@ -21,11 +24,9 @@ from django.utils.decorators import method_decorator
 
 
 # Create your views here.
-
 class BookingPagination(PageNumberPagination):
     page_size = 10  # You can set a default page size
     page_size_query_param = 'page_size'  # Allows dynamic page sizing by passing this in query params
-
 
 def get_bookingqueryset(request):
     queryset = Booking.objects.all()
@@ -244,6 +245,28 @@ class ActivitiesListAvailed(generics.ListCreateAPIView):
         if self.request.method == 'POST':
             return ActivitiesAvailedSerializer
         return ActivitiesAvailedListSerializer
+        
+    def create(self, request, *args, **kwargs):
+        # Check if the request is coming from the built-in API form
+        if isinstance(request.data, dict):  # Single amenity
+            activities_data = [request.data]
+        elif isinstance(request.data, list):  # Multiple amenities
+            activities_data = request.data
+        else:
+            return Response({'error': 'Expected a list of amenities.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        created_amenities = []
+        
+        # Wrap in a transaction to ensure all-or-nothing behavior
+        with transaction.atomic():
+            for amenity_data in activities_data:
+                serializer = self.get_serializer(data=amenity_data)
+                serializer.is_valid(raise_exception=True)
+                self.perform_create(serializer)
+                created_amenities.append(serializer.data)
+
+        return Response(created_amenities, status=status.HTTP_201_CREATED)
+
 
     def get_queryset(self):
         return get_activitiesavailedqueryset(self.request)
@@ -252,7 +275,93 @@ class ActivitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ActivitiesAvailedSerializer
     primary_key = 'pk'
     queryset = ActivitiesAvailed.objects.all()
+
+class AddAmenitiesAndActivitiesAvailed(APIView):
+     def get(self, request, format=None):
+        return Response({"message": "Use POST to submit amenities and activities."}, status=200)
     
+     def post(self, request, format=None):
+        amenities_data = request.data.get('amenities', [])
+        activities_data = request.data.get('activities', [])
+        
+        created_amenities = []
+        created_activities = []
+
+        # Wrap in a transaction to ensure all-or-nothing behavior
+        with transaction.atomic():
+            # Handle amenities if provided
+            if amenities_data:
+                if isinstance(amenities_data, dict):
+                    amenities_data = [amenities_data]  # Single amenity
+            
+                for amenity_data in amenities_data:
+                    amenity_serializer = AmenitiesAvailedSerializer(data=amenity_data)
+                    amenity_serializer.is_valid(raise_exception=True)
+                    amenity_serializer.save()
+                    created_amenities.append(amenity_serializer.data)
+
+            # Handle activities if provided
+            if activities_data:
+                if isinstance(activities_data, dict):
+                    activities_data = [activities_data]  # Single activity
+                
+                for activity_data in activities_data:
+                    activity_serializer = ActivitiesAvailedSerializer(data=activity_data)
+                    activity_serializer.is_valid(raise_exception=True)
+                    activity_serializer.save()
+                    created_activities.append(activity_serializer.data)
+
+        # Return combined response
+        return Response({
+            'created_amenities': created_amenities,
+            'created_activities': created_activities
+        }, status=status.HTTP_201_CREATED)
+        
+        
+class UpadtePendingBookings(APIView):
+
+    def patch(self, request, *args, **kwargs):
+        updatedRooms = request.data.get('booking', [])
+        updatedBilling = request.data.get('billing', None)
+
+        response_data = []
+        for data in updatedRooms:
+            booking_id = data.get('id')
+
+            try:
+                booking = Booking.objects.get(id=booking_id)
+            except Booking.DoesNotExist:
+                return Response({"detail": f"Booking {booking_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+            
+            serializer = BookingsSerializer(booking, data=data, partial=True)
+
+            if serializer.is_valid():
+                serializer.save()
+                response_data.append(serializer.data)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        if updatedBilling:
+            try:
+                billing = Billing.objects.get(id=updatedBilling['id'])
+            except Billing.DoesNotExist:
+                return Response({"detail", "Billing does not exist"}, status=status.HTTP_404_NOT_FOUND)
+            
+            billing_serializer = BillingSerialzerBase(billing, data=updatedBilling, partial=True)
+
+            if billing_serializer.is_valid():
+                billing_serializer.save()
+            else:
+                return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        return Response({"updated_rooms": response_data, 'billing':billing_serializer.data}, status=status.HTTP_200_OK)
     
 
+class GetPayments(generics.ListCreateAPIView):
+    serializer_class = PaymentSerializer
+
+    def get_queryset(self): 
+        queryset = Payment.objects.all()
+
     
+        return queryset.order_by('-date')
