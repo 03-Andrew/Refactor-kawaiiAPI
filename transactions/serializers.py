@@ -1,17 +1,24 @@
 from rest_framework import serializers
 from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, BillingStatus
 
+from bookings.models import Booking
+
 from django.db.models import Sum, F
 
-from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer2, AdditionalPaymentSerializer, FoodBillSerializer
+from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer2, AdditionalPaymentSerializer
 
 
-from bookings.serializers import BookingSerializer2
+from bookings.serializers import BookingSerializer
 
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
         fields = '__all__'
+
+class CustomerSerializer2(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ['first_name', 'last_name']
 
 class BillingSerialzerBase(serializers.ModelSerializer):
     class Meta:
@@ -39,12 +46,6 @@ class BillingSerializer(serializers.ModelSerializer):
 
 
 
-class CustomerSerializer2(serializers.ModelSerializer):
-    class Meta:
-        model = Customer
-        fields = "__all__"
-
-
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
@@ -56,7 +57,6 @@ class GuestStatusSerializer(serializers.ModelSerializer):
         fields = ['id','status']
 
 class GuestListSerializer(serializers.ModelSerializer):
-    status = GuestStatusSerializer()
     class Meta:
         model = GuestList
         fields = ['id', 'guest', 'status']
@@ -84,9 +84,26 @@ class BillingStatusSerializer(serializers.ModelSerializer):
         model = BillingStatus
         fields = ['status']
 
+class ConfirmedBooking(BookingSerializer):
+    availed_boat_transfer = serializers.SerializerMethodField()
+    room_type = serializers.CharField(source='room_type.name')
+
+    class Meta:
+        model = Booking
+        fields = '__all__'
+    
+    def get_availed_boat_transfer(self, obj):
+    # Get the AmenitiesAvailed object with 'boat transfer' amenity
+        boat_transfer = AmenitiesAvailed.objects.filter(
+            customer_bill=obj.customer_bill, amenity__amenity='boat transfer'
+        ).first()
+        
+        # If the boat transfer exists, return the time; otherwise return None
+        return boat_transfer.time if boat_transfer else "Not Availed"
+
 class PendingBookings(serializers.ModelSerializer):
     customer = CustomerSerializer()
-    booking = BookingSerializer2(many=True, read_only=True, source='bookings')
+    booking = BookingSerializer(many=True, read_only=True, source='bookings')
     availed_boat_transfer = serializers.SerializerMethodField()
     booking_payment = serializers.SerializerMethodField()
     total_booking_bill = serializers.SerializerMethodField()
@@ -112,7 +129,7 @@ class PendingBookings(serializers.ModelSerializer):
 
         if downpayment_payment_for:
             # Retrieve the first Payment linked to this Billing that is for down payment
-            payment = obj.payment_set.filter(paymentFor=downpayment_payment_for).first()  
+            payment = obj.payment.filter(paymentFor=downpayment_payment_for).first()  
             
             if payment:
                 return {
@@ -134,9 +151,11 @@ class PendingBookings(serializers.ModelSerializer):
         return sum(booking.number_of_guests for booking in bookingss)
 
 
+
+
 class BillingDetailSerializer(serializers.ModelSerializer):
     customer = CustomerSerializer()
-    booking  =  BookingSerializer2(many=True, read_only=True, source='bookings')
+    booking  =  BookingSerializer(many=True, read_only=True, source='bookings')
     amenitiesAvailed = AmenitiesAvailedSerializer2(many=True, read_only=True, source="amenities_availed")
     activitiesAvailed = ActivitiesAvailedSerializer2(many=True, read_only=True, source="activities_availed")
     foodBill = FoodBillSerializer2(many=True, read_only=True, source="food_bill")

@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Sum, F
-
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 
 # Create your models here.
 class Customer(models.Model):
@@ -77,7 +78,7 @@ class Billing(models.Model):
     
     @property
     def paid_amount(self):
-        return sum(payment.amount for payment in self.payment_set.all())
+        return sum(payment.amount for payment in self.payment.all())
     
     @property
     def running_balance(self):
@@ -121,7 +122,7 @@ class Amenities(models.Model):
 
 class AmenitiesAvailed(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="amenities_availed")
-    amenity = models.ForeignKey(Amenities, on_delete=models.PROTECT)
+    amenity = models.ForeignKey(Amenities, on_delete=models.PROTECT, related_name="amenities_availed")
     head_count = models.SmallIntegerField()
     time = models.TimeField(null=True, blank=True)
     def __str__(self):
@@ -149,6 +150,20 @@ class ActivitiesAvailed(models.Model):
     @property
     def total_cost(self):
         return self.activity.hourly_rate * self.hours_availed if self.activity else 0
+
+
+class ExtraItems(models.Model):
+    item = models.CharField(max_length=100)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return self.item
+    
+class ExtraItemsAvailed(models.Model):
+    customer_bill = models.ForeignKey(Billing, on_delete=models.CASCADE, related_name="extra_items")
+    extraItem = models.ForeignKey(ExtraItems, on_delete=models.CASCADE, related_name="extra_items")
+    count = models.SmallIntegerField()
+
 
 class AdditonalPayment(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.CASCADE, related_name="additional_payment")
@@ -178,12 +193,15 @@ class PaymentStatus(models.Model):
         return self.status
     
 class Payment(models.Model):
-    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
+    customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="payment")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateTimeField()
-    mop = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT)
-    paymentFor = models.ForeignKey(PaymentFor, on_delete=models.PROTECT, null=True, blank=True)
-    status = models.ForeignKey(PaymentStatus, on_delete=models.PROTECT, null=True, blank=True)
+    mop = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT, related_name="payment")
+    paymentFor = models.ForeignKey(PaymentFor, on_delete=models.PROTECT, null=True, blank=True, related_name="payment")
+    status = models.ForeignKey(PaymentStatus, on_delete=models.PROTECT, null=True, blank=True, related_name="payment")
 
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    paid_for = GenericForeignKey('content_type', 'object_id')
     def __str__(self):
         return f"{self.customer_bill.id} {self.date}"
