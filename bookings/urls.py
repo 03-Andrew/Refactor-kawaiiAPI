@@ -3,8 +3,8 @@ from . import views
 
 urlpatterns = [
     path('', views.home, name="home"),
-    path('available-rooms/', views.available_rooms, name="available_rooms"),
-    path("api/available-rooms/", views.get_available_rooms1, name="api_available_rooms"),
+    # path('available-rooms/', views.AvailableRoomTypes.as_view, name="available_rooms"),
+    path("api/available-rooms/", views.AvailableRoomTypes.as_view(), name="api_available_rooms"),
     path("api/available-rooms2/", views.AvailableRooms.as_view(), name="available_rooms2"),
     path("api/booking/", views.BookingListCreate.as_view(), name="booking"),
     path('api/rooms/', views.RoomListCreateView.as_view(), name='room-list_create'),
@@ -13,5 +13,8 @@ urlpatterns = [
     path('api/create-stayin-booking/', views.CreateStayInBooking.as_view(), name='create_stayin_booking'),
 
     path('api/booking/current/', views.GetBookedRoomsNow.as_view(), name='booked_rooms_now'),
-    path('api/booking/current2/', views.GetBookedNow.as_view(), name='booked_rooms_now2')
+    path('api/booking/current2/', views.GetBookedNow.as_view(), name='booked_rooms_now2'),
+
+
+    # path('api/av/', views.AvailableRoomTypes.as_view())
 ]
