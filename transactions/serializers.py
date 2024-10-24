@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, BillingStatus
+from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, BillingStatus, Food
 
 from bookings.models import Booking
 
@@ -184,6 +184,10 @@ class BillingDetailSerializer(serializers.ModelSerializer):
     def get_additionalPaymentTotal(slef, obj):
         return obj.total_additional()
     
+class FoodListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Food
+        fields = '__all__'
     
     
     
