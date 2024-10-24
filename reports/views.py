@@ -117,8 +117,8 @@ class GetTotalEarningsPerMonth(APIView):
                             .order_by('month'))
         
         monthly_earnings = {
-            'months': {},
-            'total_yr': 0
+            'months': {month: 0.0 for month in range(1, 13)},  # Initialize all months with 0
+            'total_yr': 0.0
         }
 
         for earnings in earnings_monthly:
@@ -152,9 +152,9 @@ class GetDailyReport(APIView):
         for item in activities:
             data['other sales'][item.activity] = {'amount': 0,'pax/hrs': 0}  
         
-        data['other extras'] = {}
-        for item in extraItems:
-            data['other extras'][item.item] = {'amount': 0,'pax/hrs': 0}  
+        # data['other extras'] = {}
+        # for item in extraItems:
+        #     data['other extras'][item.item] = {'amount': 0,'pax/hrs': 0}  
 
         data['Food bill'] = 0
         return data 
