@@ -205,7 +205,7 @@ GRAPH_MODELS = {
 
 # AUTH_USER_MODEL = "user.CustomUser"
 
-PAYMONGO_SECRET_KEY = 'sk_test_Y4Sv1NEcDmqXYmkzfVa9L5uF'  # this is just a key for testing
+#PAYMONGO_SECRET_KEY = 'sk_test_Y4Sv1NEcDmqXYmkzfVa9L5uF'  # this is just a key for testing
 #PAYMONGO_SECRET_KEY = os.getenv('PAYMONGO_SECRET_KEY')
-PAYMONGO_WEBHOOK_SECRET = 'whsk_jyRejxZU15Lx21bmaEwEkiVa' # For andrei's repo
+#PAYMONGO_WEBHOOK_SECRET = 'whsk_jyRejxZU15Lx21bmaEwEkiVa' # For andrei's repo
 #PAYMONGO_WEBHOOK_SECRET = 'whsk_HM3A544z4mkskX9zKH87Pu5V' # For my fork
