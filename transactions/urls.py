@@ -24,5 +24,8 @@ urlpatterns = [
     
     path("api/foodbill/add/", views.AddFoodBill.as_view(), name="add-food-bill"),
     path("api/foodbill/edit/<int:pk>/", views.ModifyFoodBill.as_view(), name='modify-foodbill'),
+
+    path("api/food/add/", views.AddFoodList.as_view(), name="add-food-list"),
+    path("api/food/edit/<int:pk>/", views.ModifyFoodList.as_view(), name='modify-food-list'),
     
 ]
