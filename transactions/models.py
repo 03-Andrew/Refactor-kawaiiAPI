@@ -205,3 +205,9 @@ class Payment(models.Model):
     paid_for = GenericForeignKey('content_type', 'object_id')
     def __str__(self):
         return f"{self.customer_bill.id} {self.date}"
+    
+class Food(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    def __str__(self):
+        return f"{self.name} {self.description}"
