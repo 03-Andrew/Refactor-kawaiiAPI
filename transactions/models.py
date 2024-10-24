@@ -206,8 +206,15 @@ class Payment(models.Model):
     def __str__(self):
         return f"{self.customer_bill.id} {self.date}"
     
+class FoodType(models.Model):
+    name = models.CharField(max_length=100)
+    def __str__(self):
+        return f"{self.name}"
+    
 class Food(models.Model):
+    food_type = models.ForeignKey(FoodType, on_delete=models.CASCADE, related_name='food')
     name = models.CharField(max_length=100)
     description = models.TextField()
     def __str__(self):
         return f"{self.name} {self.description}"
+    
