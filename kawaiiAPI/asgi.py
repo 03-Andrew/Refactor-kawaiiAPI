@@ -15,6 +15,7 @@ from channels.routing import ProtocolTypeRouter,URLRouter
 from channels.auth import AuthMiddlewareStack
 from django.urls import path
 from urls import websocket_urlpatterns
+import receptionist.routing
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kawaiiAPI.settings')
 
@@ -24,7 +25,7 @@ application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": AuthMiddlewareStack(
         URLRouter(
-            websocket_urlpatterns
+            receptionist.routing.websocket_urlpatterns
         )
     ),
 })
