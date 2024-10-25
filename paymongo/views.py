@@ -268,24 +268,23 @@ class WebhookNotif(APIView):
             # Retrieve data 
             event_id = payload.get('data', {}).get('id')
             billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
-            billing_split = billing_description.split(" - ")[0] if billing_description else None 
-
-            # Try retrieving billing ID and handle error if not found
-            try:
-                billing_id = Billing.objects.get(id=billing_split)
-            except Billing.DoesNotExist:
-                logging.error(f"Billing ID '{billing_split}' not found.")
-                return  # Early exit if billing not found
-
+            billing_split = billing_description.split(" - ")[0] if billing_description else None
+            billing_id = Billing.objects.get(id=billing_split)
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
             payment_status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
+            source_data = payload['data']['attributes']['data']
+            source_id = source_data['id']
+            amount = source_data['attributes']['amount']
+            billing_info = source_data['attributes']['billing']
+            description = source_data['attributes'].get('description', "")
+            payment_type = source_data['attributes'].get('source', {}).get('type', "")
 
             # Check if the payment is chargeable or paid and act accordingly
             if payment_status == 'chargeable':
-                self.create_gcash_payment(payload)
+                self.create_gcash_payment(source_id, amount, billing_info, description)
 
             if payment_status == 'paid':
-                self.create_payment(payload, billing_id)
+                self.create_payment(amount, billing_id, payment_type, description)
                 self.websocket_notif()
 
             # Log and store the event safely
