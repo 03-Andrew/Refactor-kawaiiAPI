@@ -1,7 +1,6 @@
-# receptionist/routing.py
 from django.urls import path
-from . import consumers
+from .consumers import ReceptionistConsumer
 
 websocket_urlpatterns = [
-    path('ws/booking_notifications/', consumers.BookingConsumer.as_asgi()),  # WebSocket URL for receptionist
+    path('ws/receptionist/', ReceptionistConsumer.as_asgi()),  # WebSocket route
 ]

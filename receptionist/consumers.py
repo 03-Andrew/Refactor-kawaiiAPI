@@ -1,31 +1,31 @@
 # receptionist/consumers.py
+
+from channels.generic.websocket import WebsocketConsumer
 import json
-from channels.generic.websocket import AsyncWebsocketConsumer
+from asgiref.sync import async_to_sync
 
-class BookingConsumer(AsyncWebsocketConsumer):
-    async def connect(self):
-        self.room_group_name = 'booking_notifications'
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
-        await self.accept()
+class ReceptionistConsumer(WebsocketConsumer):
+    def connect(self):
+        self.accept()
 
-    async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
+        # Join receptionist group to receive booking notifications
+        async_to_sync(self.channel_layer.group_add)(
+            "receptionist",
             self.channel_name
         )
 
-    # Receive message from WebSocket
-    async def receive(self, text_data):
-        await self.send(text_data=json.dumps({
-            'message': text_data
-        }))
+    def disconnect(self, close_code):
+        # Leave the receptionist group on disconnect
+        async_to_sync(self.channel_layer.group_discard)(
+            "receptionist",
+            self.channel_name
+        )
 
-    # Send message to WebSocket
-    async def booking_notification(self, event):
+    # Handle custom event type 'booking_paid'
+    def booking_paid(self, event):
         message = event['message']
-        await self.send(text_data=json.dumps({
+
+        # Send the message to WebSocket
+        self.send(text_data=json.dumps({
             'message': message
         }))

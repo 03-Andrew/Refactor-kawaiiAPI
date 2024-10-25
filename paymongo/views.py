@@ -280,6 +280,16 @@ class WebhookNotif(APIView):
             if is_paid:
                 # Create payment record
                 self.create_payment(amount, billing_id, payment_type, description)
+                
+                 # Notify the receptionist via WebSockets
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    'receptionist',  # WebSocket group for receptionists
+                    {
+                        'type': 'booking_paid',  # Custom event type
+                        'message': 'A new customer has booked a room.',
+                    }
+                )
 
             # Create webhook event
             self.create_webhook_event(event_id, billing_id, event_type, payload)
