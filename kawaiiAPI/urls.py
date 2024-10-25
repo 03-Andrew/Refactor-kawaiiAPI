@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from receptionist.consumers import ReceptionistConsumer
 
 
 urlpatterns = [
@@ -28,4 +29,8 @@ urlpatterns = [
     path('', include('user.urls')),
     path('', include('paymongo.urls')),
     path('', include('reports.urls'))
+]
+
+websocket_urlpatterns = [
+    path('ws/receptionist/', ReceptionistConsumer.as_asgi()),  # WebSocket route
 ]
