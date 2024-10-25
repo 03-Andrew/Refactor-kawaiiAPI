@@ -252,57 +252,47 @@ class GCashSource(APIView):
         
 class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
-        try:
-            # Signature validation
-            if not self.validate_signature(request):
-                return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
-            
-            # Return 200 OK immediately after signature validation
-            response = Response({'status': 'success'}, status=status.HTTP_200_OK)
+        # Validate the signature
+        if not self.validate_signature(request):
+            return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
 
-            # Proceed with processing the event if signature is valid
-            payload = request.data
+        # Send a 200 OK response right after validation
+        response = Response({'status': 'success'}, status=status.HTTP_200_OK)
+        
+        self.process_event(request.data)
+
+        return response
+
+    def process_event(self, payload):
+        try:
+            # Retrieve data 
             event_id = payload.get('data', {}).get('id')
             billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
-            billing_split = billing_description.split(" - ")[0] if billing_description else None
-            billing_id = Billing.objects.get(id=billing_split)
+            billing_split = billing_description.split(" - ")[0] if billing_description else None 
+
+            # Try retrieving billing ID and handle error if not found
+            try:
+                billing_id = Billing.objects.get(id=billing_split)
+            except Billing.DoesNotExist:
+                logging.error(f"Billing ID '{billing_split}' not found.")
+                return  # Early exit if billing not found
+
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
             payment_status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
-            source_data = payload['data']['attributes']['data']
-            source_id = source_data['id']
-            amount = source_data['attributes']['amount']
-            billing_info = source_data['attributes']['billing']
-            description = source_data['attributes'].get('description', "")
-            payment_type = source_data['attributes'].get('source', {}).get('type', "")
 
-            is_chargeable = payment_status == 'chargeable'
-            is_paid = payment_status == 'paid'
+            # Check if the payment is chargeable or paid and act accordingly
+            if payment_status == 'chargeable':
+                self.create_gcash_payment(payload)
 
-            # Handle chargeable status
-            if is_chargeable:
-                self.create_gcash_payment(source_id, amount, billing_info, description)
+            if payment_status == 'paid':
+                self.create_payment(payload, billing_id)
+                self.websocket_notif()
 
-            # Handle paid status
-            if is_paid:
-                self.create_payment(amount, billing_id, payment_type, description)
-
-                # Notify the receptionist via WebSockets
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    'receptionist',  # WebSocket group for receptionists
-                    {
-                        'type': 'booking_paid',  # Custom event type
-                        'message': 'A new customer has booked a room.',
-                    }
-                )
-
-            # Log the webhook event
+            # Log and store the event safely
             self.create_webhook_event(event_id, billing_id, event_type, payload)
 
         except Exception as e:
-            logging.error(f"Error processing webhook: {str(e)}")
-
-        return response
+            logging.error(f"Unexpected error processing event: {str(e)}")
 
     def validate_signature(self, request):
         # Get the signature from the headers
@@ -326,13 +316,26 @@ class WebhookNotif(APIView):
 
         return computed_signature == test_signature
 
+    def websocket_notif(self):
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'receptionist',
+                {'type': 'booking_paid', 'message': 'A new customer has booked a room.'}
+            )
+        except Exception as e:
+            logging.error(f"Error in notifying receptionist: {str(e)}")
+
     def create_webhook_event(self, event_id, billing_id, event_type, payload):
-        WebhookEvent.objects.create(
-            event_id=event_id,
-            billing=billing_id,
-            event_type=event_type,
-            payload=payload
-        )
+        try:
+            WebhookEvent.objects.create(
+                event_id=event_id,
+                billing=billing_id,
+                event_type=event_type,
+                payload=payload
+            )
+        except Exception as e:
+            logging.error(f"Error creating Webhook event: {str(e)}")
 
     def create_payment(self, amount, billing_id, payment_type, description):
         logging.info(f"Creating payment with amount: {amount}, billing_id: {billing_id}, payment_type: {payment_type}, description: {description}")
