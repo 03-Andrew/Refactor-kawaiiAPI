@@ -24,6 +24,7 @@ from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+import threading                    
 
 class CardPayment(APIView):
     def post(self, request):
@@ -259,7 +260,8 @@ class WebhookNotif(APIView):
         # Send a 200 OK response right after validation
         response = Response({'status': 'success'}, status=status.HTTP_200_OK)
         
-        self.process_event(request.data)
+        # Process the event in a separate thread
+        threading.Thread(target=self.process_event, args=(request.data,)).start()
 
         return response
 
