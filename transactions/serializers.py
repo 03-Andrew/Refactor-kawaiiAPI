@@ -5,7 +5,7 @@ from bookings.models import Booking
 
 from django.db.models import Sum, F
 
-from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer2, AdditionalPaymentSerializer
+from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer2, AdditionalPaymentSerializer, AmenitiesAvailedSerializer
 
 
 from bookings.serializers import BookingSerializer
