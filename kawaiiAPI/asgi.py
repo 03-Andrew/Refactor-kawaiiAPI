@@ -11,10 +11,8 @@ import os
 
 from django.core.asgi import get_asgi_application
 from whitenoise import WhiteNoise
-from channels.routing import ProtocolTypeRouter,URLRouter
+from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
-from django.urls import path
-from urls import websocket_urlpatterns
 import receptionist.routing
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kawaiiAPI.settings')
@@ -31,4 +29,3 @@ application = ProtocolTypeRouter({
 })
 
 application = WhiteNoise(application)
-
