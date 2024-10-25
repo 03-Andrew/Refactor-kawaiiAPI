@@ -256,12 +256,15 @@ class WebhookNotif(APIView):
             # Signature validation
             if not self.validate_signature(request):
                 return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
+            
+            # Return 200 OK immediately after signature validation
+            response = Response({'status': 'success'}, status=status.HTTP_200_OK)
 
             # Proceed with processing the event if signature is valid
             payload = request.data
             event_id = payload.get('data', {}).get('id')
             billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
-            billing_split = billing_description.split(" - ")[0] if billing_description else None 
+            billing_split = billing_description.split(" - ")[0] if billing_description else None
             billing_id = Billing.objects.get(id=billing_split)
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
             payment_status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
@@ -269,21 +272,21 @@ class WebhookNotif(APIView):
             source_id = source_data['id']
             amount = source_data['attributes']['amount']
             billing_info = source_data['attributes']['billing']
-            description = source_data['attributes'].get('description', "") 
-            payment_type = source_data['attributes'].get('source', {}).get('type', "")  
+            description = source_data['attributes'].get('description', "")
+            payment_type = source_data['attributes'].get('source', {}).get('type', "")
 
             is_chargeable = payment_status == 'chargeable'
             is_paid = payment_status == 'paid'
-            
+
+            # Handle chargeable status
             if is_chargeable:
-                # Create GCash payment
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
+            # Handle paid status
             if is_paid:
-                # Create payment record
                 self.create_payment(amount, billing_id, payment_type, description)
-                
-                 # Notify the receptionist via WebSockets
+
+                # Notify the receptionist via WebSockets
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
                     'receptionist',  # WebSocket group for receptionists
@@ -293,14 +296,13 @@ class WebhookNotif(APIView):
                     }
                 )
 
-            # Create webhook event
+            # Log the webhook event
             self.create_webhook_event(event_id, billing_id, event_type, payload)
-
-            return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
         except Exception as e:
             logging.error(f"Error processing webhook: {str(e)}")
-            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return response
 
     def validate_signature(self, request):
         # Get the signature from the headers
