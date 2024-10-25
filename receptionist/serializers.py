@@ -89,7 +89,6 @@ class AmenitiesAvailedSerializer(ModelSerializer):
         fields = '__all__'
         
 class AmenitiesAvailedSerializer2(ModelSerializer):
-    amenity = AmenitiesSerializer()
     class Meta:
         model = AmenitiesAvailed
         fields = ['id', 'head_count', 'amenity']
