@@ -371,7 +371,7 @@ class WebhookNotif(APIView):
         billing_split = description.split(" - ") if event_type == 'payment.paid' else remarks.split(" - ")
 
         if len(billing_split) < 5:
-            logging.error("Description or remarks format is invalid.")
+            logging.error("Description or remarks format is invalid." + "remarks: " + remarks + "description: " +description)
             return None
 
         billing_id = billing_split[0]
