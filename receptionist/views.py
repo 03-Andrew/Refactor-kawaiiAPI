@@ -379,7 +379,7 @@ class WebSocketTestView(View):
             "receptionist",  # This is the group name
             {
                 "type": "booking_paid",  # Custom message type defined in the consumer
-                "message": "Test message from API",  # The actual message content
+                "message": "A customer has booked a stay",  # The actual message content
             }
         )
 

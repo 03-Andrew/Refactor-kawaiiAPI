@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from django.shortcuts import render
 from django.db.models import Count, Q
 from django.http import HttpResponse
+import requests
 
 from .models import Room, Booking, RoomType
 from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings, BookingSerializer3
@@ -308,6 +309,14 @@ class CreateOnlineBooking(APIView):
             else:
                 print("Here At amenities")
                 return Response(amenitiesAvaied.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Call the WebSocket trigger API endpoint
+            try:
+                response = requests.get('http://127.0.0.1:8000/api/trigger-websocket/')
+                response.raise_for_status()  # Raises an error for 4xx/5xx responses
+            except requests.RequestException as e:
+                return Response({"error": "Failed to send WebSocket message", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
        
 
 
