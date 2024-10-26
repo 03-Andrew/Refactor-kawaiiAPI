@@ -323,23 +323,20 @@ class WebhookNotif(APIView):
         return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
     def process_event(self, payload):
+        """Processes the payment event from Paymongo."""
         try:
+            # Retrieve necessary data from the payload
             event_id = payload.get('data', {}).get('id')
             event_type = payload.get('data', {}).get('type')
             source_data = payload['data']['attributes']['data']
             payment_status = source_data['attributes']['status']
             amount = source_data['attributes']['amount']
-            description = source_data['attributes'].get('description', "")
             payment_type = source_data['attributes']['source']['type']
-            billing_info = source_data['attributes'].get('billing', {})
+            remarks = source_data['attributes'].get('remarks', "")
 
-            # Process only paid link payments
-            if payment_status == 'paid':
-                billing_data = description  # Use description for billing data
-                billing_id = self.create_payment(amount, payment_type, billing_data)
-
-            # Log and store the event safely
-            self.create_webhook_event(event_id, billing_id, event_type, payload)
+            if event_type == 'link.payment.paid' and payment_status == 'paid':
+                billing_id = self.create_payment(amount, payment_type, remarks)
+                self.create_webhook_event(event_id, billing_id, event_type, payload)
 
         except Exception as e:
             logging.error(f"Unexpected error processing event: {str(e)}")
@@ -413,7 +410,7 @@ class WebhookNotif(APIView):
                 logging.error(f"Error creating Payment record: {e}")
                 return None
 
-        logging.error("Description format is invalid.")
+        logging.error("Billing data format is invalid.")
         return None
 
     def get(self, request, *args, **kwargs):
