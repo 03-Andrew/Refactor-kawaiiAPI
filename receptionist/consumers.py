@@ -20,6 +20,12 @@ class ReceptionistConsumer(WebsocketConsumer):
             "receptionist",
             self.channel_name
         )
+        
+    def receive(self, text_data):
+        data = json.loads(text_data)
+        self.send(text_data=json.dumps({
+            'message': 'Hello from WebSocket!'
+        }))
 
     # Handle custom event type 'booking_paid'
     def booking_paid(self, event):
