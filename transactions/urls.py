@@ -27,5 +27,7 @@ urlpatterns = [
 
     path("api/food/add/", views.AddFoodList.as_view(), name="add-food-list"),
     path("api/food/edit/<int:pk>/", views.ModifyFoodList.as_view(), name='modify-food-list'),
+
+    path("api/additional-payments/add/", views.CreateAdditionalPayments.as_view(), name="add-additional-payments")
     
 ]

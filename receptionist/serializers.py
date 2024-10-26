@@ -112,9 +112,10 @@ class FoodBillSerializer2(ModelSerializer):
 
 
 class AdditionalPaymentSerializer(ModelSerializer):
+
     class Meta:
         model = AdditonalPayment
-        fields = ['id', 'reason','price']
+        fields = '__all__'
 
 class BookingsListSerializer(ModelSerializer):
     customer_bill=BillingSerializer()
