@@ -326,10 +326,8 @@ class WebhookNotif(APIView):
         if not self.validate_signature(request):
             return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Send a 200 OK response right after validation
         response = Response({'status': 'success'}, status=status.HTTP_200_OK)
         
-        # Process the event in a separate thread
         threading.Thread(target=self.process_event, args=(request.data,)).start()
 
         return response
@@ -346,11 +344,10 @@ class WebhookNotif(APIView):
             source_data = payload['data']['attributes']['data']
             source_id = source_data['id']
             amount = source_data['attributes']['amount']
-            billing_info = source_data['attributes']['billing']
+            billing_info = source_data.get('attributes', {}).get('billing', None)
             description = source_data['attributes'].get('description', "")
             payment_type = source_data['attributes'].get('source', {}).get('type', "")
 
-            # Check if the payment is chargeable or paid and act accordingly
             if payment_status == 'chargeable':
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
@@ -358,14 +355,12 @@ class WebhookNotif(APIView):
                 self.create_payment(amount, billing_id, payment_type, description)
                 #self.websocket_notif()
 
-            # Log and store the event safely
             self.create_webhook_event(event_id, billing_id, event_type, payload)
 
         except Exception as e:
             logging.error(f"Unexpected error processing event: {str(e)}")
 
     def validate_signature(self, request):
-        # Get the signature from the headers
         paymongo_signature = request.headers.get('Paymongo-Signature', None)
         if not paymongo_signature:
             return False
@@ -420,26 +415,11 @@ class WebhookNotif(APIView):
 
             try:
                 payment_for = PaymentFor.objects.get(name=payment_for_name)
-            except PaymentFor.DoesNotExist:
-                logging.error(f"PaymentFor with name '{payment_for_name}' does not exist.")
-                return
-
-            try:
                 payment_status = PaymentStatus.objects.get(status=payment_status_name)
-            except PaymentStatus.DoesNotExist:
-                logging.error(f"PaymentStatus with status '{payment_status_name}' does not exist.")
-                return
-            
-            try:
                 payment_method = PaymentMethod.objects.get(mode=payment_type)
-            except PaymentMethod.DoesNotExist:
-                logging.error(f"PaymentMethod with mode '{payment_type}' does not exist.")
-                return
-
-            try:
                 content_type = ContentType.objects.get(model=content_type_name)
-            except ContentType.DoesNotExist:
-                logging.error(f"ContentType with model '{content_type_name}' does not exist.")
+            except (PaymentFor.DoesNotExist, PaymentStatus.DoesNotExist, PaymentMethod.DoesNotExist, ContentType.DoesNotExist) as e:
+                logging.error(f"Error creating Payment record: {e}")
                 return
 
             # Create a Payment model
@@ -484,8 +464,7 @@ class WebhookNotif(APIView):
             'authorization': f'Basic {base64.b64encode(f"{settings.PAYMONGO_SECRET_KEY}:".encode()).decode()}',
             'content-type': 'application/json',
         }
-
-        # Send request to PayMongo to create a payment
+        
         response = requests.post(url, json=payload, headers=headers)
         return response.json()
 
