@@ -346,7 +346,7 @@ class WebhookNotif(APIView):
             source_data = payload['data']['attributes']['data']
             source_id = source_data['id']
             amount = source_data['attributes']['amount']
-            billing_info = source_data['attributes']['billing']
+            billing_info = source_data.get('attributes', {}).get('billing', None)
             description = source_data['attributes'].get('description', "")
             payment_type = source_data['attributes'].get('source', {}).get('type', "")
 
