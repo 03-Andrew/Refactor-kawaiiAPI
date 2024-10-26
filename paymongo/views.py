@@ -318,6 +318,12 @@ class WebhookNotif(APIView):
         # Validate the signature
         if not self.validate_signature(request):
             return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            payload = request.data
+            logging.info(f"Received webhook payload: {json.dumps(payload, indent=2)}")
+        except Exception as e:
+            logging.error(f"Error logging webhook payload: {e}")
 
         # Send a 200 OK response right after validation
         response = Response({'status': 'success'}, status=status.HTTP_200_OK)
