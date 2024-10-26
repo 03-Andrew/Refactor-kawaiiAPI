@@ -348,7 +348,7 @@ class WebhookNotif(APIView):
             amount = source_data['attributes']['amount']
             billing_info = source_data.get('attributes', {}).get('billing', None)
             description = source_data['attributes'].get('description', "")
-            payment_type = source_data['attributes'].get('source', {}).get('type', "")
+            payment_type = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('payments', [{}])[0].get('data', {}).get('attributes', {}).get('source', {}).get('type', "")
 
             # Check if the payment is chargeable or paid and act accordingly
             if payment_status == 'chargeable':
