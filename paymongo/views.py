@@ -258,8 +258,6 @@ class CreateLink(APIView):
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
         validated_data = serializer.validated_data
-
-        # Initialize the description as a list for easy appending
         description = []
 
         # Extract fields
@@ -281,16 +279,19 @@ class CreateLink(APIView):
         if content_type:
             description.append(f"{content_type}")
         if object_id:
-            description.append(f"{custom_description}")
+            description.append(f"{object_id}") 
+        if custom_description: 
+            description.append(custom_description)
 
-        description = " - ".join(description) if remarks else ""
+        final_description = " - ".join(description)
+
         url = "https://api.paymongo.com/v1/links"
 
         payload = {
             "data": {
                 "attributes": {
                     "amount": validated_data['amount'],
-                    "description": validated_data['description'],
+                    "description": final_description,  
                     "remarks": remarks  
                 }
             }
