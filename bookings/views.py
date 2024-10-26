@@ -4,9 +4,9 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 
 from .models import Room, Booking, RoomType
-from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings
+from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings, BookingSerializer3
 
-from transactions.serializers import CustomerSerializer, BillingSerialzerBase
+from transactions.serializers import CustomerSerializer, BillingSerialzerBase, AmenitiesAvailedSerializer
 
 from rest_framework.views import APIView
 from rest_framework import generics, status
@@ -21,6 +21,9 @@ from datetime import datetime, timedelta, date
 def home(request):
     return render(request, 'base/home.html')
 
+class RoomTypes(generics.ListAPIView):
+    serializer_class = RoomTypeSerializer
+    queryset = RoomType.objects.all()
 
 
 class AvailableRoomTypes(APIView):
@@ -70,8 +73,6 @@ class AvailableRoomTypes(APIView):
             })
         return Response(available_rooms)
 
-
-
 class AvailableRoomsView(generics.ListAPIView):
     serializer_class = AvailableRoomSerializer2
 
@@ -104,8 +105,6 @@ class AvailableRoomsView(generics.ListAPIView):
 
         return available_rooms
     
-
-
 class AvailableRooms(generics.ListAPIView):
     serializer_class = AvailableRoomSerializer2
     
@@ -150,7 +149,6 @@ class AvailableRooms(generics.ListAPIView):
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-
 class BookingListCreate(generics.ListCreateAPIView):
     serializer_class = BookingSerializer
     def get_queryset(self):
@@ -177,8 +175,6 @@ class BookingListCreate(generics.ListCreateAPIView):
             queryset = queryset.order_by('-check_in')
         return queryset
     
-
-
 class RoomListCreateView(generics.ListAPIView):
     serializer_class = RoomSerializer
  
@@ -204,11 +200,9 @@ class RoomListCreateView(generics.ListAPIView):
     def perform_create(self, serializer):
         serializer.save()
 
-
 class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
-
 
 class CreateStayInBooking(APIView):
     def post(self, request):
@@ -266,9 +260,103 @@ class CreateStayInBooking(APIView):
         rBooking['children_count'] = int(rBooking['children_count'])
         rBooking['adult_count'] = int(rBooking['adult_count'])
 
-class RoomTypes(generics.ListAPIView):
-    serializer_class = RoomTypeSerializer
-    queryset = RoomType.objects.all()
+class CreateOnlineBooking(APIView):
+    def get(self, request):
+        return Response({"Create Booking here": "Yeah Yeah"})
+    def post(self, request):
+        customer_data = request.data.get('customer')
+        bookings = request.data.get('rooms')
+        boat = request.data.get('boat')
+        billing_data = {}
+    
+        with transaction.atomic():
+            customer_serializer = CustomerSerializer(data=customer_data)
+            if customer_serializer.is_valid():
+                customer = customer_serializer.save()
+            else:
+                print("Here At customer")
+                return Response(customer_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            billing_data['customer'] = customer.id
+            billing_data['status'] = 3
+            billing_serializer = BillingSerialzerBase(data=billing_data)
+            if billing_serializer.is_valid():
+                billing = billing_serializer.save()
+            else:
+                print("Here At billing")
+                return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+
+
+            created_bookings = []
+            for booking in bookings:
+                booking['customer_bill'] = billing.id
+                booking['room'] = ""
+                booking['status'] = 1
+                booking_serializer = BookingSerializer3(data=booking)
+                if booking_serializer.is_valid():
+                    booking_data = booking_serializer.save()
+                    created_bookings.append(booking_serializer.data)
+                else:
+                    raise Exception(booking_serializer.errors)
+            
+            boat['customer_bill'] = booking_data.customer_bill.id
+            boat['amenity'] = 1
+            amenitiesAvaied = AmenitiesAvailedSerializer(data=boat)
+            if amenitiesAvaied.is_valid():
+                amenitiesAvaied.save()
+            else:
+                print("Here At amenities")
+                return Response(amenitiesAvaied.errors, status=status.HTTP_400_BAD_REQUEST)
+       
+
+
+        return Response({
+            'customer': customer_serializer.data,
+            'billing': billing_serializer.data,
+            'bookings': created_bookings,
+            'boat': amenitiesAvaied.data
+        }, status=status.HTTP_201_CREATED)
+       
+            
+        #     created_bookings = []
+        #     for rBooking in cart_data['rooms']:
+        #         newBooking = {}
+        #         newBooking["customer_bill"] = billing.id
+        #         newBooking["room_type"] = rBooking['roomId']
+        #         newBooking["check_in"] = rBooking['checkIn']
+        #         newBooking["check_out"] = rBooking['checkOut']
+        #         newBooking["adult_count"] = rBooking['adults']
+        #         newBooking["children_count"] = rBooking['children']
+        #         newBooking["status"] = 1
+
+        #         booking_serializer = BookingSerializer2(data=newBooking)
+        #         if booking_serializer.is_valid():
+        #             booking = booking_serializer.save()
+        #             created_bookings.append(booking_serializer.data)
+        #         else:
+        #             # If booking serializer is invalid, raise an exception to rollback
+        #             raise Exception(booking_serializer.errors)
+            
+        #     addOn = { "customer_bill": billing.id, "amenity": 1, "head_count": cart_data['addOns']['boat']['count'] }
+        #     amenitiesAvaied = AmenitiesAvailedSerializer2(data=addOn)
+        #     if amenitiesAvaied.is_valid():
+        #         amenitiesAvaied.save()
+        #     else:
+        #         return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+                
+
+        # return Response({
+        #     'customer': customer_serializer.data,
+        #     'billing': billing_serializer.data,
+        #     'bookings': created_bookings,
+        #     'adons': addOn
+        # }, status=status.HTTP_201_CREATED)
+            
+
+
+
 
 
 class GetBookedRoomsNow(generics.ListAPIView):

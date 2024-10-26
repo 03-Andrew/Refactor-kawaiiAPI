@@ -39,7 +39,7 @@ class Room(models.Model):
 
 
 class BookingStatus(models.Model):
-    name = models.CharField(max_length=50, null=True)
+    name = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -52,7 +52,7 @@ class Booking(models.Model):
     check_out = models.DateField()
     adult_count = models.PositiveSmallIntegerField()
     children_count = models.PositiveSmallIntegerField(default=0)
-    status = models.ForeignKey(BookingStatus, on_delete=models.PROTECT, related_name='bookings')
+    status = models.ForeignKey(BookingStatus, on_delete=models.PROTECT, related_name='bookings', default=1)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -89,6 +89,11 @@ class AmenitiesAvailedSerializer(ModelSerializer):
         fields = '__all__'
         
 class AmenitiesAvailedSerializer2(ModelSerializer):
+    class Meta:
+        model = AmenitiesAvailed
+        fields = ['id', 'head_count', 'amenity']
+
+class AmenitiesAvailedSerializer3(ModelSerializer):
     amenity = AmenitiesSerializer()
     class Meta:
         model = AmenitiesAvailed
@@ -107,9 +112,10 @@ class FoodBillSerializer2(ModelSerializer):
 
 
 class AdditionalPaymentSerializer(ModelSerializer):
+
     class Meta:
         model = AdditonalPayment
-        fields = ['id', 'reason','price']
+        fields = '__all__'
 
 class BookingsListSerializer(ModelSerializer):
     customer_bill=BillingSerializer()
