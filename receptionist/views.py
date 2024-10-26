@@ -1,4 +1,6 @@
+from django.http import JsonResponse
 from django.shortcuts import render
+from django.views import View
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view
@@ -13,7 +15,8 @@ from django.db.models import Count, Q, F, Subquery, OuterRef
 from datetime import date
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.pagination import PageNumberPagination
-
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db import transaction
 
 from rest_framework import status
@@ -365,3 +368,19 @@ class GetPayments(generics.ListCreateAPIView):
 
     
         return queryset.order_by('-date')
+    
+class WebSocketTestView(View):
+    def get(self, request, *args, **kwargs):
+        # Get the channel layer
+        channel_layer = get_channel_layer()
+
+        # Send a test message to the 'receptionist' WebSocket group
+        async_to_sync(channel_layer.group_send)(
+            "receptionist",  # This is the group name
+            {
+                "type": "booking_paid",  # Custom message type defined in the consumer
+                "message": "Test message from API",  # The actual message content
+            }
+        )
+
+        return JsonResponse({"status": "Message sent to WebSocket group 'receptionist'"})

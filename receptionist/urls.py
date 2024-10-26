@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import WebSocketTestView
 
 urlpatterns = [
     #For viewing room status
@@ -39,5 +40,8 @@ urlpatterns = [
 
 
     # Test modified Payment if it works
-    path('api/all-payments/', views.GetPayments.as_view(), name='get-payments')
+    path('api/all-payments/', views.GetPayments.as_view(), name='get-payments'),
+    
+    # Websocket Testing
+    path('api/trigger-websocket/', WebSocketTestView.as_view(), name='trigger_websocket')
 ]   
