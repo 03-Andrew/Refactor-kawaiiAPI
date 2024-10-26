@@ -258,40 +258,33 @@ class CreateLink(APIView):
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
         validated_data = serializer.validated_data
-        description = []
 
-        # Extract fields
+        remarks = []
         billing_id = validated_data.get('billing_id')
         payment_for = validated_data.get('payment_for')
         payment_status = validated_data.get('payment_status')
         content_type = validated_data.get('content_type')
         object_id = validated_data.get('object_id')
-        custom_description = validated_data.get('description') 
-        remarks = validated_data.get('remarks')
 
-        # Append each field to description if it has a value
         if billing_id:
-            description.append(f"{billing_id}")
+            remarks.append(f"{billing_id}")
         if payment_for:
-            description.append(f"{payment_for}")
+            remarks.append(f"{payment_for}")
         if payment_status:
-            description.append(f"{payment_status}")
+            remarks.append(f"{payment_status}")
         if content_type:
-            description.append(f"{content_type}")
+            remarks.append(f"{content_type}")
         if object_id:
-            description.append(f"{object_id}") 
-        if custom_description: 
-            description.append(custom_description)
+            remarks.append(f"{object_id}")
 
-        final_description = " - ".join(description)
-
+        remarks = " - ".join(remarks) if remarks else ""
         url = "https://api.paymongo.com/v1/links"
 
         payload = {
             "data": {
                 "attributes": {
                     "amount": validated_data['amount'],
-                    "description": final_description,  
+                    "description": validated_data['description'],
                     "remarks": remarks  
                 }
             }
@@ -359,7 +352,7 @@ class WebhookNotif(APIView):
                 if event_type == 'link.payment.paid':
                     payment_type = payload['data']['attributes']['data']['attributes']['payments'][0]['data']['attributes']['source']['type']
                     description = remarks
-                    
+
                 self.create_payment(amount, billing_id, payment_type, description)
                 #self.websocket_notif()
 
