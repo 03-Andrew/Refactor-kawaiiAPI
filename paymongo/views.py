@@ -340,37 +340,23 @@ class WebhookNotif(APIView):
             event_id = payload.get('data', {}).get('id')
             billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
             billing_split = billing_description.split(" - ")[0] if billing_description else None
-            
-            # Ensure billing_id is retrieved successfully
-            try:
-                billing_id = Billing.objects.get(id=billing_split)
-            except Billing.DoesNotExist:
-                logging.error(f"Billing ID '{billing_split}' does not exist.")
-                return
-
+            billing_id = Billing.objects.get(id=billing_split)
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
             payment_status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
             source_data = payload['data']['attributes']['data']
             source_id = source_data['id']
             amount = source_data['attributes']['amount']
-            billing_info = source_data.get('attributes', {}).get('billing', None)
+            billing_info = source_data['attributes']['billing']
             description = source_data['attributes'].get('description', "")
-
-            # Extract payment type
-            payments = source_data.get('attributes', {}).get('payments', [])
-            if payments:
-                payment_type = payments[0].get('data', {}).get('attributes', {}).get('source', {}).get('type', "")
-            else:
-                logging.error("No payment information found.")
-                payment_type = ""
+            payment_type = source_data['attributes'].get('source', {}).get('type', "")
 
             # Check if the payment is chargeable or paid and act accordingly
             if payment_status == 'chargeable':
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
-            if payment_status == 'paid':
+            if payment_status == 'paid' and event_type == 'payment.paid':
                 self.create_payment(amount, billing_id, payment_type, description)
-                # self.websocket_notif()
+                #self.websocket_notif()
 
             # Log and store the event safely
             self.create_webhook_event(event_id, billing_id, event_type, payload)
@@ -460,9 +446,9 @@ class WebhookNotif(APIView):
             logging.info(f"Creating Payment record for billing_id: {billing_id}")
             Payment.objects.create(
                 customer_bill=billing_id,
-                amount=amount / 100,  # convert from cents
+                amount=amount / 100, # convert from cents
                 date=timezone.now(),
-                mop=payment_method,
+                mop=payment_method,  
                 paymentFor=payment_for,
                 status=payment_status,
                 content_type=content_type,
