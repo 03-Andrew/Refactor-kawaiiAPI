@@ -22,6 +22,11 @@ class BookingSerializer(serializers.ModelSerializer):
         model = Booking
         fields = ['id', 'customer_bill', 'customer_name','room', 'room_type', 'check_in', 'check_out', 'adult_count', 'children_count', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
 
+class BookingSerializer3(serializers.ModelSerializer):
+    class Meta:
+        model = Booking
+        fields = ['id', 'customer_bill', 'room_type', 'check_in', 'check_out', 'adult_count', 'children_count']
+
 class RoomStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = RoomStatus
