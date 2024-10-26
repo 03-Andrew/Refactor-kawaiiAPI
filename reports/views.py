@@ -166,46 +166,84 @@ class GetMonthlyReport(APIView):
         amenities = Amenities.objects.all()
         activities = Activity.objects.all()
 
-        # Initialize the report structure
         report = defaultdict(lambda: initialize_data(rooms, amenities, activities))
 
-        start_month = request.query_params.get('s')
-        end_month = request.query_params.get('e')
+        year = request.query_params.get('year')
+        start_month = request.query_params.get('s')  # Start month
+        end_month = request.query_params.get('e')    # End month
 
+        if not year:
+            return Response({"error": "Year is required."}, status=400)
+
+        # If end_month is not provided, treat it as the same as start_month
         if not end_month:
             end_month = start_month
 
-        month = request.query_params.get('month')
-        year = request.query_params.get('year')
+        start_month = int(start_month)
+        end_month = int(end_month)
 
-        payments = Payment.objects.all()
-
-        # Filter payments based on year and month
-        if month and year:
-            payments = payments.filter(date__year=year, date__month=month)
-
-        # If both start and end months are provided
-        if start_month and end_month:
-            payments = payments.filter(date__month__gte=start_month, date__month__lte=end_month)
-
-        # Process payments and group them by week
-        for payment in payments:
-            week_number = payment.date.isocalendar()[1]  # Get the week number
-            year_of_payment = payment.date.isocalendar()[0]  # Get the year of the payment
-            
-
-            week_start = payment.date - timedelta(days=payment.date.weekday())  # Start of the week (Monday)
-            week_end = week_start + timedelta(days=6)  # End of the week (Sunday)
-            week_key = f"week {week_number} ({week_start.strftime('%b %d, %Y')} - {week_end.strftime('%b %d, %Y')})"
+        for month in range(start_month, end_month + 1):
+            month_name = datetime(2000, month, 1).strftime('%B') 
+            month_key = f"{month_name} {year}"
 
 
-            serialized_data = PaymentSerializer(payment).data
-            
-            # Process payments for the specific week
-            report[week_key] = process_payments(report[week_key], [serialized_data])  # Pass serialized_data in a list
+            payments = Payment.objects.filter(date__year=year, date__month=month)
 
-        # Format the response to contain only the required weeks
+
+            first_day_of_month = datetime(year=int(year), month=int(month), day=1)
+            last_day_of_month = (first_day_of_month + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+
+            week_start = first_day_of_month
+            while week_start <= last_day_of_month:
+                week_end = week_start + timedelta(days=6) 
+                week_end = min(week_end, last_day_of_month)  
+                
+                week_key = f"week {week_start.isocalendar()[1]} ({week_start.strftime('%b %d, %Y')} - {week_end.strftime('%b %d, %Y')})"
+                
+                weekly_payments = payments.filter(date__gte=week_start, date__lte=week_end)
+                serialized_data = PaymentSerializer(weekly_payments, many=True).data
+                
+                report[week_key] = process_payments(report[week_key], serialized_data)
+
+                week_start += timedelta(days=7)
+
         response_data = {week: report[week] for week in sorted(report.keys())}
+
+        return Response(response_data)
+
+class GetYearlyReport(APIView):
+    def get(self, request):
+        rooms = Room.objects.all()
+        amenities = Amenities.objects.all()
+        activities = Activity.objects.all()
+
+        report = defaultdict(lambda: initialize_data(rooms, amenities, activities))
+
+        start_year = request.query_params.get('s') # Start year
+        end_year = request.query_params.get('e') # End year
+
+        # If end_month is not provided, treat it as the same as start_year
+        if not end_year:
+            end_year = start_year
+
+        start_year = int(start_year)
+        end_year = int(end_year)
+
+        if not start_year:
+            return Response({"error": "Start year is required."}, status=400)
+
+        for current_year in range(start_year, end_year + 1):
+            for month in range(1, 13): 
+                month_name = datetime(2000, month, 1).strftime('%B') 
+                month_key = f"year {current_year} ({month_name})"
+
+                monthly_payments = Payment.objects.filter(date__year=current_year, date__month=month)
+
+                serialized_data = PaymentSerializer(monthly_payments, many=True).data
+                
+                report[month_key] = process_payments(report[month_key], serialized_data)
+
+        response_data = {month_key: report[month_key] for month_key in report}
 
         return Response(response_data)
 
