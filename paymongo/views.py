@@ -6,7 +6,7 @@ from rest_framework import status
 from django.conf import settings
 import base64
 from rest_framework import generics
-from .serializers import CardPaymentSerializer, GCashSourceSerializer, WebhookEventSerializer
+from .serializers import CardPaymentSerializer, GCashSourceSerializer, WebhookEventSerializer, LinkSerializer
 from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus,PaymentFor
 import logging
 import json
@@ -248,6 +248,68 @@ class GCashSource(APIView):
             checkout_url = response.json().get('data', {}).get('attributes', {}).get('redirect', {}).get('checkout_url')
             src_id =  response.json().get('data', {}).get('id')
             return Response({'status': 'success', 'src_id': src_id,'checkout_url': checkout_url}, status=status.HTTP_200_OK)
+        else:
+            return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
+
+class CreateLink(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = LinkSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_data = serializer.validated_data
+
+        remarks = []
+        billing_id = validated_data.get('billing_id')
+        payment_for = validated_data.get('payment_for')
+        payment_status = validated_data.get('payment_status')
+        content_type = validated_data.get('content_type')
+        object_id = validated_data.get('object_id')
+
+        if billing_id:
+            remarks.append(f"{billing_id}")
+        if payment_for:
+            remarks.append(f"{payment_for}")
+        if payment_status:
+            remarks.append(f"{payment_status}")
+        if content_type:
+            remarks.append(f"{content_type}")
+        if object_id:
+            remarks.append(f"{object_id}")
+
+        remarks = " - ".join(remarks) if remarks else ""
+        url = "https://api.paymongo.com/v1/links"
+
+        payload = {
+            "data": {
+                "attributes": {
+                    "amount": validated_data['amount'],
+                    "description": validated_data['description'],
+                    "remarks": remarks  
+                }
+            }
+        }
+
+        headers = {
+            'accept': 'application/json',
+            'authorization': f'Basic {base64.b64encode(f"{settings.PAYMONGO_SECRET_KEY}:".encode()).decode()}',
+            'content-type': 'application/json',
+        }
+
+        # Send request to PayMongo to create the link
+        response = requests.post(url, json=payload, headers=headers)
+
+        if response.status_code == 200:
+            response_data = response.json().get('data', {}).get('attributes', {})
+            return Response({
+                'id': response.json().get('data', {}).get('id'),  
+                'checkout_url': response_data.get('checkout_url'),  # URL for payment
+                'amount': response_data.get('amount') / 100,  
+                'description': response_data.get('description'),  
+                'status': response_data.get('status'), 
+                'remarks': response_data.get('remarks'),  
+                'reference_number': response_data.get('reference_number')  # Unique reference number
+            }, status=status.HTTP_200_OK)
         else:
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
         
