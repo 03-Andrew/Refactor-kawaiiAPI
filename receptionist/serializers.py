@@ -93,6 +93,12 @@ class AmenitiesAvailedSerializer2(ModelSerializer):
         model = AmenitiesAvailed
         fields = ['id', 'head_count', 'amenity']
 
+class AmenitiesAvailedSerializer3(ModelSerializer):
+    amenity = AmenitiesSerializer()
+    class Meta:
+        model = AmenitiesAvailed
+        fields = ['id', 'head_count', 'amenity']
+
 class FoodBillSerializer(ModelSerializer):
     class Meta:
         model = FoodBill

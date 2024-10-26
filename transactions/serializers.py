@@ -5,7 +5,7 @@ from bookings.models import Booking
 
 from django.db.models import Sum, F
 
-from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer2, AdditionalPaymentSerializer, AmenitiesAvailedSerializer
+from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer3, FoodBillSerializer2, AdditionalPaymentSerializer, AmenitiesAvailedSerializer
 
 
 from bookings.serializers import BookingSerializer
@@ -156,7 +156,7 @@ class PendingBookings(serializers.ModelSerializer):
 class BillingDetailSerializer(serializers.ModelSerializer):
     customer = CustomerSerializer()
     booking  =  BookingSerializer(many=True, read_only=True, source='bookings')
-    amenitiesAvailed = AmenitiesAvailedSerializer2(many=True, read_only=True, source="amenities_availed")
+    amenitiesAvailed = AmenitiesAvailedSerializer3(many=True, read_only=True, source="amenities_availed")
     activitiesAvailed = ActivitiesAvailedSerializer2(many=True, read_only=True, source="activities_availed")
     foodBill = FoodBillSerializer2(many=True, read_only=True, source="food_bill")
     additonalPayment = AdditionalPaymentSerializer(many=True, read_only=True, source='additional_payment')
