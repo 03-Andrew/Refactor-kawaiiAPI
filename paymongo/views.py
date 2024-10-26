@@ -345,6 +345,7 @@ class WebhookNotif(APIView):
             amount = source_data['attributes']['amount']
             billing_info = source_data['attributes']['billing']
             description = source_data['attributes'].get('description', "")
+            remarks = source_data['attributes'].get('remarks', "")
             payment_type = source_data['attributes'].get('source', {}).get('type', "")
 
             # Check if the payment is chargeable or paid and act accordingly
@@ -358,7 +359,6 @@ class WebhookNotif(APIView):
                 billing_id = self.create_payment_record(event_type, amount, payment_type, description, remarks)
 
             if event_type == 'link.payment.paid':
-                remarks = source_data['attributes'].get('remarks', "")
                 billing_id = self.create_payment_record(event_type, amount, payment_type, description, remarks)
                 
             # Log and store the event safely
