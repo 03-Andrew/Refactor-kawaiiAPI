@@ -1,11 +1,11 @@
 from rest_framework import serializers
-from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, BillingStatus
+from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, BillingStatus, Food
 
 from bookings.models import Booking
 
 from django.db.models import Sum, F
 
-from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer2, FoodBillSerializer2, AdditionalPaymentSerializer
+from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer3, FoodBillSerializer2, AdditionalPaymentSerializer, AmenitiesAvailedSerializer
 
 
 from bookings.serializers import BookingSerializer
@@ -156,7 +156,7 @@ class PendingBookings(serializers.ModelSerializer):
 class BillingDetailSerializer(serializers.ModelSerializer):
     customer = CustomerSerializer()
     booking  =  BookingSerializer(many=True, read_only=True, source='bookings')
-    amenitiesAvailed = AmenitiesAvailedSerializer2(many=True, read_only=True, source="amenities_availed")
+    amenitiesAvailed = AmenitiesAvailedSerializer3(many=True, read_only=True, source="amenities_availed")
     activitiesAvailed = ActivitiesAvailedSerializer2(many=True, read_only=True, source="activities_availed")
     foodBill = FoodBillSerializer2(many=True, read_only=True, source="food_bill")
     additonalPayment = AdditionalPaymentSerializer(many=True, read_only=True, source='additional_payment')
@@ -184,6 +184,12 @@ class BillingDetailSerializer(serializers.ModelSerializer):
     def get_additionalPaymentTotal(slef, obj):
         return obj.total_additional()
     
+class FoodListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Food
+        fields = '__all__'
     
+
+
     
     

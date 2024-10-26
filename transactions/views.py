@@ -13,10 +13,10 @@ from django.utils.decorators import method_decorator
 
 from django.db.models.functions import ExtractMonth
 
-from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill, GuestStatus
-from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer
+from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill, GuestStatus, Food, AdditonalPayment
+from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer, FoodListSerializer
 
-from receptionist.serializers import FoodBillSerializer
+from receptionist.serializers import FoodBillSerializer, AdditionalPaymentSerializer
 from bookings.serializers import BookingSerializer
 from bookings.models import Booking
 
@@ -164,7 +164,17 @@ class ModifyFoodBill(generics.RetrieveUpdateAPIView):
     queryset = FoodBill.objects.all()
     lookup_field = 'pk'
 
+class AddFoodList(generics.ListCreateAPIView):
+    serializer_class = FoodListSerializer
+    queryset = Food.objects.all()
 
+class ModifyFoodList(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = FoodListSerializer
+    queryset = Food.objects.all()
+    lookup_field = 'pk'
 
+class CreateAdditionalPayments(generics.ListCreateAPIView):
+    serializer_class = AdditionalPaymentSerializer
+    queryset = AdditonalPayment.objects.all()
 
 
