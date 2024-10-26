@@ -348,13 +348,16 @@ class WebhookNotif(APIView):
             amount = source_data['attributes']['amount']
             billing_info = source_data.get('attributes', {}).get('billing', None)
             description = source_data['attributes'].get('description', "")
-            payment_type = source_data['attributes'].get('source', {}).get('type', "")
+            payment_type = source_data['attributes'].get('source', {}).get('type', None)
 
             # Check if the payment is chargeable or paid and act accordingly
             if payment_status == 'chargeable':
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
             if payment_status == 'paid':
+                if event_type == 'link':
+                    payment_type = payload['data']['attributes']['data']['attributes']['payments'][0]['data']['attributes']['source']['type']
+
                 self.create_payment(amount, billing_id, payment_type, description)
                 #self.websocket_notif()
 
