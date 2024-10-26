@@ -331,9 +331,7 @@ class WebhookNotif(APIView):
         try:
             # Retrieve data 
             event_id = payload.get('data', {}).get('id')
-            billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
-            billing_split = billing_description.split(" - ")[0] if billing_description else None
-            billing_id = Billing.objects.get(id=billing_split)
+            billing_id = None
             event_type = payload.get('data', {}).get('attributes', {}).get('type')
             payment_status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
             source_data = payload['data']['attributes']['data']
@@ -345,17 +343,60 @@ class WebhookNotif(APIView):
 
             # Check if the payment is chargeable or paid and act accordingly
             if payment_status == 'chargeable':
+                billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
+                billing_split = billing_description.split(" - ")[0] if billing_description else None
+                billing_id = Billing.objects.get(id=billing_split)
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
             if payment_status == 'paid':
-                self.create_payment(amount, billing_id, payment_type, description)
-                self.websocket_notif()
+                billing_id = self.create_payment_record(event_type, amount, payment_type, description, remarks)
 
+            if event_type == 'link.payment.paid':
+                remarks = source_data['attributes'].get('remarks', "")
+                billing_id = self.create_payment_record(event_type, amount, payment_type, description, remarks)
+                
             # Log and store the event safely
             self.create_webhook_event(event_id, billing_id, event_type, payload)
 
         except Exception as e:
             logging.error(f"Unexpected error processing event: {str(e)}")
+
+    def create_payment_record(self, event_type, amount, payment_type, description, remarks):
+        billing_split = description.split(" - ") if event_type == 'payment.paid' else remarks.split(" - ")
+
+        if len(billing_split) < 5:
+            logging.error("Description or remarks format is invalid.")
+            return None
+
+        billing_id = billing_split[0]
+        payment_for_name = billing_split[1]
+        payment_status_name = billing_split[2]
+        content_type_name = billing_split[3]
+        object_id = billing_split[4]
+
+        try:
+            payment_for = PaymentFor.objects.get(name=payment_for_name)
+            payment_status = PaymentStatus.objects.get(status=payment_status_name)
+            payment_method = PaymentMethod.objects.get(mode=payment_type)
+            content_type = ContentType.objects.get(model=content_type_name)
+        except (PaymentFor.DoesNotExist, PaymentStatus.DoesNotExist, PaymentMethod.DoesNotExist, ContentType.DoesNotExist) as e:
+            logging.error(f"Error creating Payment record: {e}")
+            return None
+
+        # Create Payment record
+        logging.info(f"Creating Payment record for billing_id: {billing_id}")
+        Payment.objects.create(
+            customer_bill=billing_id,
+            amount=amount / 100,  # convert from cents
+            date=timezone.now(),
+            mop=payment_method,  
+            paymentFor=payment_for,
+            status=payment_status,
+            content_type=content_type,
+            object_id=object_id,
+        )
+        return billing_id
+
 
     def validate_signature(self, request):
         # Get the signature from the headers
