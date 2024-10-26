@@ -131,70 +131,78 @@ class GetTotalEarningsPerMonth(APIView):
 
         return Response(monthly_earnings) 
 
+def process_payments(data, serialized_data):
+    for item in serialized_data:
+        paid_for = item.get('paid_for')
 
+        # Check if `paid_for` is a dictionary (object) before proceeding
+        if not isinstance(paid_for, dict):
+            print(f"Skipping non-dict paid_for: {paid_for} (type: {type(paid_for)})")
+            continue
+
+        try:
+            if item['paymentFor'] in ["Room", "Down payment"]:
+                field = str(paid_for['room'])
+                data['bookings'][field]['amount'] += float(item['amount'])
+                data['bookings'][field]['pax/hrs'] = int(paid_for['adult_count']) + int(paid_for['children_count'])
+                continue
+
+            if item['paymentFor'] == 'Activities':
+                field = paid_for['activity']['activity']
+                data['other sales'][field]['amount'] += float(item['amount'])
+                data['other sales'][field]['pax/hrs'] = float(paid_for['hours_availed'])
+                continue
+
+            if item['paymentFor'] == 'Amenities':
+                field = paid_for['amenity']['amenity']
+                data['other sales'][field]['amount'] += float(item['amount'])
+                data['other sales'][field]['pax/hrs'] = int(paid_for['head_count'])
+                continue
+
+            if item['paymentFor'] == 'Food':
+                data['Food bill'] += float(item['amount'])
+                continue
+
+        except TypeError as e:
+            print(f"Error accessing fields in paid_for: {paid_for} - Error: {e}")
+
+    return data
+
+def initialize_data(rooms, amenities, activities):
+    data = {}
+    
+    data['bookings'] = {}
+    for item in rooms:            
+        data['bookings'][item.number] = {'amount': 0, 'pax/hrs': 0}
+
+    data['other sales'] = {} 
+    for item in amenities:
+        data['other sales'][item.amenity] = {'amount': 0, 'pax/hrs': 0}
+    for item in activities:
+        data['other sales'][item.activity] = {'amount': 0, 'pax/hrs': 0}  
+    
+    # data['other extras'] = {}
+    # for item in extraItems:
+    #     data['other extras'][item.item] = {'amount': 0, 'pax/hrs': 0}  
+
+    data['Food bill'] = 0
+    return data 
 
 class GetDailyReport(APIView):
-    def get_json(self):
-        data = {}
+    def get(self, request): 
         rooms = Room.objects.all()
         amenities = Amenities.objects.all()
         activities = Activity.objects.all()
-        extraItems = ExtraItems.objects.all()
 
-
-        data['bookings'] = {}
-        for item in rooms:            
-            data['bookings'][item.number] = {'amount': 0,'pax/hrs': 0}
-
-        data['other sales'] = {} 
-        for item in amenities:
-            data['other sales'][item.amenity] = {'amount': 0,'pax/hrs': 0}
-        for item in activities:
-            data['other sales'][item.activity] = {'amount': 0,'pax/hrs': 0}  
+        data = initialize_data(rooms, amenities, activities)
         
-        # data['other extras'] = {}
-        # for item in extraItems:
-        #     data['other extras'][item.item] = {'amount': 0,'pax/hrs': 0}  
-
-        data['Food bill'] = 0
-        return data 
-          
-    def get(self, request):
         date = request.query_params.get('date')
-        data = self.get_json()
         payments = Payment.objects.all()
         if date:
             payments = payments.filter(date__date=date)
 
         serialized_data = PaymentSerializer(payments, many=True).data
-        for item in serialized_data:
-            if item['paymentFor'] in ["Room", "Down payment"]:
-                field = str(item['paid_for']['room'])
-                data['bookings'][field]['amount'] += float(item['amount'])
-                data['bookings'][field]['pax/hrs'] = int(item['paid_for']['adult_count']) + int(item['paid_for']['children_count'])
-                continue
-            
-            if item['paymentFor'] == 'Activities':
-                field = item['paid_for']['activity']['activity']
-                data['other sales'][field]['amount'] += float(item['amount'])
-                data['other sales'][field]['pax/hrs'] = float(item['paid_for']['hours_availed'])
-                continue
-
-            if item['paymentFor'] == 'Amenities':
-                field = item['paid_for']['amenity']['amenity']
-                data['other sales'][field]['amount'] += float(item['amount'])
-                data['other sales'][field]['pax/hrs'] = int(item['paid_for']['head_count'])
-                continue
-            
-            if item['paymentFor'] == 'Food':
-                data['Food bill'] += float(item['amount'])
-                continue
-
-
-                
+        data = process_payments(data, serialized_data)
         return Response(data)
- 
-
-
 
 
