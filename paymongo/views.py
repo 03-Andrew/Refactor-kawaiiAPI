@@ -315,24 +315,23 @@ class CreateLink(APIView):
         
 class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
-        # Validate the signature
         if not self.validate_signature(request):
             return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
-        
+
         threading.Thread(target=self.process_event, args=(request.data,)).start()
         return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
     def process_event(self, payload):
-        """Processes the payment event from Paymongo."""
         try:
-            # Retrieve necessary data from the payload
             event_id = payload.get('data', {}).get('id')
             event_type = payload.get('data', {}).get('type')
-            source_data = payload['data']['attributes']['data']
-            payment_status = source_data['attributes']['status']
-            amount = source_data['attributes']['amount']
-            payment_type = source_data['attributes']['source']['type']
-            remarks = source_data['attributes'].get('remarks', "")
+            source_data = payload.get('data', {}).get('attributes', {}).get('data', {})
+            payment_status = source_data.get('attributes', {}).get('status')
+            amount = source_data.get('attributes', {}).get('amount')
+
+            source = source_data.get('attributes', {}).get('source', {})
+            payment_type = source.get('type')
+            remarks = source_data.get('attributes', {}).get('remarks', "")
 
             if event_type == 'link.payment.paid' and payment_status == 'paid':
                 billing_id = self.create_payment(amount, payment_type, remarks)
@@ -342,7 +341,6 @@ class WebhookNotif(APIView):
             logging.error(f"Unexpected error processing event: {str(e)}")
 
     def validate_signature(self, request):
-        """Validates the Paymongo signature."""
         paymongo_signature = request.headers.get('Paymongo-Signature', None)
         if not paymongo_signature:
             return False
@@ -354,7 +352,6 @@ class WebhookNotif(APIView):
         signature_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
         webhook_secret = settings.PAYMONGO_WEBHOOK_SECRET
 
-        # Generate the computed signature
         computed_signature = hmac.new(
             webhook_secret.encode('utf-8'),
             signature_payload.encode('utf-8'),
@@ -364,7 +361,6 @@ class WebhookNotif(APIView):
         return computed_signature == test_signature
 
     def create_webhook_event(self, event_id, billing_id, event_type, payload):
-        """Creates a webhook event record."""
         try:
             WebhookEvent.objects.create(
                 event_id=event_id,
@@ -376,7 +372,6 @@ class WebhookNotif(APIView):
             logging.error(f"Error creating Webhook event: {str(e)}")
 
     def create_payment(self, amount, payment_type, billing_data):
-        """Creates a payment record."""
         billing_data_parts = billing_data.split(" - ")
 
         if len(billing_data_parts) >= 5:
@@ -392,11 +387,10 @@ class WebhookNotif(APIView):
                 payment_method = PaymentMethod.objects.get(mode=payment_type)
                 content_type = ContentType.objects.get(model=content_type_name)
 
-                # Create a Payment model
                 logging.info(f"Creating Payment record for billing_id: {billing_id}")
                 Payment.objects.create(
                     customer_bill=billing_id,
-                    amount=amount / 100,  # convert from cents
+                    amount=amount / 100,
                     date=timezone.now(),
                     mop=payment_method,
                     paymentFor=payment_for,
@@ -404,7 +398,7 @@ class WebhookNotif(APIView):
                     content_type=content_type,
                     object_id=object_id,
                 )
-                return billing_id  # Return billing_id for logging
+                return billing_id
 
             except (PaymentFor.DoesNotExist, PaymentStatus.DoesNotExist, PaymentMethod.DoesNotExist, ContentType.DoesNotExist) as e:
                 logging.error(f"Error creating Payment record: {e}")
