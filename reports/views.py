@@ -219,10 +219,11 @@ class GetYearlyReport(APIView):
 
         report = defaultdict(lambda: initialize_data(rooms, amenities, activities))
 
-        start_year = request.query_params.get('s') # Start year
-        end_year = request.query_params.get('e') # End year
+        start_year = request.query_params.get('s')  # Start year
+        end_year = request.query_params.get('e')    # End year
+        start_month = request.query_params.get('sm') # Start month (optional)
+        end_month = request.query_params.get('em')   # End month (optional)
 
-        # If end_month is not provided, treat it as the same as start_year
         if not end_year:
             end_year = start_year
 
@@ -232,9 +233,15 @@ class GetYearlyReport(APIView):
         if not start_year:
             return Response({"error": "Start year is required."}, status=400)
 
+        start_month = int(start_month) if start_month else 1
+        end_month = int(end_month) if end_month else 12
+
+        if start_month < 1 or start_month > 12 or end_month < 1 or end_month > 12:
+            return Response({"error": "Months must be between 1 and 12."}, status=400)
+
         for current_year in range(start_year, end_year + 1):
-            for month in range(1, 13): 
-                month_name = datetime(2000, month, 1).strftime('%B') 
+            for month in range(start_month, end_month + 1):  
+                month_name = datetime(2000, month, 1).strftime('%B')
                 month_key = f"year {current_year} ({month_name})"
 
                 monthly_payments = Payment.objects.filter(date__year=current_year, date__month=month)
