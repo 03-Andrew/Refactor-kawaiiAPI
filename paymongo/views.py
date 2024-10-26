@@ -386,7 +386,7 @@ class WebhookNotif(APIView):
             payment_method = PaymentMethod.objects.get(mode=payment_type)
             content_type = ContentType.objects.get(model=content_type_name)
         except (PaymentFor.DoesNotExist, PaymentStatus.DoesNotExist, PaymentMethod.DoesNotExist, ContentType.DoesNotExist) as e:
-            logging.error(f"Error creating Payment record: {e}")
+            logging.error(f"Error creating Payment record: {e}" + payment_for + payment_status + payment_method + content_type)
             return None
 
         # Create Payment record
