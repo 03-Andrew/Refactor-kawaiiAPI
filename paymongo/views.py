@@ -318,43 +318,25 @@ class WebhookNotif(APIView):
         # Validate the signature
         if not self.validate_signature(request):
             return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
-
-        # Send a 200 OK response right after validation
-        response = Response({'status': 'success'}, status=status.HTTP_200_OK)
         
-        # Process the event in a separate thread
         threading.Thread(target=self.process_event, args=(request.data,)).start()
-
-        return response
+        return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
     def process_event(self, payload):
         try:
-            # Retrieve data 
             event_id = payload.get('data', {}).get('id')
-            billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
-            billing_split = billing_description.split(" - ")[0] if billing_description else None
-            billing_id = Billing.objects.get(id=billing_split)
-            event_type = payload.get('data', {}).get('attributes', {}).get('type')
-            payment_status = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('status')
+            event_type = payload.get('data', {}).get('type')
             source_data = payload['data']['attributes']['data']
-            source_id = source_data['id']
+            payment_status = source_data['attributes']['status']
             amount = source_data['attributes']['amount']
-            billing_info = source_data.get('attributes', {}).get('billing', None)
             description = source_data['attributes'].get('description', "")
-            payment_type = source_data['attributes'].get('source', {}).get('type', None)
-            remarks = payload['data']['attributes']['data']['attributes'].get('remarks', None)
+            payment_type = source_data['attributes']['source']['type']
+            billing_info = source_data['attributes'].get('billing', {})
 
-            # Check if the payment is chargeable or paid and act accordingly
-            if payment_status == 'chargeable':
-                self.create_gcash_payment(source_id, amount, billing_info, description)
-
+            # Process only paid link payments
             if payment_status == 'paid':
-                if event_type == 'link.payment.paid':
-                    payment_type = payload['data']['attributes']['data']['attributes']['payments'][0]['data']['attributes']['source']['type']
-                    description = remarks
-
-                self.create_payment(amount, billing_id, payment_type, description)
-                #self.websocket_notif()
+                billing_data = description  # Use description for billing data
+                billing_id = self.create_payment(amount, payment_type, billing_data)
 
             # Log and store the event safely
             self.create_webhook_event(event_id, billing_id, event_type, payload)
@@ -363,7 +345,7 @@ class WebhookNotif(APIView):
             logging.error(f"Unexpected error processing event: {str(e)}")
 
     def validate_signature(self, request):
-        # Get the signature from the headers
+        """Validates the Paymongo signature."""
         paymongo_signature = request.headers.get('Paymongo-Signature', None)
         if not paymongo_signature:
             return False
@@ -371,11 +353,11 @@ class WebhookNotif(APIView):
         parts = paymongo_signature.split(',')
         timestamp = parts[0].split('=')[1]
         test_signature = parts[1].split('=')[1]
-
         raw_body = request.body
         signature_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
-
         webhook_secret = settings.PAYMONGO_WEBHOOK_SECRET
+
+        # Generate the computed signature
         computed_signature = hmac.new(
             webhook_secret.encode('utf-8'),
             signature_payload.encode('utf-8'),
@@ -384,17 +366,8 @@ class WebhookNotif(APIView):
 
         return computed_signature == test_signature
 
-    def websocket_notif(self):
-        try:
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                'receptionist',
-                {'type': 'booking_paid', 'message': 'A new customer has booked a room.'}
-            )
-        except Exception as e:
-            logging.error(f"Error in notifying receptionist: {str(e)}")
-
     def create_webhook_event(self, event_id, billing_id, event_type, payload):
+        """Creates a webhook event record."""
         try:
             WebhookEvent.objects.create(
                 event_id=event_id,
@@ -405,94 +378,49 @@ class WebhookNotif(APIView):
         except Exception as e:
             logging.error(f"Error creating Webhook event: {str(e)}")
 
-    def create_payment(self, amount, billing_id, payment_type, description):
-        logging.info(f"Creating payment with amount: {amount}, billing_id: {billing_id}, payment_type: {payment_type}, description: {description}")
-        
-        description_parts = description.split(" - ")
+    def create_payment(self, amount, payment_type, billing_data):
+        """Creates a payment record."""
+        billing_data_parts = billing_data.split(" - ")
 
-        if len(description_parts) >= 5:
-            payment_for_name = description_parts[1]
-            payment_status_name = description_parts[2]
-            content_type_name = description_parts[3]
-            object_id = description_parts[4]
+        if len(billing_data_parts) >= 5:
+            billing_id = billing_data_parts[0]
+            payment_for_name = billing_data_parts[1]
+            payment_status_name = billing_data_parts[2]
+            content_type_name = billing_data_parts[3]
+            object_id = billing_data_parts[4]
 
             try:
                 payment_for = PaymentFor.objects.get(name=payment_for_name)
-            except PaymentFor.DoesNotExist:
-                logging.error(f"PaymentFor with name '{payment_for_name}' does not exist.")
-                return
-
-            try:
                 payment_status = PaymentStatus.objects.get(status=payment_status_name)
-            except PaymentStatus.DoesNotExist:
-                logging.error(f"PaymentStatus with status '{payment_status_name}' does not exist.")
-                return
-            
-            try:
                 payment_method = PaymentMethod.objects.get(mode=payment_type)
-            except PaymentMethod.DoesNotExist:
-                logging.error(f"PaymentMethod with mode '{payment_type}' does not exist.")
-                return
-
-            try:
                 content_type = ContentType.objects.get(model=content_type_name)
-            except ContentType.DoesNotExist:
-                logging.error(f"ContentType with model '{content_type_name}' does not exist.")
-                return
 
-            # Create a Payment model
-            logging.info(f"Creating Payment record for billing_id: {billing_id}")
-            Payment.objects.create(
-                customer_bill=billing_id,
-                amount=amount / 100, # convert from cents
-                date=timezone.now(),
-                mop=payment_method,  
-                paymentFor=payment_for,
-                status=payment_status,
-                content_type=content_type,
-                object_id=object_id,
-            )
-        else:
-            logging.error("Description format is invalid.")
+                # Create a Payment model
+                logging.info(f"Creating Payment record for billing_id: {billing_id}")
+                Payment.objects.create(
+                    customer_bill=billing_id,
+                    amount=amount / 100,  # convert from cents
+                    date=timezone.now(),
+                    mop=payment_method,
+                    paymentFor=payment_for,
+                    status=payment_status,
+                    content_type=content_type,
+                    object_id=object_id,
+                )
+                return billing_id  # Return billing_id for logging
 
-    def create_gcash_payment(self, source_id, amount, billing_info, description):
-        url = "https://api.paymongo.com/v1/payments"
+            except (PaymentFor.DoesNotExist, PaymentStatus.DoesNotExist, PaymentMethod.DoesNotExist, ContentType.DoesNotExist) as e:
+                logging.error(f"Error creating Payment record: {e}")
+                return None
 
-        payload = {
-            "data": {
-                "attributes": {
-                    "amount": amount,
-                    "source": {
-                        "id": source_id,
-                        "type": "source"
-                    },
-                    "currency": "PHP",
-                    "description": description,
-                    "billing": {
-                        "name": billing_info['name'],
-                        "email": billing_info['email'],
-                        "phone": billing_info['phone']
-                    }
-                }
-            }
-        }
-
-        headers = {
-            'accept': 'application/json',
-            'authorization': f'Basic {base64.b64encode(f"{settings.PAYMONGO_SECRET_KEY}:".encode()).decode()}',
-            'content-type': 'application/json',
-        }
-
-        # Send request to PayMongo to create a payment
-        response = requests.post(url, json=payload, headers=headers)
-        return response.json()
+        logging.error("Description format is invalid.")
+        return None
 
     def get(self, request, *args, **kwargs):
         try:
             webhook_events = WebhookEvent.objects.all()
             serializer = WebhookEventSerializer(webhook_events, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-
         except Exception as e:
             logging.error(f"Error retrieving webhook events: {str(e)}")
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
