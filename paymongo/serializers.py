@@ -29,6 +29,14 @@ class GCashSourceSerializer(serializers.Serializer):
     content_type = serializers.CharField(required=False)  
     object_id = serializers.IntegerField(required=False) 
 
+class LinkSerializer(serializers.Serializer):
+    billing_id = serializers.CharField()
+    payment_for = serializers.CharField()
+    payment_status = serializers.CharField()
+    content_type = serializers.CharField()
+    object_id = serializers.CharField()
+    amount = serializers.IntegerField()
+    description = serializers.CharField(required=False, allow_blank=True)    
 
 class WebhookEventSerializer(serializers.ModelSerializer):
     class Meta:
