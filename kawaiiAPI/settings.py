@@ -24,14 +24,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-le41^5*zazcf%@9r2vmkip1%h#f)uba6osnt1_4-v2o9f$(bmb'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['.vercel.app','127.0.0.1'] # Added localhost
+ALLOWED_HOSTS = ['.onrender.com','.vercel.app','127.0.0.1'] # Added localhost
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'channels',
     'whitenoise.runserver_nostatic',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -51,7 +52,6 @@ INSTALLED_APPS = [
     'receptionist',
     'user',
     'paymongo', #Added yeah
-    'reports'
 ]
 
 
@@ -89,18 +89,28 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
+#WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
+ASGI_APPLICATION = 'kawaiiAPI.asgi.application'
 
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 
 
@@ -126,16 +136,16 @@ DATABASES = {
 # CSRF_USE_SESSIONS = False  
 # SECURE_SSL_REDIRECT = True
 
-# DATABASES = {
-#    'default': {
-#        'ENGINE': 'django.db.backends.postgresql',
-#        'NAME': 'railway',
-#        'USER': 'postgres',
-#        'PASSWORD': 'IhBdVXegOCPEExHtDjzUpOArgfBRYXsw',
-#        'HOST': 'junction.proxy.rlwy.net',
-#        'PORT': '19216',
-#    }
-# }
+DATABASES = {
+   'default': {
+       'ENGINE': 'django.db.backends.postgresql',
+       'NAME': 'railway',
+       'USER': 'postgres',
+       'PASSWORD': 'IhBdVXegOCPEExHtDjzUpOArgfBRYXsw',
+       'HOST': 'junction.proxy.rlwy.net',
+       'PORT': '19216',
+   }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
@@ -207,5 +217,5 @@ GRAPH_MODELS = {
 
 PAYMONGO_SECRET_KEY = 'sk_test_Y4Sv1NEcDmqXYmkzfVa9L5uF'  # this is just a key for testing
 #PAYMONGO_SECRET_KEY = os.getenv('PAYMONGO_SECRET_KEY')
-PAYMONGO_WEBHOOK_SECRET = 'whsk_jyRejxZU15Lx21bmaEwEkiVa' # For andrei's repo
-#PAYMONGO_WEBHOOK_SECRET = 'whsk_HM3A544z4mkskX9zKH87Pu5V' # For my fork
+#PAYMONGO_WEBHOOK_SECRET = 'whsk_2oKw1JfVMTmkjCU9YAvkd3Mh'
+PAYMONGO_WEBHOOK_SECRET = "whsk_yT7LwSjYMP3UryAqrFbn6WyR"
