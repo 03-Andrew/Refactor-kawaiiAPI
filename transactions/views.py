@@ -81,6 +81,12 @@ class ListConfirmedBooking(generics.ListAPIView):
         return queryset
     
 
+class EditBooking(generics.RetrieveUpdateAPIView):
+    serializer_class = ConfirmedBooking
+    lookup_field = 'pk'
+    queryset = Booking.objects.all()
+    
+
     
 
 
