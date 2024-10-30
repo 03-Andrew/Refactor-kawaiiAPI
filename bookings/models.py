@@ -52,6 +52,7 @@ class Booking(models.Model):
     check_out = models.DateField()
     adult_count = models.PositiveSmallIntegerField()
     children_count = models.PositiveSmallIntegerField(default=0)
+    extra_guest =  models.PositiveSmallIntegerField(null=True, blank=True, default=0)
     status = models.ForeignKey(BookingStatus, on_delete=models.PROTECT, related_name='bookings', default=1)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -75,7 +76,9 @@ class Booking(models.Model):
 
     @property
     def total_cost(self):
-        return self.room_type.price * self.number_of_nights if self.room_type else 0
+        base_cost = self.room_type.price * self.number_of_nights if self.room_type else 0
+        extra_guest_cost = 1500 * self.extra_guest * self.number_of_nights if self.extra_guest else 0
+        return base_cost + extra_guest_cost
     
     def clean(self):
         if self.check_in >= self.check_out:
