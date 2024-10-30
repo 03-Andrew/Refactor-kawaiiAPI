@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from django.shortcuts import render
 from django.db.models import Count, Q
 from django.http import HttpResponse
-import requests
 
 from .models import Room, Booking, RoomType
 from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings, BookingSerializer3
@@ -261,6 +260,7 @@ class CreateStayInBooking(APIView):
         rBooking['children_count'] = int(rBooking['children_count'])
         rBooking['adult_count'] = int(rBooking['adult_count'])
 
+
 class CreateOnlineBooking(APIView):
     def get(self, request):
         return Response({"Create Booking here": "Yeah Yeah"})
@@ -286,84 +286,43 @@ class CreateOnlineBooking(APIView):
             else:
                 print("Here At billing")
                 return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
-
 
             created_bookings = []
             for booking in bookings:
                 booking['customer_bill'] = billing.id
                 booking['room'] = ""
                 booking['status'] = 1
+                booking['total_cost'] = booking['price']
                 booking_serializer = BookingSerializer3(data=booking)
                 if booking_serializer.is_valid():
                     booking_data = booking_serializer.save()
                     created_bookings.append(booking_serializer.data)
                 else:
                     raise Exception(booking_serializer.errors)
-            
-            boat['customer_bill'] = booking_data.customer_bill.id
-            boat['amenity'] = 1
-            amenitiesAvaied = AmenitiesAvailedSerializer(data=boat)
-            if amenitiesAvaied.is_valid():
-                amenitiesAvaied.save()
-            else:
-                print("Here At amenities")
-                return Response(amenitiesAvaied.errors, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Call the WebSocket trigger API endpoint
-            try:
-                response = requests.get('http://127.0.0.1:8000/api/trigger-websocket/')
-                response.raise_for_status()  # Raises an error for 4xx/5xx responses
-            except requests.RequestException as e:
-                return Response({"error": "Failed to send WebSocket message", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-       
+            amenitiesAvaied = None  # Initialize to None
+            if boat:
+                print("Boat data is present")
+                boat['customer_bill'] = billing.id  # Update this to use the billing id
+                boat['amenity'] = 1
+                amenitiesAvaied = AmenitiesAvailedSerializer(data=boat)
+                if amenitiesAvaied.is_valid():
+                    amenitiesAvaied.save()
+                else:
+                    print("Here At amenities")
+                    return Response(amenitiesAvaied.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-        return Response({
+        response_data = {
             'customer': customer_serializer.data,
             'billing': billing_serializer.data,
-            'bookings': created_bookings,
-            'boat': amenitiesAvaied.data
-        }, status=status.HTTP_201_CREATED)
-       
-            
-        #     created_bookings = []
-        #     for rBooking in cart_data['rooms']:
-        #         newBooking = {}
-        #         newBooking["customer_bill"] = billing.id
-        #         newBooking["room_type"] = rBooking['roomId']
-        #         newBooking["check_in"] = rBooking['checkIn']
-        #         newBooking["check_out"] = rBooking['checkOut']
-        #         newBooking["adult_count"] = rBooking['adults']
-        #         newBooking["children_count"] = rBooking['children']
-        #         newBooking["status"] = 1
+            'bookings': created_bookings
+        }
+    
+        if amenitiesAvaied:
+            response_data['boat'] = amenitiesAvaied.data  # Only include boat if it was created
 
-        #         booking_serializer = BookingSerializer2(data=newBooking)
-        #         if booking_serializer.is_valid():
-        #             booking = booking_serializer.save()
-        #             created_bookings.append(booking_serializer.data)
-        #         else:
-        #             # If booking serializer is invalid, raise an exception to rollback
-        #             raise Exception(booking_serializer.errors)
-            
-        #     addOn = { "customer_bill": billing.id, "amenity": 1, "head_count": cart_data['addOns']['boat']['count'] }
-        #     amenitiesAvaied = AmenitiesAvailedSerializer2(data=addOn)
-        #     if amenitiesAvaied.is_valid():
-        #         amenitiesAvaied.save()
-        #     else:
-        #         return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
-                
-
-        # return Response({
-        #     'customer': customer_serializer.data,
-        #     'billing': billing_serializer.data,
-        #     'bookings': created_bookings,
-        #     'adons': addOn
-        # }, status=status.HTTP_201_CREATED)
-            
-
+        return Response(response_data, status=status.HTTP_201_CREATED)
+    
 
 
 
