@@ -2,9 +2,11 @@ from datetime import datetime, timedelta
 from django.shortcuts import render
 from django.db.models import Count, Q
 from django.http import HttpResponse
+import requests
 
 from .models import Room, Booking, RoomType
 from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings, BookingSerializer3
+from paymongo.serializers import LinkSerializer
 
 from transactions.serializers import CustomerSerializer, BillingSerialzerBase, AmenitiesAvailedSerializer
 
@@ -260,14 +262,15 @@ class CreateStayInBooking(APIView):
         rBooking['children_count'] = int(rBooking['children_count'])
         rBooking['adult_count'] = int(rBooking['adult_count'])
 
-
 class CreateOnlineBooking(APIView):
     def get(self, request):
         return Response({"Create Booking here": "Yeah Yeah"})
+
     def post(self, request):
         customer_data = request.data.get('customer')
         bookings = request.data.get('rooms')
         boat = request.data.get('boat')
+        payment_data = request.data.get('payment')
         billing_data = {}
     
         with transaction.atomic():
@@ -288,6 +291,8 @@ class CreateOnlineBooking(APIView):
                 return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
             created_bookings = []
+            booking_ids = [] 
+            
             for booking in bookings:
                 booking['customer_bill'] = billing.id
                 booking['room'] = ""
@@ -297,8 +302,10 @@ class CreateOnlineBooking(APIView):
                 if booking_serializer.is_valid():
                     booking_data = booking_serializer.save()
                     created_bookings.append(booking_serializer.data)
+                    booking_ids.append(str(booking_data.id))
                 else:
                     raise Exception(booking_serializer.errors)
+
             amenitiesAvaied = None  # Initialize to None
             if boat:
                 print("Boat data is present")
@@ -310,22 +317,42 @@ class CreateOnlineBooking(APIView):
                 else:
                     print("Here At amenities")
                     return Response(amenitiesAvaied.errors, status=status.HTTP_400_BAD_REQUEST)
+                
+            # Create payment link
+            payment_link_data = {
+                'billing_id': str(billing.id),
+                'payment_for': 'Down payment',
+                'payment_status': 'Down Payment',
+                'content_type': 'booking',
+                'object_id': ','.join(booking_ids),  # Join all booking IDs
+                'amount': payment_data.get('amount', 0),  # in cents
+                'description': f"Booking for customer {customer.id}",
+                'remarks': f"Booking for customer {customer.id}"
+            }
 
+            try:
+                response = requests.post(
+                    'http://127.0.0.1:8000/api/payment-link/', 
+                    json=payment_link_data
+                )
+                if response.status_code == 200:
+                    payment_link_info = response.json()
+                else:
+                    return Response({"error": "Payment link creation failed", "details": response.json()}, status=response.status_code)
+            except requests.RequestException as e:
+                return Response({"error": "Failed to send request to payment API", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         response_data = {
             'customer': customer_serializer.data,
             'billing': billing_serializer.data,
-            'bookings': created_bookings
+            'bookings': created_bookings,
+            'payment': payment_link_info  
         }
     
         if amenitiesAvaied:
             response_data['boat'] = amenitiesAvaied.data  # Only include boat if it was created
 
         return Response(response_data, status=status.HTTP_201_CREATED)
-    
-
-
-
 
 class GetBookedRoomsNow(generics.ListAPIView):
     serializer_class = BookingSerializer
