@@ -36,7 +36,8 @@ class LinkSerializer(serializers.Serializer):
     content_type = serializers.CharField()
     object_id = serializers.CharField()
     amount = serializers.IntegerField()
-    description = serializers.CharField(required=False, allow_blank=True)    
+    description = serializers.CharField(required=False, allow_blank=True)
+    remarks = serializers.CharField(required=False, allow_blank=True)     
 
 class WebhookEventSerializer(serializers.ModelSerializer):
     class Meta:
