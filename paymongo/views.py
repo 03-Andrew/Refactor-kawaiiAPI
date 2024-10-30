@@ -308,14 +308,9 @@ class CreateLink(APIView):
 
         if response.status_code == 200:
             response_data = response.json().get('data', {}).get('attributes', {})
-            return Response({
-                'id': response.json().get('data', {}).get('id'),  
-                'checkout_url': response_data.get('checkout_url'),  # URL for payment
+            return Response({ 
+                'checkout_url': response_data.get('checkout_url'),  
                 'amount': response_data.get('amount') / 100,  
-                'description': response_data.get('description'),  
-                'status': response_data.get('status'), 
-                'remarks': response_data.get('remarks'),  
-                'reference_number': response_data.get('reference_number')  # Unique reference number
             }, status=status.HTTP_200_OK)
         else:
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
@@ -404,14 +399,19 @@ class WebhookNotif(APIView):
 
     def create_payment(self, amount, billing_id, payment_type, description):
         logging.info(f"Creating payment with amount: {amount}, billing_id: {billing_id}, payment_type: {payment_type}, description: {description}")
-        
+
         description_parts = description.split(" - ")
 
         if len(description_parts) >= 5:
             payment_for_name = description_parts[1]
             payment_status_name = description_parts[2]
             content_type_name = description_parts[3]
-            object_id = description_parts[4]
+            object_ids_str = description_parts[4].strip()  # Make sure to strip any leading/trailing whitespace
+
+            # Split the object IDs into a list and convert them to integers
+            object_ids = [int(id.strip()) for id in object_ids_str.split(",") if id.strip().isdigit()]
+            num_of_objects = len(object_ids)
+            amount_per_payment = amount / num_of_objects   # Calculate the amount for each payment
 
             try:
                 payment_for = PaymentFor.objects.get(name=payment_for_name)
@@ -422,18 +422,19 @@ class WebhookNotif(APIView):
                 logging.error(f"Error creating Payment record: {e}")
                 return
 
-            # Create a Payment model
-            logging.info(f"Creating Payment record for billing_id: {billing_id}")
-            Payment.objects.create(
-                customer_bill=billing_id,
-                amount=amount / 100, # convert from cents
-                date=timezone.now(),
-                mop=payment_method,  
-                paymentFor=payment_for,
-                status=payment_status,
-                content_type=content_type,
-                object_id=object_id,
-            )
+            # Create payment records
+            for object_id in object_ids:
+                logging.info(f"Creating Payment record for billing_id: {billing_id} with object_id: {object_id}")
+                Payment.objects.create(
+                    customer_bill=billing_id,
+                    amount=amount_per_payment / 100,  # convert cents to pesos
+                    date=timezone.now(),
+                    mop=payment_method,
+                    paymentFor=payment_for,
+                    status=payment_status,
+                    content_type=content_type,
+                    object_id=object_id,
+                )
         else:
             logging.error("Description format is invalid.")
 
