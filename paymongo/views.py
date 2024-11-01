@@ -439,6 +439,7 @@ class WebhookNotif(APIView):
             bookings = booking_data.get("booking", [])
             amenities = booking_data.get("amenitiesAvailed", [])
             total_cost = booking_data.get("total_cost", 0.0)
+            amount = amount/100
 
             # intro
             message = f"Dear {customer.get('first_name', 'Customer  ')},\n\n"
