@@ -422,7 +422,7 @@ class WebhookNotif(APIView):
         else:
             logging.error("Description format is invalid.")
 
-    def send_email(billing_id):
+    def send_email(self, billing_id):
         # Construct the email subject and message
         subject = f'Billing Notification for ID: {billing_id}'
         message = f'Your billing ID is {billing_id}. Please check your account for details.'
