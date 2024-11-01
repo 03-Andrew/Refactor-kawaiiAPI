@@ -344,7 +344,7 @@ class WebhookNotif(APIView):
             if payment_status == 'paid' and event_type == 'payment.paid':
                 logging.info(f"Payment status is paid, proceeding with creating payment and sending email.")
                 self.create_payment(amount, billing_id, payment_type, description)
-                self.send_email(billing_id, amount)
+                self.send_email(billing_id.id, amount)
 
             self.create_webhook_event(event_id, billing_id, event_type, payload)
 
@@ -433,7 +433,6 @@ class WebhookNotif(APIView):
             booking_data = response.json()
         except requests.exceptions.RequestException as e:
             logging.error(f"Error fetching booking details: {str(e)}")
-            message = "There was an error retrieving your billing details. Please contact support for assistance."
 
         else:
             customer = booking_data.get("customer", {})
