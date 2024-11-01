@@ -311,7 +311,6 @@ class CreateLink(APIView):
         
 class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
-        logging.info("Webhook triggered")
         # Validate the signature
         if not self.validate_signature(request):
             return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
@@ -324,7 +323,6 @@ class WebhookNotif(APIView):
         return response
 
     def process_event(self, payload):
-        logging.info(f"Processing webhook event")
         try:
             # Retrieve data 
             event_id = payload.get('data', {}).get('id')
@@ -346,7 +344,7 @@ class WebhookNotif(APIView):
             if payment_status == 'paid' and event_type == 'payment.paid':
                 logging.info(f"Payment status is paid, proceeding with creating payment and sending email.")
                 self.create_payment(amount, billing_id, payment_type, description)
-                self.send_email(billing_id)
+                self.send_email(billing_id, amount)
 
             self.create_webhook_event(event_id, billing_id, event_type, payload)
 
@@ -386,8 +384,6 @@ class WebhookNotif(APIView):
             logging.error(f"Error creating Webhook event: {str(e)}")
 
     def create_payment(self, amount, billing_id, payment_type, description):
-        logging.info(f"Creating payment with amount: {amount}, billing_id: {billing_id}, payment_type: {payment_type}, description: {description}")
-
         description_parts = description.split(" - ")
 
         if len(description_parts) >= 5:
@@ -426,22 +422,76 @@ class WebhookNotif(APIView):
         else:
             logging.error("Description format is invalid.")
 
-    def send_email(self, billing_id):
-        # Construct the email subject and message
-        subject = f'Billing Notification for ID: {billing_id}'
-        message = f'Your billing ID is {billing_id}. Please check your account for details.'
+    def send_email(self, billing_id, amount):
+        subject = f'Kawaii Resort: Billing Notification #{billing_id}'
+        message = ''
 
-        # Define the recipient email address (you can modify this as needed)
-        recipient_list = ['sharlynneyap@gmail.com']  # Replace with the actual recipient's email
-
+        # fetch booking details
         try:
-            # Send the email
+            response = requests.get(f'http://127.0.0.1:8000/api/booking-details/{billing_id}/')
+            response.raise_for_status()
+            booking_data = response.json()
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching booking details: {str(e)}")
+            message = "There was an error retrieving your billing details. Please contact support for assistance."
+
+        else:
+            customer = booking_data.get("customer", {})
+            bookings = booking_data.get("booking", [])
+            amenities = booking_data.get("amenitiesAvailed", [])
+            total_cost = booking_data.get("total_cost", 0.0)
+
+            # intro
+            message = f"Dear {customer.get('first_name', 'Customer  ')},\n\n"
+            message += f"Below are your booking details:\n\n"
+
+            # Customer info
+            message += f"Billing ID: {billing_id}"
+            message += f"Customer Name: {customer.get('first_name', '')} {customer.get('last_name', '')}\n"
+            message += f"Contact Number: {customer.get('contact_number', '')}\n"
+            message += f"Email: {customer.get('email', '')}\n\n"
+
+            # Booking info
+            message += "Bookings:\n"
+            for booking in bookings:
+                message += (
+                    f"- Booking ID: {booking.get('id')}\n"
+                    f"  Check-in: {booking.get('check_in')}\n"
+                    f"  Check-out: {booking.get('check_out')}\n"
+                    f"  Guests: {booking.get('number_of_guests')}\n"
+                    f"  Total Cost: PHP {booking.get('total_cost')}\n\n"
+                )
+
+            # Amenities info
+            message += "Amenities Availed:\n"
+            for amenity in amenities:
+                amenity_details = amenity.get("amenity", {})
+                rate_per_head = float(amenity_details.get("rate_per_head", 0))
+                head_count = amenity.get("head_count", 0)
+                total_amenity_cost = rate_per_head * head_count
+                message += (
+                    f"- Amenity: {amenity_details.get('amenity')}\n"
+                    f"  Rate per Head: PHP {rate_per_head}\n"
+                    f"  Head Count: {head_count}\n"
+                    f"  Total Cost: PHP {total_amenity_cost}\n\n"
+                )
+
+            # outro
+            message += f"Total Cost: PHP {total_cost}\n\n"
+            message += f"Amount Paid (Down Payment): PHP {amount}\n\n"
+            message += "Thank you for booking with us! Please await confirmation of your booking, and feel free to contact us if you have any questions.\n"
+
+        # recipient email address
+        recipient_list = [customer.get('email', '')]
+
+         # Send the email
+        try:
             send_mail(
                 subject,
                 message,
-                settings.EMAIL_HOST_USER,  # From email
+                settings.EMAIL_HOST_USER, 
                 recipient_list,
-                fail_silently=False,  # Set to True to suppress errors
+                fail_silently=False,
             )
         except Exception as e:
             logging.error(f"Error sending email: {str(e)}")
