@@ -1,30 +1,24 @@
-import hashlib
-from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.conf import settings
-import base64
-from rest_framework import generics
+
 from .serializers import CardPaymentSerializer, GCashSourceSerializer, WebhookEventSerializer, LinkSerializer
 from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus,PaymentFor
+from .models import WebhookEvent
+
 import logging
-import json
 import requests
 import hmac
 import hashlib
-from django.http import JsonResponse
-from .models import WebhookEvent
-from django.views.decorators.csrf import csrf_protect
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-from rest_framework.permissions import IsAuthenticated
+import base64
+import threading  
+
+from django.conf import settings
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
+from django.core.mail import send_mail
 from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
-import threading                    
+from asgiref.sync import async_to_sync                  
 
 class CardPayment(APIView):
     def post(self, request):
@@ -324,6 +318,7 @@ class WebhookNotif(APIView):
         response = Response({'status': 'success'}, status=status.HTTP_200_OK)
         
         threading.Thread(target=self.process_event, args=(request.data,)).start()
+        logging.info("Started processing webhook event in a new thread.")
 
         return response
 
@@ -347,8 +342,9 @@ class WebhookNotif(APIView):
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
             if payment_status == 'paid' and event_type == 'payment.paid':
+                logging.info(f"Payment status is paid, proceeding with creating payment and sending email.")
                 self.create_payment(amount, billing_id, payment_type, description)
-                #self.websocket_notif()
+                self.send_email(billing_id.id, amount)
 
             self.create_webhook_event(event_id, billing_id, event_type, payload)
 
@@ -376,16 +372,6 @@ class WebhookNotif(APIView):
 
         return computed_signature == test_signature
 
-    def websocket_notif(self):
-        try:
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                'receptionist',
-                {'type': 'booking_paid', 'message': 'A new customer has booked a room.'}
-            )
-        except Exception as e:
-            logging.error(f"Error in notifying receptionist: {str(e)}")
-
     def create_webhook_event(self, event_id, billing_id, event_type, payload):
         try:
             WebhookEvent.objects.create(
@@ -398,8 +384,6 @@ class WebhookNotif(APIView):
             logging.error(f"Error creating Webhook event: {str(e)}")
 
     def create_payment(self, amount, billing_id, payment_type, description):
-        logging.info(f"Creating payment with amount: {amount}, billing_id: {billing_id}, payment_type: {payment_type}, description: {description}")
-
         description_parts = description.split(" - ")
 
         if len(description_parts) >= 5:
@@ -437,6 +421,81 @@ class WebhookNotif(APIView):
                 )
         else:
             logging.error("Description format is invalid.")
+
+    def send_email(self, billing_id, amount):
+        subject = f'Kawaii Resort: Billing Notification #{billing_id}'
+        message = ''
+
+        # fetch booking details
+        try:
+            response = requests.get(f'http://127.0.0.1:8000/api/billing-details/{billing_id}/')
+            response.raise_for_status()
+            booking_data = response.json()
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching booking details: {str(e)}")
+
+        else:
+            customer = booking_data.get("customer", {})
+            bookings = booking_data.get("booking", [])
+            amenities = booking_data.get("amenitiesAvailed", [])
+            total_cost = booking_data.get("total_cost", 0.0)
+            amount = amount/100
+
+            # intro
+            message = f"Dear {customer.get('first_name', 'Customer  ')},\n\n"
+            message += f"Below are your booking details:\n\n"
+
+            # Customer info
+            message += f"Billing ID: {billing_id}\n"
+            message += f"Customer Name: {customer.get('first_name', '')} {customer.get('last_name', '')}\n"
+            message += f"Contact Number: {customer.get('contact_number', '')}\n"
+            message += f"Email: {customer.get('email', '')}\n\n"
+
+            # Booking info
+            message += "Bookings:\n"
+            for booking in bookings:
+                message += (
+                    f"- Booking ID: {booking.get('id')}\n"
+                    f"  Check-in: {booking.get('check_in')}\n"
+                    f"  Check-out: {booking.get('check_out')}\n"
+                    f"  Guests: {booking.get('number_of_guests')}\n"
+                    f"  Total Cost: PHP {booking.get('total_cost')}\n\n"
+                )
+
+            # Amenities info
+            message += "Amenities Availed:\n"
+            for amenity in amenities:
+                amenity_details = amenity.get("amenity", {})
+                rate_per_head = float(amenity_details.get("rate_per_head", 0))
+                head_count = amenity.get("head_count", 0)
+                total_amenity_cost = rate_per_head * head_count
+                message += (
+                    f"- Amenity: {amenity_details.get('amenity')}\n"
+                    f"  Rate per Head: PHP {rate_per_head}\n"
+                    f"  Head Count: {head_count}\n"
+                    f"  Total Cost: PHP {total_amenity_cost}\n\n"
+                )
+
+            # outro
+            message += f"Total Cost: PHP {total_cost}\n"
+            message += f"Amount Paid (Down Payment): PHP {amount}\n\n"
+            message += "Thank you for booking with us! Please await confirmation of your booking, and feel free to contact us if you have any questions.\n"
+
+        # recipient email address
+        recipient_list = [customer.get('email', '')]
+
+         # Send the email
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.EMAIL_HOST_USER, 
+                recipient_list,
+                fail_silently=False,
+            )
+        except Exception as e:
+            logging.error(f"Error sending email: {str(e)}")
+        
 
     def create_gcash_payment(self, source_id, amount, billing_info, description):
         url = "https://api.paymongo.com/v1/payments"

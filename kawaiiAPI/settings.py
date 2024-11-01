@@ -219,3 +219,11 @@ PAYMONGO_SECRET_KEY = 'sk_test_Y4Sv1NEcDmqXYmkzfVa9L5uF'  # this is just a key f
 #PAYMONGO_SECRET_KEY = os.getenv('PAYMONGO_SECRET_KEY')
 #PAYMONGO_WEBHOOK_SECRET = 'whsk_2oKw1JfVMTmkjCU9YAvkd3Mh'
 PAYMONGO_WEBHOOK_SECRET = "whsk_yT7LwSjYMP3UryAqrFbn6WyR"
+
+# GMAIL DETAILS
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_HOST_USER = 'kawaiiresort123@gmail.com'
+EMAIL_HOST_PASSWORD = 'jcjm lhxg ljsg lthk'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
