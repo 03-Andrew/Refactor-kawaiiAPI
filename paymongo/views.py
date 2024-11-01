@@ -428,7 +428,7 @@ class WebhookNotif(APIView):
 
         # fetch booking details
         try:
-            response = requests.get(f'http://127.0.0.1:8000/api/booking-details/{billing_id}/')
+            response = requests.get(f'http://127.0.0.1:8000/api/billing-details/{billing_id}/')
             response.raise_for_status()
             booking_data = response.json()
         except requests.exceptions.RequestException as e:
