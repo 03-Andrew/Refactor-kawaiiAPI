@@ -445,7 +445,7 @@ class WebhookNotif(APIView):
             message += f"Below are your booking details:\n\n"
 
             # Customer info
-            message += f"Billing ID: {billing_id}"
+            message += f"Billing ID: {billing_id}\n"
             message += f"Customer Name: {customer.get('first_name', '')} {customer.get('last_name', '')}\n"
             message += f"Contact Number: {customer.get('contact_number', '')}\n"
             message += f"Email: {customer.get('email', '')}\n\n"
@@ -476,7 +476,7 @@ class WebhookNotif(APIView):
                 )
 
             # outro
-            message += f"Total Cost: PHP {total_cost}\n\n"
+            message += f"Total Cost: PHP {total_cost}\n"
             message += f"Amount Paid (Down Payment): PHP {amount}\n\n"
             message += "Thank you for booking with us! Please await confirmation of your booking, and feel free to contact us if you have any questions.\n"
 
