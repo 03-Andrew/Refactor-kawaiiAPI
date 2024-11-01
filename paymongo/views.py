@@ -439,9 +439,8 @@ class WebhookNotif(APIView):
                 recipient_list,
                 fail_silently=False,  # Set to True to suppress errors
             )
-            print(f'Email sent successfully to {recipient_list}')
         except Exception as e:
-            print(f'Error sending email: {e}')
+            logging.error(f"Error sending email: {str(e)}")
         
 
     def create_gcash_payment(self, source_id, amount, billing_info, description):
