@@ -311,6 +311,7 @@ class CreateLink(APIView):
         
 class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
+        logging.info("Webhook triggered")
         # Validate the signature
         if not self.validate_signature(request):
             return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
@@ -318,10 +319,12 @@ class WebhookNotif(APIView):
         response = Response({'status': 'success'}, status=status.HTTP_200_OK)
         
         threading.Thread(target=self.process_event, args=(request.data,)).start()
+        logging.info("Started processing webhook event in a new thread.")
 
         return response
 
     def process_event(self, payload):
+        logging.info(f"Processing webhook event")
         try:
             # Retrieve data 
             event_id = payload.get('data', {}).get('id')
@@ -341,6 +344,7 @@ class WebhookNotif(APIView):
                 self.create_gcash_payment(source_id, amount, billing_info, description)
 
             if payment_status == 'paid' and event_type == 'payment.paid':
+                logging.info(f"Payment status is paid, proceeding with creating payment and sending email.")
                 self.create_payment(amount, billing_id, payment_type, description)
                 self.send_email(billing_id)
 
