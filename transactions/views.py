@@ -72,11 +72,15 @@ class ListBillingBooking(generics.ListAPIView):
 class ListConfirmedBooking(generics.ListAPIView):
     serializer_class = ConfirmedBooking
     def get_queryset(self):
+        booking_id = self.request.GET.get('id')
         check_in = self.request.GET.get('check_in')
         queryset = Booking.objects.filter(status=2).order_by("-check_out")
 
         if check_in:
             queryset = queryset.filter(check_in=check_in)
+
+        if booking_id:
+            queryset = queryset.filter(id=booking_id)
         
         return queryset
     
