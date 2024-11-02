@@ -19,11 +19,18 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
 
+
 from rest_framework import status
 
 
 from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
+from django.core.mail import send_mail
+from django.conf import settings
+
+import requests
+import logging
+from datetime import datetime
 
 
 # Create your views here.
@@ -356,9 +363,82 @@ class UpadtePendingBookings(APIView):
                 billing_serializer.save()
             else:
                 return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
+        billing_id = billing.id  # Get the billing ID here
+        self.send_email(billing_id, booking_id)
+
         return Response({"updated_rooms": response_data, 'billing':billing_serializer.data}, status=status.HTTP_200_OK)
-    
+
+    def send_email(self, billing_id, booking_id):
+        subject = f'Kawaii Resort: Booking Confirmed #{billing_id}'
+        message = ''
+
+        try:
+            response = requests.get(f'http://127.0.0.1:8000/api/billing-details/{billing_id}/')
+            response.raise_for_status()
+            booking_data = response.json()
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching booking details: {str(e)}")
+
+        try:
+            response = requests.get(f'http://127.0.0.1:8000/api/confirmed-bookings/?id={booking_id}')
+            response.raise_for_status() 
+            booking_data2 = response.json()
+            
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching confirmed bookings: {str(e)}")
+            return  # Exit if there is an error fetching bookings
+
+        else:
+            customer = booking_data.get("customer", {})
+            
+            if booking_data2['count'] > 0:
+                booking_info = booking_data2['results'][0]
+                customer_name = booking_info.get("customer_name", "None")
+                last_name = customer_name.split()[-1]  # Get the last name
+                room_type = booking_info.get("room_type", "None")
+                room_number = booking_info.get("room", "None")
+                check_in = booking_info.get("check_in", "None")
+                check_out = booking_info.get("check_out", "None")
+                availed_boat_transfer = booking_info.get("availed_boat_transfer", "None")
+
+                # Convert time to AM/PM format
+                if availed_boat_transfer != "None":
+                    availed_boat_transfer_time = datetime.strptime(availed_boat_transfer, "%H:%M:%S").strftime("%I:%M %p")
+                else:
+                    availed_boat_transfer_time = "None"
+
+                # Intro
+                message += f"Dear {last_name},\n\n"
+                message += "Your booking has been confirmed. Below are your booking details:\n\n"
+                message += f"Booking ID: {booking_id}\n"
+                message += f"Room Type: {room_type}\n"
+                message += f"Room Number: {room_number}\n"
+                message += f"Check-in: {check_in}\n"
+                message += f"Check-out: {check_out}\n"
+                message += f"Boat Schedule: {availed_boat_transfer_time}\n\n"
+
+                # Reminder
+                message += "Please remember to bring a valid ID and arrive 15 minutes early before the scheduled boat time.\n\n"
+                # Outro
+                message += "Thank you for booking with us!\n"
+            else:
+                message += "No confirmed bookings found.\n\n"
+
+         # recipient email address
+        recipient_list = [customer.get('email', '')]
+
+        # Send the email
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.EMAIL_HOST_USER, 
+                recipient_list,
+                fail_silently=False,
+            )
+        except Exception as e:
+            logging.error(f"Error sending email: {str(e)}")
+        
 
 class GetPayments(generics.ListCreateAPIView):
     serializer_class = PaymentSerializer
