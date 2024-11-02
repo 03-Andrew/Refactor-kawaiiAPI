@@ -151,23 +151,43 @@ class PendingBookings(serializers.ModelSerializer):
         return sum(booking.number_of_guests for booking in bookingss)
 
 
+class PaymentSerializer2(serializers.ModelSerializer):
+    content_type = serializers.SerializerMethodField()
 
+    class Meta:
+        model = Payment
+        fields = '__all__'
+
+    def get_content_type(self, obj):
+        if obj.content_type:
+            return obj.content_type.model  
+        return None 
 
 class BillingDetailSerializer(serializers.ModelSerializer):
     customer = CustomerSerializer()
-    booking  =  BookingSerializer(many=True, read_only=True, source='bookings')
+    booking = BookingSerializer(many=True, read_only=True, source='bookings')
+    payments = PaymentSerializer2(many=True, read_only=True, source='payment')
     amenitiesAvailed = AmenitiesAvailedSerializer3(many=True, read_only=True, source="amenities_availed")
     activitiesAvailed = ActivitiesAvailedSerializer2(many=True, read_only=True, source="activities_availed")
     foodBill = FoodBillSerializer2(many=True, read_only=True, source="food_bill")
-    additonalPayment = AdditionalPaymentSerializer(many=True, read_only=True, source='additional_payment')
+    additionalPayment = AdditionalPaymentSerializer(many=True, read_only=True, source='additional_payment')
     bookingTotal = serializers.SerializerMethodField()
     amenityTotal = serializers.SerializerMethodField()
     activityTotal = serializers.SerializerMethodField()
     foodBillTotal = serializers.SerializerMethodField()
     additionalPaymentTotal = serializers.SerializerMethodField()
+    runningBalance = serializers.SerializerMethodField()
+    paidAmount = serializers.SerializerMethodField()
+
     class Meta:
         model = Billing
-        fields = ['id', 'customer','booking','bookingTotal','amenitiesAvailed','amenityTotal','activitiesAvailed','activityTotal','foodBill','foodBillTotal', 'additonalPayment','additionalPaymentTotal','total_cost'] 
+        fields = [
+            'id', 'customer', 'booking', 'bookingTotal', 
+            'amenitiesAvailed', 'amenityTotal', 'activitiesAvailed', 
+            'activityTotal', 'foodBill', 'foodBillTotal', 
+            'additionalPayment', 'additionalPaymentTotal', 
+            'total_cost', 'runningBalance', 'paidAmount', 'payments'
+        ] 
         
     def get_bookingTotal(self, obj):
         return obj.total_booking_cost()
@@ -181,8 +201,14 @@ class BillingDetailSerializer(serializers.ModelSerializer):
     def get_foodBillTotal(self, obj):
         return obj.total_food_bill()
     
-    def get_additionalPaymentTotal(slef, obj):
+    def get_additionalPaymentTotal(self, obj):  
         return obj.total_additional()
+    
+    def get_paidAmount(self, obj):
+        return obj.paid_amount 
+    
+    def get_runningBalance(self, obj):
+        return obj.running_balance 
     
 class FoodListSerializer(serializers.ModelSerializer):
     class Meta:
