@@ -227,7 +227,7 @@ class CreateDayTourGuest(APIView):
             customer = customer_serializer.save()
 
             billing_data['customer'] = customer.id
-            billing_data['status'] = 2
+            billing_data['status'] = 1
             billing_serializer = BillingSerialzerBase(data=billing_data)
             billing_serializer.is_valid(raise_exception=True)
             billing = billing_serializer.save()
@@ -240,6 +240,7 @@ class CreateDayTourGuest(APIView):
                 tourist_data['status'] = 2
                 tourist_serializer = GuestListSerializer(data=tourist_data)
                 tourist_serializer.is_valid(raise_exception=True)
+                tourist_serializer.save()
                 tourist_added.append(tourist_serializer.data)
 
             amenities_added = []
