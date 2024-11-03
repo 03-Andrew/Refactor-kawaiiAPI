@@ -81,6 +81,11 @@ class RoomSerializer(serializers.ModelSerializer):
         model = Room
         fields = ['id', 'number', 'type', 'status']
 
+class RoomSerializer2(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = '__all__'
+
 
 class AvailableRoomSerializer(serializers.Serializer):
     id = serializers.IntegerField()

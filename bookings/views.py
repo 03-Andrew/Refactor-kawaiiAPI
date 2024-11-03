@@ -5,16 +5,22 @@ from django.http import HttpResponse
 import requests
 
 from .models import Room, Booking, RoomType
-from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings, BookingSerializer3
+from transactions.models import Billing
+
+from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings, BookingSerializer3, RoomSerializer2
 from paymongo.serializers import LinkSerializer
 
-from transactions.serializers import CustomerSerializer, BillingSerialzerBase, AmenitiesAvailedSerializer
+from transactions.serializers import CustomerSerializer, BillingSerialzerBase, AmenitiesAvailedSerializer, GuestListSerializer, ActivitiesAvailedSerializer2
+
+from receptionist.serializers import ActivitiesAvailedSerializer
+from transactions.models import GuestList, AmenitiesAvailed, ActivitiesAvailed
 
 from rest_framework.views import APIView
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.pagination import LimitOffsetPagination, PageNumberPagination
+
 
 from django.db import transaction
 from datetime import datetime, timedelta, date
@@ -206,6 +212,68 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
 
+
+class CreateDayTourGuest(APIView):
+    def post(self, request):
+        customer_data = request.data.get('personalInfo')
+        tourists_data = request.data.get('touristList')
+        amenities_data = request.data.get('selectedAmenities')
+        activities_data = request.data.get('selectedActivities')
+        billing_data = {}
+
+        with transaction.atomic():         
+            customer_serializer = CustomerSerializer(data=customer_data)
+            customer_serializer.is_valid(raise_exception=True)
+            customer = customer_serializer.save()
+
+            billing_data['customer'] = customer.id
+            billing_data['status'] = 2
+            billing_serializer = BillingSerialzerBase(data=billing_data)
+            billing_serializer.is_valid(raise_exception=True)
+            billing = billing_serializer.save()
+
+            tourist_added = []
+            for tourist in tourists_data:
+                tourist_data = {}
+                tourist_data['customer_bill'] = billing.id
+                tourist_data['guest'] = tourist
+                tourist_data['status'] = 2
+                tourist_serializer = GuestListSerializer(data=tourist_data)
+                tourist_serializer.is_valid(raise_exception=True)
+                tourist_added.append(tourist_serializer.data)
+
+            amenities_added = []
+            for amenity_data in amenities_data:
+                amenity_data['amenity'] = amenity_data['id']
+                amenity_data['customer_bill'] = billing.id
+                amenity_data['head_count'] = amenity_data['hours']
+                amenity_serializer = AmenitiesAvailedSerializer(data=amenity_data)
+                amenity_serializer.is_valid(raise_exception=True)
+                amenity_serializer.save()
+                amenities_added.append(amenity_serializer.data)
+
+            activities_added = []
+            for activity_data in activities_data:
+                activity_data['activity'] = activity_data['id']
+                activity_data['customer_bill'] = billing.id
+                activity_data['hours_availed'] = activity_data['hours']
+                activity_serializer = ActivitiesAvailedSerializer(data=activity_data)
+                activity_serializer.is_valid(raise_exception=True)
+                activity_serializer.save()
+                activities_added.append(activity_serializer.data)
+
+        return Response({
+            'customer': customer_serializer.data,
+            'billing': billing_serializer.data,
+            'amenities': amenities_added,
+            'activities': activities_added
+        }, status=status.HTTP_201_CREATED)
+
+                    
+                
+
+            
+
 class CreateStayInBooking(APIView):
     def post(self, request):
         customer_data = request.data.get('customer')
@@ -306,17 +374,21 @@ class CreateOnlineBooking(APIView):
                 else:
                     raise Exception(booking_serializer.errors)
 
-            amenitiesAvaied = None  # Initialize to None
+            amenitiesAvaiedArr = []  # Initialize to an empty list
             if boat:
-                print("Boat data is present")
-                boat['customer_bill'] = billing.id  # Update this to use the billing id
-                boat['amenity'] = 1
-                amenitiesAvaied = AmenitiesAvailedSerializer(data=boat)
-                if amenitiesAvaied.is_valid():
-                    amenitiesAvaied.save()
-                else:
-                    print("Here At amenities")
-                    return Response(amenitiesAvaied.errors, status=status.HTTP_400_BAD_REQUEST)
+                for availed_boat in boat:
+                    print("Boat data is present")
+                    availed_boat['customer_bill'] = billing.id  # Update this to use the billing id
+                    availed_boat['amenity'] = 1  # Assuming 1 is the ID or key for the boat amenity
+                    
+                    amenitiesAvaied = AmenitiesAvailedSerializer(data=availed_boat)
+                    
+                    if amenitiesAvaied.is_valid():
+                        saved_amenity = amenitiesAvaied.save()  # Save the serialized data
+                        amenitiesAvaiedArr.append(saved_amenity.id)  # Append the ID or any relevant data to the array
+                    else:
+                        print("Here At amenities")
+                        return Response(amenitiesAvaied.errors, status=status.HTTP_400_BAD_REQUEST)
                 
             # Create payment link
             payment_link_data = {
@@ -345,7 +417,7 @@ class CreateOnlineBooking(APIView):
         response_data = {
             'customer': customer_serializer.data,
             'billing': billing_serializer.data,
-            'bookings': created_bookings,
+            'bookings': amenitiesAvaiedArr,
             'payment': payment_link_info  
         }
     
@@ -365,6 +437,35 @@ class GetBookedRoomsNow(generics.ListAPIView):
         )
         
         return queryset
+    
+class RoomPagination(PageNumberPagination):
+    page_size = 10  # Number of rooms per page
+    page_size_query_param = 'limit'  # Allow clients to set the page size
+    max_page_size = 100  # Limit for the page size
+  
+
+class GetAvailableRoomsNow(APIView):
+    pagination_class = RoomPagination  # Set the pagination class
+
+    def get(self, request):
+        today = datetime.now().date()
+        rooms = Room.objects.all()
+        data ={}
+        booking = Booking.objects.filter(check_in__lte=today, check_out__gte=today).first()
+        for room in rooms:
+        # Get the booking for today
+            booking = Booking.objects.filter(room=room, check_in__lte=today, check_out__gte=today).first()
+            if booking:  # If a booking exists for today
+                data[room.id] = RoomSerializer(room).data # Store serialized data in response
+                data[room.id]['is_booked'] = True
+            else:
+                data[room.id] = RoomSerializer(room).data  # No bookings for this room today
+                data[room.id]['is_booked'] = False
+            
+        paginator = self.pagination_class()
+        paginated_data = paginator.paginate_queryset(list(data.values()), request)  # Pass only values for pagination
+        return paginator.get_paginated_response(paginated_data)
+    
 
 class GetBookedNow(APIView):
     def get(self, request):
@@ -372,9 +473,11 @@ class GetBookedNow(APIView):
         rooms = Room.objects.all()
 
         data ={}
+        booking = Booking.objects.filter(check_in__lte=today, check_out__gte=today).first()
+        print(booking)
         for room in rooms:
         # Get the booking for today
-            booking = Booking.objects.filter(room=room, check_in__lte=today, check_out__gte=today).first()  # Get the first booking if it exists
+            booking = Booking.objects.filter(room=room, check_in__lte=today, check_out__gte=today).first()
             if booking:  # If a booking exists for today
                 serialized_data = CurrentRoomBookings(booking)  # Serialize the booking
                 data[room.id] = serialized_data.data  # Store serialized data in response
@@ -382,6 +485,7 @@ class GetBookedNow(APIView):
                 data[room.id] = None  # No bookings for this room today
             
         return Response(data)
+    
 
 
 '''Trash code below'''

@@ -13,10 +13,11 @@ urlpatterns = [
 
     path('api/create-stayin-booking/', views.CreateStayInBooking.as_view(), name='create_stayin_booking'),
     path('api/create-online-booking/', views.CreateOnlineBooking.as_view(), name='create_online_booking'),
+    path('api/create-daytour-guest/', views.CreateDayTourGuest.as_view(), name='create_day_tour'),
 
     path('api/booking/current/', views.GetBookedRoomsNow.as_view(), name='booked_rooms_now'),
     path('api/booking/current2/', views.GetBookedNow.as_view(), name='booked_rooms_now2'),
 
-
+    path('api/rooms/status/', views.GetAvailableRoomsNow.as_view(), name='room-status')
     # path('api/av/', views.AvailableRoomTypes.as_view())
 ]

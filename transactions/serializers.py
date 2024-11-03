@@ -59,7 +59,7 @@ class GuestStatusSerializer(serializers.ModelSerializer):
 class GuestListSerializer(serializers.ModelSerializer):
     class Meta:
         model = GuestList
-        fields = ['id', 'guest', 'status']
+        fields = '__all__'
         
 class GuestListSerializerAll(serializers.ModelSerializer):
     status = GuestStatusSerializer()
