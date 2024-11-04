@@ -10,6 +10,7 @@ from rest_framework.decorators import api_view
 
 from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
+from django.utils import timezone
 
 from django.db.models.functions import ExtractMonth
 
