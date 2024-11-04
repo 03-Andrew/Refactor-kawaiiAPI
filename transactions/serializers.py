@@ -215,7 +215,3 @@ class FoodListSerializer(serializers.ModelSerializer):
         model = Food
         fields = '__all__'
     
-
-
-    
-    
