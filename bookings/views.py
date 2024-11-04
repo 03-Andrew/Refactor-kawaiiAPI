@@ -144,7 +144,7 @@ class AvailableRooms(generics.ListAPIView):
         ).distinct().filter(status__id=1)
         
         if r_type:
-            queryset.filter(type__id=r_type)
+            queryset = queryset.filter(type_id=r_type)
 
         return queryset
 
