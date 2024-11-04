@@ -194,7 +194,7 @@ class PaymentStatus(models.Model):
     
 class Payment(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="payment")
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=20, decimal_places=2)
     date = models.DateTimeField()
     mop = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT, related_name="payment")
     paymentFor = models.ForeignKey(PaymentFor, on_delete=models.PROTECT, null=True, blank=True, related_name="payment")

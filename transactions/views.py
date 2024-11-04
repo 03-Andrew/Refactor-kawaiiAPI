@@ -2,6 +2,10 @@ from django.shortcuts import render
 from django.db.models import F, Sum, Q, Exists, OuterRef
 from datetime import date, timedelta, datetime
 from calendar import monthrange
+from django.contrib.contenttypes.models import ContentType
+from django.utils.timezone import make_aware
+
+
 
 from rest_framework.views import APIView
 from rest_framework import generics
@@ -13,7 +17,7 @@ from django.utils.decorators import method_decorator
 
 from django.db.models.functions import ExtractMonth
 
-from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill, GuestStatus, Food, AdditonalPayment
+from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill, GuestStatus, Food, AdditonalPayment, Activity, Amenities, FoodType, ActivitiesAvailed, PaymentMethod, PaymentStatus
 from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer, FoodListSerializer
 
 from receptionist.serializers import FoodBillSerializer, AdditionalPaymentSerializer
@@ -62,6 +66,59 @@ class PaymentListCreate(generics.ListCreateAPIView):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
 
+
+class CreatePayment(APIView):
+    
+    def post(self, request):
+        data = request.data
+        customer_info = data.get("customerInfo", {})
+        amount = data.get("amount", 0)
+        selected_items = data.get("selectedItems", {})
+
+        # Get common payment fields
+        customer_bill_id = customer_info.get("customer_bill")
+        date = make_aware(datetime.strptime(customer_info.get("date"), "%Y-%m-%d"))
+        mop_id = customer_info.get("mop")
+        status_id = customer_info.get("status")
+
+        created_payments = []
+        
+        # Mapping of selected items to their content type and paymentFor value
+        item_mapping = {
+            "selectedRooms": {"model": Booking, "payment_for_id": 2},
+            "selectedActivities": {"model": ActivitiesAvailed, "payment_for_id": 5},
+            "selectedAmenities": {"model": AmenitiesAvailed, "payment_for_id": 4},
+            "selectedFoodBills": {"model": FoodBill, "payment_for_id": 3},
+        }
+
+        for key, config in item_mapping.items():
+            item_ids = selected_items.get(key, [])
+            if item_ids:
+                content_type = ContentType.objects.get_for_model(config["model"])
+                
+                for item in item_ids:  # item_ids is expected to be a list of dicts like [{id: 9, price: 22500}, ...]
+                    object_id = item['id']          # Get the id from the dict
+                    amount = item['price']          # Get the price from the dict
+                    payment_data = {
+                        "customer_bill": customer_bill_id,
+                        "amount": amount,            # Set the amount from the price
+                        "date": date,
+                        "mop": mop_id,
+                        "paymentFor": config["payment_for_id"],
+                        "status": status_id,
+                        "content_type": content_type.id,
+                        "object_id": object_id,
+                    }
+                    serializer = PaymentSerializer(data=payment_data)
+                    if serializer.is_valid():
+                        payment = serializer.save()
+                        created_payments.append(serializer.data)
+                    else:
+                        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"created_payments": created_payments}, status=status.HTTP_201_CREATED)
+
+        
 class ListBillingBooking(generics.ListAPIView):
     serializer_class = PendingBookings
     def get_queryset(self):
