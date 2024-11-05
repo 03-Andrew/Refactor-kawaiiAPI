@@ -374,10 +374,21 @@ class CreateOnlineBooking(APIView):
                     booking_ids.append(str(booking_data.id))
                 else:
                     raise Exception(booking_serializer.errors)
+            tourist_added = []
+            # for tourist in boat.guests:
+            #     tourist_data = {}
+            #     tourist_data['customer_bill'] = billing.id
+            #     tourist_data['guest'] = tourist
+            #     tourist_data['status'] = 2
+            #     tourist_serializer = GuestListSerializer(data=tourist_data)
+            #     tourist_serializer.is_valid(raise_exception=True)
+            #     tourist_serializer.save()
+            #     tourist_added.append(tourist_serializer.data)
 
             amenitiesAvaiedArr = []  # Initialize to an empty list
             if boat:
                 for availed_boat in boat:
+                    print(availed_boat['guests'])
                     print("Boat data is present")
                     availed_boat['customer_bill'] = billing.id  # Update this to use the billing id
                     availed_boat['amenity'] = 1  # Assuming 1 is the ID or key for the boat amenity
@@ -390,6 +401,17 @@ class CreateOnlineBooking(APIView):
                     else:
                         print("Here At amenities")
                         return Response(amenitiesAvaied.errors, status=status.HTTP_400_BAD_REQUEST)
+                    for tourist in availed_boat['guests']:
+                        tourist_data = {}
+                        tourist_data['customer_bill'] = billing.id
+                        tourist_data['guest'] = tourist
+                        tourist_data['status'] = 2
+                        tourist_serializer = GuestListSerializer(data=tourist_data)
+                        tourist_serializer.is_valid(raise_exception=True)
+                        tourist_serializer.save()
+                        tourist_added.append(tourist_serializer.data)
+                            
+                    
                 
             # Create payment link
             payment_link_data = {
