@@ -153,6 +153,7 @@ class PendingBookings(serializers.ModelSerializer):
 
 class PaymentSerializer2(serializers.ModelSerializer):
     content_type = serializers.SerializerMethodField()
+    object_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -161,6 +162,24 @@ class PaymentSerializer2(serializers.ModelSerializer):
     def get_content_type(self, obj):
         if obj.content_type:
             return obj.content_type.model  
+        return None 
+    
+    def get_object_name(self, obj):
+        if obj.content_type and obj.object_id:
+            if obj.content_type.model == 'foodbill':
+                return "Food Bill"  
+            elif obj.content_type.model == 'booking':
+                booking = Booking.objects.filter(id=obj.object_id).first()
+                if booking and booking.room:
+                    return str(booking.room) 
+            elif obj.content_type.model == 'amenitiesavailed':
+                amenities = AmenitiesAvailed.objects.filter(id=obj.object_id).first()
+                if amenities and amenities.amenity:
+                    return str(amenities.amenity) 
+            elif obj.content_type.model == 'activitiesavailed':
+                activities = ActivitiesAvailed.objects.filter(id=obj.object_id).first()
+                if activities and activities.activity:
+                    return str(activities.activity) 
         return None 
 
 class BillingDetailSerializer(serializers.ModelSerializer):
