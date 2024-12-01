@@ -27,7 +27,6 @@ idna==3.10
 incremental==24.7.2
 msgpack==1.1.0
 packaging==24.1
-psycopg2==2.9.10
 psycopg2-binary==2.9.9
 pyasn1==0.6.1
 pyasn1_modules==0.4.1
