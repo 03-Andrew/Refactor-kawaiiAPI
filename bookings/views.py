@@ -410,6 +410,7 @@ class CreateOnlineBooking(APIView):
                         tourist_serializer.is_valid(raise_exception=True)
                         tourist_serializer.save()
                         tourist_added.append(tourist_serializer.data)
+                        
                             
                     
                 
