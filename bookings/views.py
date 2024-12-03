@@ -427,8 +427,13 @@ class CreateOnlineBooking(APIView):
             }
 
             try:
+               
+                # response = requests.post(
+                #     'http://127.0.0.1:8000/api/payment-link/', 
+                #     json=payment_link_data
+                # )
                 response = requests.post(
-                    'http://127.0.0.1:8000/api/payment-link/', 
+                    'https://kawaii-api.vercel.app/api/payment-link/', 
                     json=payment_link_data
                 )
                 if response.status_code == 200:
