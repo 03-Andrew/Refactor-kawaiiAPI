@@ -1,2 +1,2 @@
 docker build --tag python-django .
-docker run --publish 8000:8000 python-django
+docker run --publish 8000:8000 sha256:cf1fc4c75f29e40d0e90f65ec421e9855a79f1a599398880434bd9d3ba4f648d
