@@ -98,7 +98,7 @@ CHANNEL_LAYERS = {
     },
 }
 
-#WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
+WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
 ASGI_APPLICATION = 'kawaiiAPI.asgi.application'
 
 
