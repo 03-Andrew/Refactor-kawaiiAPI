@@ -433,7 +433,7 @@ class CreateOnlineBooking(APIView):
                 #     json=payment_link_data
                 # )
                 response = requests.post(
-                    'https://kawaii-api.vercel.app/api/payment-link/', 
+                    'https://kawaii-app-nb6lb.ondigitalocean.app/api/payment-link/', 
                     json=payment_link_data
                 )
                 if response.status_code == 200:
