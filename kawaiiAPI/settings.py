@@ -214,7 +214,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:5174",  # Add your frontend URL here
     "https://kawaii-project-front-sw7d.vercel.app",
-    "https://kawaii-project-front-sw7d-git-main-andreis-projects-d8ee1fa3.vercel.app/",
+    #"https://kawaii-project-front-sw7d-git-main-andreis-projects-d8ee1fa3.vercel.app/",
 
 ]
 CORS_ALLOW_CREDENTIALS = True

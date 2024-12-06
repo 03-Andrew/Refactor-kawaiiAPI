@@ -33,7 +33,6 @@ class RoomTypes(generics.ListAPIView):
     serializer_class = RoomTypeSerializer
     queryset = RoomType.objects.all()
 
-
 class AvailableRoomTypes(APIView):
     def get(self, request):
         check_in = self.request.query_params.get('check_in')
@@ -212,7 +211,6 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
 
-
 class CreateDayTourGuest(APIView):
     def post(self, request):
         customer_data = request.data.get('personalInfo')
@@ -269,11 +267,6 @@ class CreateDayTourGuest(APIView):
             'amenities': amenities_added,
             'activities': activities_added
         }, status=status.HTTP_201_CREATED)
-
-                    
-                
-
-            
 
 class CreateStayInBooking(APIView):
     def post(self, request):
@@ -374,18 +367,10 @@ class CreateOnlineBooking(APIView):
                     booking_ids.append(str(booking_data.id))
                 else:
                     raise Exception(booking_serializer.errors)
+                
             tourist_added = []
-            # for tourist in boat.guests:
-            #     tourist_data = {}
-            #     tourist_data['customer_bill'] = billing.id
-            #     tourist_data['guest'] = tourist
-            #     tourist_data['status'] = 2
-            #     tourist_serializer = GuestListSerializer(data=tourist_data)
-            #     tourist_serializer.is_valid(raise_exception=True)
-            #     tourist_serializer.save()
-            #     tourist_added.append(tourist_serializer.data)
+            amenitiesAvailedArr = []  # Initialize to an empty list
 
-            amenitiesAvaiedArr = []  # Initialize to an empty list
             if boat:
                 for availed_boat in boat:
                     print(availed_boat['guests'])
@@ -393,14 +378,15 @@ class CreateOnlineBooking(APIView):
                     availed_boat['customer_bill'] = billing.id  # Update this to use the billing id
                     availed_boat['amenity'] = 1  # Assuming 1 is the ID or key for the boat amenity
                     
-                    amenitiesAvaied = AmenitiesAvailedSerializer(data=availed_boat)
+                    amenitiesAvailed = AmenitiesAvailedSerializer(data=availed_boat)
                     
-                    if amenitiesAvaied.is_valid():
-                        saved_amenity = amenitiesAvaied.save()  # Save the serialized data
-                        amenitiesAvaiedArr.append(saved_amenity.id)  # Append the ID or any relevant data to the array
+                    if amenitiesAvailed.is_valid():
+                        saved_amenity = amenitiesAvailed.save()  # Save the serialized data
+                        amenitiesAvailedArr.append(saved_amenity.id)  # Append the ID or any relevant data to the array
                     else:
                         print("Here At amenities")
-                        return Response(amenitiesAvaied.errors, status=status.HTTP_400_BAD_REQUEST)
+                        return Response(amenitiesAvailed.errors, status=status.HTTP_400_BAD_REQUEST)
+                    
                     for tourist in availed_boat['guests']:
                         tourist_data = {}
                         tourist_data['customer_bill'] = billing.id
@@ -446,12 +432,13 @@ class CreateOnlineBooking(APIView):
         response_data = {
             'customer': customer_serializer.data,
             'billing': billing_serializer.data,
-            'bookings': amenitiesAvaiedArr,
+            'bookings': created_bookings,
             'payment': payment_link_info  
         }
     
-        if amenitiesAvaied:
-            response_data['boat'] = amenitiesAvaied.data  # Only include boat if it was created
+        if amenitiesAvailedArr:
+            response_data['boat'] = amenitiesAvailedArr  # Only include boat if it was created
+            response_data['guests'] = tourist_added
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 
@@ -472,7 +459,6 @@ class RoomPagination(PageNumberPagination):
     page_size_query_param = 'limit'  # Allow clients to set the page size
     max_page_size = 100  # Limit for the page size
   
-
 class GetAvailableRoomsNow(APIView):
     pagination_class = RoomPagination  # Set the pagination class
 
@@ -495,7 +481,6 @@ class GetAvailableRoomsNow(APIView):
         paginated_data = paginator.paginate_queryset(list(data.values()), request)  # Pass only values for pagination
         return paginator.get_paginated_response(paginated_data)
     
-
 class GetBookedNow(APIView):
     def get(self, request):
         today = datetime.now().date()
