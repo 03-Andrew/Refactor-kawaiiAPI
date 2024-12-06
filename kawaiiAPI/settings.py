@@ -237,9 +237,7 @@ GRAPH_MODELS = {
 # AUTH_USER_MODEL = "user.CustomUser"
 
 PAYMONGO_SECRET_KEY = 'sk_test_Y4Sv1NEcDmqXYmkzfVa9L5uF'  # this is just a key for testing
-#PAYMONGO_SECRET_KEY = os.getenv('PAYMONGO_SECRET_KEY')
-#PAYMONGO_WEBHOOK_SECRET = 'whsk_2oKw1JfVMTmkjCU9YAvkd3Mh'
-PAYMONGO_WEBHOOK_SECRET = "whsk_yT7LwSjYMP3UryAqrFbn6WyR"
+PAYMONGO_WEBHOOK_SECRET = "whsk_RU9ZGfc9iJruzgpJHG3BzgYd"
 
 # GMAIL DETAILS
 EMAIL_HOST = 'smtp.gmail.com'
