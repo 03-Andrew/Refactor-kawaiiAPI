@@ -408,8 +408,7 @@ class WebhookNotif(APIView):
 
             # Create payment records
             for object_id in object_ids:
-                logging.info(f"Creating Payment record for billing_id: {billing_id} with object_id: {object_id}")
-                Payment.objects.create(
+                payment1 = Payment.objects.create(
                     customer_bill=billing_id,
                     amount=amount_per_payment / 100,  # convert cents to pesos
                     date=timezone.now(),
@@ -419,6 +418,9 @@ class WebhookNotif(APIView):
                     content_type=content_type,
                     object_id=object_id,
                 )
+                logging.info(f"Payment successful. billing_id: {billing_id}, payment_id: {payment1.id}")
+                print(f"Payment successful. billing_id: {billing_id}, payment_id: {payment1.id}")
+
         else:
             logging.error("Description format is invalid.")
 
