@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from .serializers import CardPaymentSerializer, GCashSourceSerializer, WebhookEventSerializer, LinkSerializer
+from .serializers import WebhookEventSerializer, LinkSerializer
 from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus,PaymentFor
 from .models import WebhookEvent
 
