@@ -337,6 +337,8 @@ class WebhookNotif(APIView):
             billing_info = source_data.get('attributes', {}).get('billing', None)
             description = source_data['attributes'].get('description', "")
             payment_type = source_data['attributes'].get('source', {}).get('type', "")
+            
+            self.create_webhook_event(event_id, billing_id, event_type, payload)
 
             if payment_status == 'chargeable':
                 self.create_gcash_payment(source_id, amount, billing_info, description)
@@ -345,8 +347,6 @@ class WebhookNotif(APIView):
                 logging.info(f"Payment status is paid, proceeding with creating payment and sending email.")
                 self.create_payment(amount, billing_id, payment_type, description)
                 self.send_email(billing_id.id, amount)
-
-            self.create_webhook_event(event_id, billing_id, event_type, payload)
 
         except Exception as e:
             logging.error(f"Unexpected error processing event: {str(e)}")
@@ -428,7 +428,7 @@ class WebhookNotif(APIView):
 
         # fetch booking details
         try:
-            response = requests.get(f'http://127.0.0.1:8000/api/billing-details/{billing_id}/')
+            response = requests.get(f'https://kawaii-app-nb6lb.ondigitalocean.app/api/billing-details/{billing_id}/')
             response.raise_for_status()
             booking_data = response.json()
         except requests.exceptions.RequestException as e:
