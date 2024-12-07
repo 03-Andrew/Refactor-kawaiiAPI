@@ -1,3 +1,4 @@
+from django.views import View
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -18,7 +19,19 @@ from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.core.mail import send_mail
 from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync                  
+from asgiref.sync import async_to_sync        
+
+from django_eventstream import send_event
+
+
+from django.http import HttpResponse, JsonResponse
+from time import sleep
+
+from drf_sse import SSEMixin, SSEResponse
+
+
+
+
 class CreateLink(APIView):
     def post(self, request, *args, **kwargs):
         # Serializer
@@ -82,7 +95,7 @@ class CreateLink(APIView):
             }, status=status.HTTP_200_OK)
         else:
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
-        
+       
 class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
         # Validate the signature
@@ -98,6 +111,7 @@ class WebhookNotif(APIView):
 
     def process_event(self, payload):
         try:
+            print("HEYEYEHEYEHYEH")
             # Retrieve data 
             event_id = payload.get('data', {}).get('id')
             billing_description = payload.get('data', {}).get('attributes', {}).get('data', {}).get('attributes', {}).get('description', "")
@@ -118,8 +132,17 @@ class WebhookNotif(APIView):
             # Create payment record and send email
             if payment_status == 'paid' and event_type == 'payment.paid':
                 logging.info(f"Payment status is paid, proceeding with creating payment and sending email.")
+                send_event('payments', 'payment_success', {
+                    'message': 'Payment successful!',
+                })
+                
                 self.create_payment(amount, billing_id, payment_type, description)
                 self.send_email(billing_id.id, amount)
+                
+            
+            send_event('payments', 'payment_success', {
+                    'message': 'Payment successful!',
+                })
             
             # if payment_status == 'chargeable':
             #     self.create_gcash_payment(source_id, amount, billing_info, description)
@@ -195,6 +218,7 @@ class WebhookNotif(APIView):
                 )
                 logging.info(f"Payment successful. {billing_id}. Payment ID: {payment1.id}")
                 print(f"Payment successful. {billing_id}. Payment ID: {payment1.id}")
+                # payment_successful.send(sender=payment1.__class__, payment_id=payment1.id)
 
         else:
             logging.error("Description format is invalid.")
@@ -283,6 +307,8 @@ class WebhookNotif(APIView):
             logging.error(f"Error retrieving webhook events: {str(e)}")
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
+
+
 # class CardPayment(APIView):
 #     def post(self, request):
 #         # Step 1: Validate the incoming data using the combined serializer

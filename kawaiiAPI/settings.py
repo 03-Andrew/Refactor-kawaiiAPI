@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
-import dj_database_url
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -32,6 +31,7 @@ ALLOWED_HOSTS = ['*'] # Added localhost
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'channels',
     'whitenoise.runserver_nostatic',
     'django.contrib.admin',
@@ -45,7 +45,8 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'django_filters',
-    "django_extensions",
+    'django_extensions',
+    'drf_sse',
 
     'bookings',
     'transactions',
@@ -54,6 +55,11 @@ INSTALLED_APPS = [
     'paymongo', #Added yeah
 ]
 
+
+
+# SSE configuration
+# SSE_RESPONSE_MODE = 'add'  # [optional, default: "chunk"]
+SSE_ENCODE_BASE64 = True     # [optional, default: False]
 
 
 
