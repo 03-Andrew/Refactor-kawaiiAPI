@@ -397,9 +397,6 @@ class CreateOnlineBooking(APIView):
                         tourist_serializer.save()
                         tourist_added.append(tourist_serializer.data)
                         
-                            
-                    
-                
             # Create payment link
             payment_link_data = {
                 'billing_id': str(billing.id),
