@@ -320,8 +320,11 @@ class ConfirmPayment(APIView):
             filters['contact_number'] = number
 
         # Filter the Customer model using the dynamic filters
-        customers = Customer.objects.filter(**filters).order_by('-created_at').values().first()  # Order by created_at descending
-        return customers["id"]
+        customer = Customer.objects.filter(**filters).order_by('-created_at').values().first()  # Order by created_at descending
+        if customer:
+            return customer["id"]
+        else:
+            return None
 
 
     def get(self, request):
@@ -329,11 +332,14 @@ class ConfirmPayment(APIView):
         lName = request.query_params.get('lName', None)
         number = request.query_params.get('contact', None)
         customer=self.get_customer_id(fName, lName, number)
-        bill = Billing.objects.filter(customer__exact=customer).values().first()
-        print(bill)
-        webhook = WebhookEvent.objects.filter(billing__exact=bill["id"]).values().first()
-        if webhook and webhook["event_type"] in ["link.payment.paid", "payment.paid"]:
-            return Response(True)
+        if customer:
+            bill = Billing.objects.filter(customer__exact=customer).values().first()
+            print(bill)
+            webhook = WebhookEvent.objects.filter(billing__exact=bill["id"]).values().first()
+            if webhook and webhook["event_type"] in ["link.payment.paid", "payment.paid"]:
+                return Response(True)
+            else:
+                return Response(False)
         else:
             return Response(False)
 
