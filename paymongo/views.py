@@ -27,8 +27,6 @@ from django_eventstream import send_event
 from django.http import HttpResponse, JsonResponse
 from time import sleep
 
-from drf_sse import SSEMixin, SSEResponse
-
 
 
 
