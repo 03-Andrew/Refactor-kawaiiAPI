@@ -3,6 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
+from django.db.models import Count, Q
+
 from .serializers import WebhookEventSerializer, LinkSerializer
 from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus,PaymentFor
 from .models import WebhookEvent
@@ -27,7 +29,7 @@ from django_eventstream import send_event
 from django.http import HttpResponse, JsonResponse
 from time import sleep
 
-
+from transactions.models import Customer, Billing
 
 
 class CreateLink(APIView):
@@ -306,6 +308,36 @@ class WebhookNotif(APIView):
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
+class ConfirmPayment(APIView):
+    def get_customer_id(self, fName, lName, number):
+        # Build the query dynamically based on the available parameters
+        filters = {}
+        if fName:
+            filters['first_name__icontains'] = fName
+        if lName:
+            filters['last_name__icontains'] = lName
+        if number:
+            filters['contact_number'] = number
+
+        # Filter the Customer model using the dynamic filters
+        customers = Customer.objects.filter(**filters).order_by('-created_at').values().first()  # Order by created_at descending
+        return customers["id"]
+
+
+    def get(self, request):
+        fName = request.query_params.get('fName', None)
+        lName = request.query_params.get('lName', None)
+        number = request.query_params.get('contact', None)
+        customer=self.get_customer_id(fName, lName, number)
+        bill = Billing.objects.filter(customer__exact=customer).values().first()
+        print(bill)
+        webhook = WebhookEvent.objects.filter(billing__exact=bill["id"]).values().first()
+        if webhook and webhook["event_type"] in ["link.payment.paid", "payment.paid"]:
+            return Response(True)
+        else:
+            return Response(False)
+
+      
 
 # class CardPayment(APIView):
 #     def post(self, request):

@@ -1,5 +1,5 @@
 from django.urls import path, include
-from .views import CreateLink, WebhookNotif
+from .views import CreateLink, WebhookNotif, ConfirmPayment
 from . import sse
 
 #from .views import PaymentIntentList
@@ -12,6 +12,7 @@ urlpatterns = [
     path('api/webhook/', WebhookNotif.as_view(), name='view_webhook_notif'), #FOR TESTING
 
     path('events/', include('django_eventstream.urls'), {'channels': ['payments']}),
-    path('test-event/', sse.trigger_payment)
+    path('test-event/', sse.trigger_payment),
+    path('confirm-payment/', ConfirmPayment.as_view()),
 
 ]
