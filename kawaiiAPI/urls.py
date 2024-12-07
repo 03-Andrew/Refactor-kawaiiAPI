@@ -14,7 +14,6 @@ urlpatterns = [
     path('', include('user.urls')),
     path('', include('paymongo.urls')),
     path('', include('reports.urls')),
-    path("events/", include(django_eventstream.urls), {"channels": ["test"]}),
 ]
 
 websocket_urlpatterns = [
