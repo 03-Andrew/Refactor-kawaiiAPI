@@ -139,11 +139,12 @@ DATABASES = {
 #    }
 # }
 # CSRF HEHE
-# CSRF_TRUSTED_ORIGINS = [
-#     'https://kawaii-api.vercel.app',  
-#     'http://localhost:3000', 
-#     'https://kawaii-vj-fork.vercel.app',            
-# ]
+CSRF_TRUSTED_ORIGINS = [
+    'https://kawaii-api.vercel.app',  
+    'http://localhost:3000', 
+    'https://kawaii-vj-fork.vercel.app',
+    'https://kawaii-app-nb6lb.ondigitalocean.app',            
+]
 
 # CSRF_COOKIE_SECURE = True 
 # CSRF_COOKIE_HTTPONLY = False  
