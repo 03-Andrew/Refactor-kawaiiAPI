@@ -143,7 +143,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://kawaii-api.vercel.app',  
     'http://localhost:3000', 
     'https://kawaii-vj-fork.vercel.app',
-    'https://kawaii-app-nb6lb.ondigitalocean.app',            
+    'https://kawaii-app-nb6lb.ondigitalocean.app',     
+    'https://kawaii-booking-front.vercel.app'       
 ]
 
 # CSRF_COOKIE_SECURE = True 
@@ -220,6 +221,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:5174",  # Add your frontend URL here
     "https://kawaii-project-front-sw7d.vercel.app",
+    "https://kawaii-booking-front.vercel.app",
     #"https://kawaii-project-front-sw7d-git-main-andreis-projects-d8ee1fa3.vercel.app/",
 
 ]
