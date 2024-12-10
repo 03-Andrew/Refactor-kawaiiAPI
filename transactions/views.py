@@ -124,6 +124,14 @@ class ListBillingBooking(generics.ListAPIView):
     serializer_class = PendingBookings
     def get_queryset(self):
         queryset = Billing.objects.filter(Q(bookings__isnull=False) & Q(bookings__status__exact=1)).distinct()
+        customer = self.request.GET.get('customer')  
+
+        # Filtering 
+        if customer:
+            queryset = queryset.filter(
+                Q(customer__first_name__icontains=customer) | 
+                Q(customer__last_name__icontains=customer)
+            )
 
         return queryset
 
