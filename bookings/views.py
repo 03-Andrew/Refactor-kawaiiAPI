@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 from django.shortcuts import render
 from django.db.models import Count, Q
 from django.http import HttpResponse
+from django.db.models import IntegerField
+from django.db.models.functions import Cast
 import requests
 
 from .models import Room, Booking, RoomType
@@ -442,13 +444,35 @@ class CreateOnlineBooking(APIView):
 class GetBookedRoomsNow(generics.ListAPIView):
     serializer_class = BookingSerializer
 
-    def get_queryset(self):
+    def get_queryset(self): 
+        customer = self.request.GET.get('customer')
+        sort = self.request.GET.get('sort')
+
         today = datetime.now().date()
         print(today)
         queryset = Booking.objects.filter(
             Q(status=2) & Q(check_in__lte=today) & Q(check_out__gte=today)
         )
-        
+
+        # Filtering 
+        if customer:
+            queryset = queryset.filter(
+                Q(customer_bill__customer__first_name__icontains=customer) | 
+                Q(customer_bill__customer__last_name__icontains=customer)
+            )
+            
+        # Sorting
+        if sort:
+            if sort == 'asccheckin':
+                queryset = queryset.order_by('check_in') 
+            elif sort == 'desccheckin':
+                queryset = queryset.order_by('-check_in')  
+
+            if sort == 'asccheckout':
+                queryset = queryset.order_by('check_out') 
+            elif sort == 'desccheckout':
+                queryset = queryset.order_by('-check_out')  
+
         return queryset
     
 class RoomPagination(PageNumberPagination):
@@ -461,7 +485,7 @@ class GetAvailableRoomsNow(APIView):
 
     def get(self, request):
         today = datetime.now().date()
-        rooms = Room.objects.all()
+        rooms = self.get_queryset()
         data ={}
         booking = Booking.objects.filter(check_in__lte=today, check_out__gte=today).first()
         for room in rooms:
@@ -477,6 +501,24 @@ class GetAvailableRoomsNow(APIView):
         paginator = self.pagination_class()
         paginated_data = paginator.paginate_queryset(list(data.values()), request)  # Pass only values for pagination
         return paginator.get_paginated_response(paginated_data)
+    
+    def get_queryset(self):
+        queryset = Room.objects.all() 
+        room_type = self.request.GET.get('type')  
+        sort = self.request.GET.get('sort')
+
+        # Filtering 
+        if room_type:
+            queryset = queryset.filter(type__name=room_type)
+                
+        # Sorting
+        if sort:
+            if sort == 'ascroom':
+                queryset = queryset.annotate(num_int=Cast('number', IntegerField())).order_by('num_int')
+            elif sort == 'descroom':
+                queryset = queryset.annotate(num_int=Cast('number', IntegerField())).order_by('-num_int')
+
+        return queryset
     
 class GetBookedNow(APIView):
     def get(self, request):
