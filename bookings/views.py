@@ -119,11 +119,7 @@ class AvailableRooms(generics.ListAPIView):
         check_in = self.request.GET.get('check_in')
         check_out = self.request.GET.get('check_out')
         r_type = self.request.GET.get('type')
-        min_price = self.request.GET.get('min_price')
-        max_price = self.request.GET.get('max_price')
-        max_children = self.request.GET.get('max_children')  
-        max_adult = self.request.GET.get('max_adult')  
-        sort = self.request.GET.get('sort') 
+        
 
         # Set default dates if not provided
         if not check_in or not check_out:
@@ -148,25 +144,6 @@ class AvailableRooms(generics.ListAPIView):
         
         if r_type:
             queryset = queryset.filter(type_id=r_type)
-
-        # Apply price range filtering
-        if min_price:
-            queryset = queryset.filter(type__price__gte=float(min_price))
-        if max_price:
-            queryset = queryset.filter(type__price__lte=float(max_price))
-
-        # Apply max children & adult filtering
-        if max_children:
-            queryset = queryset.filter(type__max_children__gte=int(max_children))
-        if max_adult:
-            queryset = queryset.filter(type__max_adult__gte=int(max_adult))
-
-        # Apply sorting
-        if sort:
-            if sort == 'ascprice':
-                queryset = queryset.order_by('type__price') 
-            elif sort == 'descprice':
-                queryset = queryset.order_by('-type__price')
 
         return queryset
 
