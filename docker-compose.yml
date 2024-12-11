@@ -1,15 +1,5 @@
 version: "3.9"
 services:
-  db:
-    image: postgres:15
-    container_name: postgres
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: mydb
-
   redis:
     image: redis:alpine
     container_name: redis-main
@@ -25,13 +15,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
       - redis
     environment:
       DEBUG: "False"
       SECRET_KEY: "django-insecure-le41^5*zazcf%@9r2vmkip1%h#f)uba6osnt1_4-v2o9f$(bmb"
-      DATABASE_URL: "postgres://postgres:postgres@db:5432/mydb"
       REDIS_URL: "redis://redis:6379/0"
 
-volumes:
-  db_data:
+# No volumes for database are needed
