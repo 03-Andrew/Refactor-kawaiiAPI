@@ -445,9 +445,29 @@ class GetPayments(generics.ListCreateAPIView):
 
     def get_queryset(self): 
         queryset = Payment.objects.all()
+        mop = self.request.GET.get('mop')
+        customer = self.request.GET.get('customer')
+        sort = self.request.GET.get('sort') 
 
-    
-        return queryset.order_by('-date')
+        # Filter
+        if mop:
+            mop_list = mop.split(',') 
+            queryset = queryset.filter(mop__mode__in=[mode.strip() for mode in mop_list])
+
+        if customer:
+            queryset = queryset.filter(
+                Q(customer_bill__customer__first_name__icontains=customer) | 
+                Q(customer_bill__customer__last_name__icontains=customer)
+            )
+
+        # Sorting
+        if sort:
+            if sort == 'ascdate':
+                queryset = queryset.order_by('date') 
+            elif sort == 'descdate':
+                queryset = queryset.order_by('-date')
+
+        return queryset
     
 class WebSocketTestView(View):
     def get(self, request, *args, **kwargs):

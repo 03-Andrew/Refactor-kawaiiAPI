@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
 from django.shortcuts import render
-from django.db.models import Count, Q
+from django.db.models import Count, Q, FloatField, ExpressionWrapper, F, Subquery, OuterRef, Sum
 from django.http import HttpResponse
+from django.db.models import IntegerField
+from django.db.models.functions import Cast, Coalesce
 import requests
 
 from .models import Room, Booking, RoomType
@@ -119,11 +121,7 @@ class AvailableRooms(generics.ListAPIView):
         check_in = self.request.GET.get('check_in')
         check_out = self.request.GET.get('check_out')
         r_type = self.request.GET.get('type')
-        min_price = self.request.GET.get('min_price')
-        max_price = self.request.GET.get('max_price')
-        max_children = self.request.GET.get('max_children')  
-        max_adult = self.request.GET.get('max_adult')  
-        sort = self.request.GET.get('sort') 
+        
 
         # Set default dates if not provided
         if not check_in or not check_out:
@@ -149,25 +147,6 @@ class AvailableRooms(generics.ListAPIView):
         if r_type:
             queryset = queryset.filter(type_id=r_type)
 
-        # Apply price range filtering
-        if min_price:
-            queryset = queryset.filter(type__price__gte=float(min_price))
-        if max_price:
-            queryset = queryset.filter(type__price__lte=float(max_price))
-
-        # Apply max children & adult filtering
-        if max_children:
-            queryset = queryset.filter(type__max_children__gte=int(max_children))
-        if max_adult:
-            queryset = queryset.filter(type__max_adult__gte=int(max_adult))
-
-        # Apply sorting
-        if sort:
-            if sort == 'ascprice':
-                queryset = queryset.order_by('type__price') 
-            elif sort == 'descprice':
-                queryset = queryset.order_by('-type__price')
-
         return queryset
 
     def get(self, request):
@@ -183,14 +162,15 @@ class BookingListCreate(generics.ListCreateAPIView):
     serializer_class = BookingSerializer
     def get_queryset(self):
         queryset = Booking.objects.all()
-        s = self.request.GET.get('s')
+        customer = self.request.GET.get('customer')
         sort = self.request.GET.get('sort')
         status_filter = self.request.GET.get('status')
         
-        if s:
+        # Filter
+        if customer:
             queryset = queryset.filter(
-                Q(billing__customer__first_name__icontains=s) | 
-                Q(billing__customer__last_name__icontains=s)
+                Q(customer_bill__customer__first_name__icontains=customer) | 
+                Q(customer_bill__customer__last_name__icontains=customer)
             )
         
         if status_filter:
@@ -198,11 +178,22 @@ class BookingListCreate(generics.ListCreateAPIView):
                 queryset = queryset.filter(status__exact=2)
             elif status_filter == 'p':
                 queryset = queryset.filter(status__exact=1)
-        
-        if sort == "asc":
-            queryset = queryset.order_by('check_in')
-        elif sort == "desc":
-            queryset = queryset.order_by('-check_in')
+
+        # Sorting
+        if sort:
+            if sort == "asc":
+                queryset = queryset.order_by('check_in')
+            elif sort == "desc":
+                queryset = queryset.order_by('-check_in')
+            elif sort == "asccheckout":
+                queryset = queryset.order_by('check_out')
+            elif sort == "desccheckout":
+                queryset = queryset.order_by('-check_out')
+            elif sort == "ascroom":
+                queryset = queryset.order_by('room')
+            elif sort == "descroom":
+                queryset = queryset.order_by('-room')
+
         return queryset
     
 class RoomListCreateView(generics.ListAPIView):
@@ -465,13 +456,35 @@ class CreateOnlineBooking(APIView):
 class GetBookedRoomsNow(generics.ListAPIView):
     serializer_class = BookingSerializer
 
-    def get_queryset(self):
+    def get_queryset(self): 
+        customer = self.request.GET.get('customer')
+        sort = self.request.GET.get('sort')
+
         today = datetime.now().date()
         print(today)
         queryset = Booking.objects.filter(
             Q(status=2) & Q(check_in__lte=today) & Q(check_out__gte=today)
         )
-        
+
+        # Filtering 
+        if customer:
+            queryset = queryset.filter(
+                Q(customer_bill__customer__first_name__icontains=customer) | 
+                Q(customer_bill__customer__last_name__icontains=customer)
+            )
+            
+        # Sorting
+        if sort:
+            if sort == 'asccheckin':
+                queryset = queryset.order_by('check_in') 
+            elif sort == 'desccheckin':
+                queryset = queryset.order_by('-check_in')  
+
+            if sort == 'asccheckout':
+                queryset = queryset.order_by('check_out') 
+            elif sort == 'desccheckout':
+                queryset = queryset.order_by('-check_out')  
+
         return queryset
     
 class RoomPagination(PageNumberPagination):
@@ -484,7 +497,7 @@ class GetAvailableRoomsNow(APIView):
 
     def get(self, request):
         today = datetime.now().date()
-        rooms = Room.objects.all()
+        rooms = self.get_queryset()
         data ={}
         booking = Booking.objects.filter(check_in__lte=today, check_out__gte=today).first()
         for room in rooms:
@@ -500,6 +513,24 @@ class GetAvailableRoomsNow(APIView):
         paginator = self.pagination_class()
         paginated_data = paginator.paginate_queryset(list(data.values()), request)  # Pass only values for pagination
         return paginator.get_paginated_response(paginated_data)
+    
+    def get_queryset(self):
+        queryset = Room.objects.all() 
+        room_type = self.request.GET.get('type')  
+        sort = self.request.GET.get('sort')
+
+        # Filtering 
+        if room_type:
+            queryset = queryset.filter(type__name=room_type)
+                
+        # Sorting
+        if sort:
+            if sort == 'ascroom':
+                queryset = queryset.annotate(num_int=Cast('number', IntegerField())).order_by('num_int')
+            elif sort == 'descroom':
+                queryset = queryset.annotate(num_int=Cast('number', IntegerField())).order_by('-num_int')
+
+        return queryset
     
 class GetBookedNow(APIView):
     def get(self, request):
