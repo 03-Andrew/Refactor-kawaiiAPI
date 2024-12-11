@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 from django.shortcuts import render
-from django.db.models import Count, Q
+from django.db.models import Count, Q, FloatField, ExpressionWrapper, F, Subquery, OuterRef, Sum
 from django.http import HttpResponse
 from django.db.models import IntegerField
-from django.db.models.functions import Cast
+from django.db.models.functions import Cast, Coalesce
 import requests
 
 from .models import Room, Booking, RoomType
@@ -162,14 +162,15 @@ class BookingListCreate(generics.ListCreateAPIView):
     serializer_class = BookingSerializer
     def get_queryset(self):
         queryset = Booking.objects.all()
-        s = self.request.GET.get('s')
+        customer = self.request.GET.get('customer')
         sort = self.request.GET.get('sort')
         status_filter = self.request.GET.get('status')
         
-        if s:
+        # Filter
+        if customer:
             queryset = queryset.filter(
-                Q(billing__customer__first_name__icontains=s) | 
-                Q(billing__customer__last_name__icontains=s)
+                Q(customer_bill__customer__first_name__icontains=customer) | 
+                Q(customer_bill__customer__last_name__icontains=customer)
             )
         
         if status_filter:
@@ -177,11 +178,22 @@ class BookingListCreate(generics.ListCreateAPIView):
                 queryset = queryset.filter(status__exact=2)
             elif status_filter == 'p':
                 queryset = queryset.filter(status__exact=1)
-        
-        if sort == "asc":
-            queryset = queryset.order_by('check_in')
-        elif sort == "desc":
-            queryset = queryset.order_by('-check_in')
+
+        # Sorting
+        if sort:
+            if sort == "asc":
+                queryset = queryset.order_by('check_in')
+            elif sort == "desc":
+                queryset = queryset.order_by('-check_in')
+            elif sort == "asccheckout":
+                queryset = queryset.order_by('check_out')
+            elif sort == "desccheckout":
+                queryset = queryset.order_by('-check_out')
+            elif sort == "ascroom":
+                queryset = queryset.order_by('room')
+            elif sort == "descroom":
+                queryset = queryset.order_by('-room')
+
         return queryset
     
 class RoomListCreateView(generics.ListAPIView):

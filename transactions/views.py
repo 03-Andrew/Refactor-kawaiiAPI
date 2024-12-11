@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.db.models import F, Sum, Q, Exists, OuterRef
+from django.db.models import F, Sum, Q, Exists, Subquery, OuterRef, TimeField, IntegerField
 from datetime import date, timedelta, datetime
 from calendar import monthrange
 from django.contrib.contenttypes.models import ContentType
@@ -16,7 +16,7 @@ from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
 from django.utils import timezone
 
-from django.db.models.functions import ExtractMonth
+from django.db.models.functions import ExtractMonth, Cast
 
 from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill, GuestStatus, Food, AdditonalPayment, Activity, Amenities, FoodType, ActivitiesAvailed, PaymentMethod, PaymentStatus
 from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer, FoodListSerializer
@@ -138,29 +138,61 @@ class ListBillingBooking(generics.ListAPIView):
 class ListConfirmedBooking(generics.ListAPIView):
     serializer_class = ConfirmedBooking
     def get_queryset(self):
+        customer = self.request.GET.get('customer')
         booking_id = self.request.GET.get('id')
         check_in = self.request.GET.get('check_in')
+        sort = self.request.GET.get('sort')
+
         queryset = Booking.objects.filter(status=2).order_by("-check_out")
+
+        #Filter
+        if customer:
+            queryset = queryset.filter(
+                Q(customer_bill__customer__first_name__icontains=customer) | 
+                Q(customer_bill__customer__last_name__icontains=customer)
+            )
 
         if check_in:
             queryset = queryset.filter(check_in=check_in)
 
         if booking_id:
             queryset = queryset.filter(id=booking_id)
-        
+
+         # Annotate with availed_boat_transfer
+        queryset = queryset.annotate(
+            availed_boat_transfer=Subquery(
+                AmenitiesAvailed.objects.filter(
+                    customer_bill=OuterRef('customer_bill'),
+                    amenity__amenity='boat transfer'
+                ).values('time')[:1]
+            )
+        )
+
+        # Sort
+        if sort:
+            if sort == 'asccheckin':
+                queryset = queryset.order_by('check_in') 
+            elif sort == 'desccheckin':
+                queryset = queryset.order_by('-check_in')
+            elif sort == 'asccheckout':
+                queryset = queryset.order_by('check_out') 
+            elif sort == 'desccheckout':
+                queryset = queryset.order_by('-check_out')
+            elif sort == 'ascroom':
+                queryset = queryset.annotate(num_int=Cast('number', IntegerField())).order_by('num_int')
+            elif sort == 'descroom':
+                queryset = queryset.annotate(num_int=Cast('number', IntegerField())).order_by('-num_int')
+            elif sort == 'ascboat':
+                queryset = queryset.order_by('availed_boat_transfer')  # Sort by annotated field
+            elif sort == 'descboat':
+                queryset = queryset.order_by('-availed_boat_transfer')  # Sort by annotated field
+ 
         return queryset
     
-
 class EditBooking(generics.RetrieveUpdateAPIView):
     serializer_class = ConfirmedBooking
     lookup_field = 'pk'
     queryset = Booking.objects.all()
-    
-
-    
-
-
-
     
 class GuestListView(generics.ListCreateAPIView):
     # queryset = GuestList.objects.all()
