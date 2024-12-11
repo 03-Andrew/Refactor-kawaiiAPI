@@ -1,39 +1,37 @@
+version: "3.9"
 services:
+  db:
+    image: postgres:15
+    container_name: postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydb
+
   redis:
     image: redis:alpine
-    container_name: redis
-
-  # db:
-  #   image: postgres
-  #   volumes:
-  #     - ./data/db:/var/lib/postgresql/data
-  #   environment: 
-  #     - POSTGRES_DB=postgres
-  #     - POSTGRES_USER=postgres
-  #     - POSTGRES_PASSWORD=postgres
-  #   container_name: postgres_db
+    container_name: redis-main
+    ports:
+     - "6379:6379"
 
   app:
     build: .
+    container_name: kawaiiapi
     volumes:
       - .:/app
+    command: daphne -p 8000 -b 0.0.0.0 kawaiiAPI.asgi:application  # Run Daphne
     ports:
-      -  8000:8000
-    image: andreww0916/django
-    container_name: django_app  
-    command: python manage.py runserver 0.0.0.0:8000
-    # depends_on:
-    #   - db
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: "django-insecure-le41^5*zazcf%@9r2vmkip1%h#f)uba6osnt1_4-v2o9f$(bmb"
+      DATABASE_URL: "postgres://postgres:postgres@db:5432/mydb"
+      REDIS_URL: "redis://redis:6379/0"
 
-  # celery:
-  #   restart: always
-  #   build: 
-  #     context: .
-  #   command: celery -A core worker -l DEBUG
-  #   volumes:
-  #     - .:/django
-  #   container_name: celery
-  #   depends_on:
-  #     - db
-  #     - redis
-  #     - app
+volumes:
+  db_data:
