@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.db.models import F, Sum, Q, Exists, Subquery, OuterRef, TimeField, IntegerField
+from django.db.models import F, Sum, Q, Exists, Subquery, OuterRef, TimeField, IntegerField, Min
 from datetime import date, timedelta, datetime
 from calendar import monthrange
 from django.contrib.contenttypes.models import ContentType
@@ -125,6 +125,7 @@ class ListBillingBooking(generics.ListAPIView):
     def get_queryset(self):
         queryset = Billing.objects.filter(Q(bookings__isnull=False) & Q(bookings__status__exact=1)).distinct()
         customer = self.request.GET.get('customer')  
+        sort = self.request.GET.get('sort')
 
         # Filtering 
         if customer:
@@ -132,6 +133,17 @@ class ListBillingBooking(generics.ListAPIView):
                 Q(customer__first_name__icontains=customer) | 
                 Q(customer__last_name__icontains=customer)
             )
+
+        # Sorting
+        if sort:
+            if sort == 'asccheckin':
+                queryset = queryset.annotate(min_check_in=Min('bookings__check_in')).order_by('min_check_in')
+            elif sort == 'desccheckin':
+                queryset = queryset.annotate(min_check_in=Min('bookings__check_in')).order_by('-min_check_in')
+            elif sort == 'asccheckout':
+                queryset = queryset.annotate(min_check_out=Min('bookings__check_out')).order_by('min_check_out')
+            elif sort == 'desccheckout':
+                queryset = queryset.annotate(min_check_out=Min('bookings__check_out')).order_by('-min_check_out')
 
         return queryset
 
@@ -198,11 +210,19 @@ class GuestListView(generics.ListCreateAPIView):
     # queryset = GuestList.objects.all()
     serializer_class = GuestListSerializerAll
     def get_queryset(self):
+        sort = self.request.GET.get('sort')
         queryset = GuestList.objects.filter(Q(customer_bill__status__status="processing") | Q(customer_bill__status__status="confirmed"))
+        customer = self.request.GET.get('customer')
+
+        if customer:
+            queryset = queryset.filter(
+                Q(guest__icontains=customer) | 
+                Q(guest__icontains=customer)
+            )
         return queryset
 
 class UpdateGuestListStatus(APIView):
-    def get(self, request, format=None):
+    def get(self, request, format=None):    
         return Response({"message": "Use POST to submit amenities and activities."}, status=200)
 
     def patch(self, request, *args, **kwargs):
