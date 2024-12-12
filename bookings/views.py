@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 from django.shortcuts import render
-from django.db.models import Count, Q, FloatField, ExpressionWrapper, F, Subquery, OuterRef, Sum
+from django.db.models import Count, Q, FloatField, ExpressionWrapper, F, Subquery, OuterRef, Sum, DecimalField
 from django.http import HttpResponse
-from django.db.models import IntegerField
-from django.db.models.functions import Cast, Coalesce
+from django.db.models import IntegerField, ExpressionWrapper, IntegerField, DecimalField, DurationField
+from django.db.models.functions import ExtractDay, Cast, Coalesce
 import requests
 
 from .models import Room, Booking, RoomType
@@ -161,7 +161,12 @@ class AvailableRooms(generics.ListAPIView):
 class BookingListCreate(generics.ListCreateAPIView):
     serializer_class = BookingSerializer
     def get_queryset(self):
-        queryset = Booking.objects.all()
+        queryset = Booking.objects.annotate(
+            total_guests=ExpressionWrapper(
+                F('adult_count') + F('children_count'),
+                output_field=IntegerField()
+            ),
+        )
         customer = self.request.GET.get('customer')
         sort = self.request.GET.get('sort')
         status_filter = self.request.GET.get('status')
@@ -193,6 +198,14 @@ class BookingListCreate(generics.ListCreateAPIView):
                 queryset = queryset.order_by('room')
             elif sort == "descroom":
                 queryset = queryset.order_by('-room')
+            elif sort == "ascguest":
+                queryset = queryset.order_by('total_guests')
+            elif sort == "descguest":
+                queryset = queryset.order_by('-total_guests')
+            elif sort == "asccost":
+                queryset = queryset.order_by('total_cost')
+            elif sort == "desccost":
+                queryset = queryset.order_by('-total_cost')
 
         return queryset
     
