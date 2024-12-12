@@ -5,6 +5,10 @@ class Command(BaseCommand):
     help = "Populates the database with sample data for development purposes."
 
     def handle(self, *args, **kwargs):
+
+
+
+
         # Step 1: Add inclusions
         inclusions_data = ["Free WiFi", "Air Conditioning", "TV", "Breakfast Included"]
         inclusion_objects = [Inclusions.objects.get_or_create(inclusion=incl)[0] for incl in inclusions_data]
