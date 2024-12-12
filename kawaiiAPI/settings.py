@@ -117,7 +117,7 @@ ASGI_APPLICATION = 'kawaiiAPI.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'cleadb.sqlite3',
     }
 }
 
@@ -130,6 +130,7 @@ if DATABASE_URL:
     except Exception as e:
         # Log the exception or handle it as needed
         print(f"Failed to parse DATABASE_URL: {e}")
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
