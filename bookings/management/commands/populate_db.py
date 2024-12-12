@@ -1,12 +1,42 @@
 from django.core.management.base import BaseCommand
-from bookings.models import Inclusions, RoomStatus, RoomType, Room, BookingStatus
-from transactions.models import Activity, Amenities
+
+from transactions.models import Activity, Amenities, PaymentStatus, PaymentMethod, PaymentFor, GuestStatus, BillingStatus
 
 
 class Command(BaseCommand):
     help = "Populates the database with sample data for development purposes."
 
-    def handle(self, *args, **kwargs):       
+    def handle(self, *args, **kwargs):    
+
+        payment_status_data = ['Full', 'Partial', 'Down Payment']
+
+        for status in payment_status_data:  
+            PaymentStatus.objects.get_or_create(status=status)
+
+        payment_method_data = ['cash', 'gCash', 'card']
+        for method in payment_method_data:
+            PaymentMethod.objects.get_or_create(mode=method)
+
+        payment_for_data = ['Down Payment', 'Room', 'Food', 'Amenities', 'Activities']
+
+        for item in payment_for_data:
+            PaymentFor.objects.get_or_create(name=item)
+
+        guest_status_data = ['Not Arrived', 'In Port', 'In Boat', 'In Resort', 'In Boat (Leaving)', 'Checked Out']
+
+        for status in guest_status_data:
+            GuestStatus.objects.get_or_create(status=status)
+        
+        billing_status_data = ['Processing', 'Complete', 'Pending', 'Confirmed', 'Cancelled']
+
+        for status in billing_status_data:
+            billing_status, created = BillingStatus.objects.get_or_create(status=status)
+            if created:
+                print(f"Created billing status: {status}")
+            else:
+                print(f"Billing status already exists: {status}")
+
+
         activity_base_data = [
             {"activity": "Kayak", "hourly_rate": 200},
             {"activity": "Jetski", "hourly_rate": 200},
@@ -47,4 +77,8 @@ class Command(BaseCommand):
                 self.stdout.write(f"Activity already exists: {activity.activity}")
                 
         self.stdout.write(self.style.SUCCESS("Database populated successfully!"))
+
+
+
+
 
