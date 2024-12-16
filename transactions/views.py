@@ -1,32 +1,24 @@
 from django.shortcuts import render
-from django.db.models import F, Sum, Q, Exists, Subquery, OuterRef, TimeField, IntegerField, Min
-from datetime import date, timedelta, datetime
-from calendar import monthrange
+from django.db.models import Q, Subquery, OuterRef, IntegerField, Min
 from django.contrib.contenttypes.models import ContentType
 from django.utils.timezone import make_aware
-
-
+from django.db.models.functions import Cast
 
 from rest_framework.views import APIView
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-
-from django.views.decorators.csrf import csrf_protect
-from django.utils.decorators import method_decorator
-from django.utils import timezone
-
-from django.db.models.functions import ExtractMonth, Cast
-
-from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill, GuestStatus, Food, AdditonalPayment, Activity, Amenities, FoodType, ActivitiesAvailed, PaymentMethod, PaymentStatus
-from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerialzerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer, FoodListSerializer
-
-from receptionist.serializers import FoodBillSerializer, AdditionalPaymentSerializer
-from bookings.serializers import BookingSerializer
-from bookings.models import Booking
-
 from rest_framework import status
 
+from datetime import datetime
+
+# Models
+from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill, GuestStatus, Food, AdditonalPayment, ActivitiesAvailed
+from bookings.models import Booking
+
+# Serializers
+from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerializerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer, FoodListSerializer
+from transactions.serializers import FoodBillSerializer, AdditionalPaymentSerializer
 
 # 1. List View - for listing all Billings
 class BillingList(generics.ListAPIView):
@@ -45,7 +37,7 @@ class BillingList(generics.ListAPIView):
 # 2. Create View - for creating a new Billing
 class BillingCreate(generics.ListCreateAPIView):
     queryset = Billing.objects.all()
-    serializer_class = BillingSerialzerBase
+    serializer_class = BillingSerializerBase
     
     # @method_decorator(csrf_protect)
     def perform_create(self, serializer):
@@ -55,7 +47,7 @@ class BillingCreate(generics.ListCreateAPIView):
 # 3. Update View - for editing an existing Billing
 class BillingUpdate(generics.RetrieveUpdateDestroyAPIView):
     queryset = Billing.objects.all()
-    serializer_class = BillingSerialzerBase
+    serializer_class = BillingSerializerBase
     lookup_field = 'pk' 
 
 

@@ -1,31 +1,24 @@
 from datetime import datetime, timedelta
 from django.shortcuts import render
-from django.db.models import Count, Q, FloatField, ExpressionWrapper, F, Subquery, OuterRef, Sum, DecimalField
-from django.http import HttpResponse
-from django.db.models import IntegerField, ExpressionWrapper, IntegerField, DecimalField, DurationField
-from django.db.models.functions import ExtractDay, Cast, Coalesce
+from django.db.models import Count, Q, ExpressionWrapper, F
+from django.db.models import IntegerField, ExpressionWrapper, IntegerField
+from django.db.models.functions import Cast
 import requests
-
-from .models import Room, Booking, RoomType
-from transactions.models import Billing
-
-from .serializers import AvailableRoomSerializer, BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings, BookingSerializer3, RoomSerializer2
-from paymongo.serializers import LinkSerializer
-
-from transactions.serializers import CustomerSerializer, BillingSerialzerBase, AmenitiesAvailedSerializer, GuestListSerializer, ActivitiesAvailedSerializer2
-
-from receptionist.serializers import ActivitiesAvailedSerializer
-from transactions.models import GuestList, AmenitiesAvailed, ActivitiesAvailed
 
 from rest_framework.views import APIView
 from rest_framework import generics, status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
-from rest_framework.pagination import LimitOffsetPagination, PageNumberPagination
-
+from rest_framework.pagination import PageNumberPagination
 
 from django.db import transaction
 from datetime import datetime, timedelta, date
+
+# Models
+from .models import Room, Booking, RoomType
+
+# Serializers
+from .serializers import BookingSerializer, RoomSerializer, AvailableRoomSerializer2, RoomTypeSerializer, CurrentRoomBookings, BookingSerializer3
+from transactions.serializers import ActivitiesAvailedSerializer, CustomerSerializer, BillingSerializerBase, AmenitiesAvailedSerializer, GuestListSerializer
 
 
 def home(request):
@@ -253,7 +246,7 @@ class CreateDayTourGuest(APIView):
 
             billing_data['customer'] = customer.id
             billing_data['status'] = 1
-            billing_serializer = BillingSerialzerBase(data=billing_data)
+            billing_serializer = BillingSerializerBase(data=billing_data)
             billing_serializer.is_valid(raise_exception=True)
             billing = billing_serializer.save()
 
@@ -312,7 +305,7 @@ class CreateStayInBooking(APIView):
 
             # Handle billing creation
             billing_data['customer'] = customer.id
-            billing_serializer = BillingSerialzerBase(data=billing_data)
+            billing_serializer = BillingSerializerBase(data=billing_data)
             if billing_serializer.is_valid():
                 billing = billing_serializer.save()
             else:
@@ -372,7 +365,7 @@ class CreateOnlineBooking(APIView):
 
             billing_data['customer'] = customer.id
             billing_data['status'] = 3
-            billing_serializer = BillingSerialzerBase(data=billing_data)
+            billing_serializer = BillingSerializerBase(data=billing_data)
             if billing_serializer.is_valid():
                 billing = billing_serializer.save()
             else:

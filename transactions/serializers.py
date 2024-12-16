@@ -1,14 +1,60 @@
 from rest_framework import serializers
-from .models import Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, BillingStatus, Food
 
 from bookings.models import Booking
-
-from django.db.models import Sum, F
-
-from receptionist.serializers import ActivitiesAvailedSerializer2, AmenitiesAvailedSerializer3, FoodBillSerializer2, AdditionalPaymentSerializer, AmenitiesAvailedSerializer
-
-
+from .models import FoodBill, AdditonalPayment, Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, BillingStatus, Food
 from bookings.serializers import BookingSerializer
+
+class ActivitiesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Activity
+        fields = '__all__'
+
+class ActivitiesAvailedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ActivitiesAvailed
+        fields = '__all__'
+
+class ActivitiesAvailedSerializer2(serializers.ModelSerializer):
+    activity = ActivitiesSerializer()
+    class Meta:
+        model = ActivitiesAvailed
+        fields = ['id', 'hours_availed', 'activity']
+
+class AmenitiesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Amenities
+        fields = '__all__'
+
+class AmenitiesAvailedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AmenitiesAvailed
+        fields = '__all__'
+
+class AmenitiesAvailedSerializer2(serializers.ModelSerializer):
+    class Meta:
+        model = AmenitiesAvailed
+        fields = ['id', 'head_count', 'amenity']
+
+class AmenitiesAvailedSerializer3(serializers.ModelSerializer):
+    amenity = AmenitiesSerializer()
+    class Meta:
+        model = AmenitiesAvailed
+        fields = ['id', 'head_count', 'amenity']
+
+class FoodBillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FoodBill
+        fields = '__all__'
+
+class FoodBillSerializer2(serializers.ModelSerializer):
+    class Meta:
+        model = FoodBill
+        fields = ['id', 'price', 'or_number']
+
+class AdditionalPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AdditonalPayment
+        fields = '__all__'
 
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
@@ -20,10 +66,16 @@ class CustomerSerializer2(serializers.ModelSerializer):
         model = Customer
         fields = ['first_name', 'last_name']
 
-class BillingSerialzerBase(serializers.ModelSerializer):
+class BillingSerializerBase(serializers.ModelSerializer):
     class Meta:
         model = Billing
         fields = "__all__"
+
+class BillingAllSerializer(serializers.ModelSerializer):
+    customer = CustomerSerializer()
+    class Meta:
+        model = Billing
+        fields = '__all__'
 
 class BillingSerializer(serializers.ModelSerializer):
     total_cost = serializers.SerializerMethodField()
@@ -43,8 +95,6 @@ class BillingSerializer(serializers.ModelSerializer):
 
     def get_running_balance(self, obj):
         return obj.running_balance or 0
-
-
 
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:

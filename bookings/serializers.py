@@ -1,11 +1,21 @@
 from rest_framework import serializers
-from .models import Booking, Room, RoomType, RoomStatus
+from .models import Booking, Room, RoomType, RoomStatus, BookingStatus
+        
+        
+class BookingsAllSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Booking
+        fields = '__all__'
+
+class BookingCountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Booking
+        fields = ['room', 'adult_count', 'children_count']
 
 class BookingSerializer(serializers.ModelSerializer):
     number_of_nights = serializers.SerializerMethodField()
     total_cost = serializers.SerializerMethodField()
     customer_name = serializers.SerializerMethodField()
-
 
     def get_number_of_nights(self, obj):
         return (obj.check_out - obj.check_in).days
@@ -22,26 +32,6 @@ class BookingSerializer(serializers.ModelSerializer):
         model = Booking
         fields = ['id', 'customer_bill', 'customer_name','room', 'room_type', 'check_in', 'check_out', 'adult_count', 'children_count', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
 
-class BookingSerializer3(serializers.ModelSerializer):
-    number_of_nights = serializers.SerializerMethodField()
-    total_cost = serializers.SerializerMethodField()
-
-
-    def get_number_of_nights(self, obj):
-        return (obj.check_out - obj.check_in).days
-
-    def get_total_cost(self, obj):
-        # Implement your logic to calculate total cost based on room_type.price and number_of_nights
-        return (obj.room_type.price + (obj.extra_guest*1500)) * self.get_number_of_nights(obj) if obj.room_type else 0
-    
-    class Meta:
-        model = Booking
-        fields = ['id', 'customer_bill', 'room_type', 'check_in', 'check_out', 'adult_count', 'children_count', 'extra_guest','number_of_nights', 'total_cost']
-
-class RoomStatusSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RoomStatus
-        fields = ['id', 'name']
 
 class BookingSerializer2(serializers.ModelSerializer):
     room_type = serializers.CharField(source='room_type.name', read_only=True)
@@ -57,11 +47,43 @@ class BookingSerializer2(serializers.ModelSerializer):
         # Implement your logic to calculate total cost based on room_type.price and number_of_nights
         return obj.room_type.price * self.get_number_of_nights(obj) if obj.room_type else 0
     
-    
     class Meta:
         model = Booking
         fields = ['id','room', 'room_type', 'room_type_id', 'check_in', 'check_out','adult_count','children_count', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
 
+
+class BookingSerializer3(serializers.ModelSerializer):
+    number_of_nights = serializers.SerializerMethodField()
+    total_cost = serializers.SerializerMethodField()
+
+    def get_number_of_nights(self, obj):
+        return (obj.check_out - obj.check_in).days
+
+    def get_total_cost(self, obj):
+        # Implement your logic to calculate total cost based on room_type.price and number_of_nights
+        return (obj.room_type.price + (obj.extra_guest*1500)) * self.get_number_of_nights(obj) if obj.room_type else 0
+    
+    class Meta:
+        model = Booking
+        fields = ['id', 'customer_bill', 'room_type', 'check_in', 'check_out', 'adult_count', 'children_count', 'extra_guest','number_of_nights', 'total_cost']
+
+
+class BookingStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BookingStatus
+        fields = '__all__'
+
+
+class RoomStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoomStatus
+        fields = ['id', 'name']
+
+
+class RoomStatusAllSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = '__all__'
 
 
 class RoomTypeSerializer(serializers.ModelSerializer):
@@ -69,10 +91,25 @@ class RoomTypeSerializer(serializers.ModelSerializer):
         model = RoomType
         fields = ['id', 'name', 'price', 'description', 'good_for', 'max_children', 'max_adult']
 
+
 class RoomTypeSerializer2(serializers.ModelSerializer):
     class Meta:
         model = RoomType
         fields = ['id', 'name']
+
+
+class RoomTypeSerializer3(serializers.ModelSerializer):
+    class Meta:
+        model = BookingStatus
+        fields = '__all__'
+
+
+class RoomAllSerializer(serializers.ModelSerializer):
+    type = RoomTypeSerializer()
+    class Meta:
+        model = Room
+        fields = '__all__'
+
 
 class RoomSerializer(serializers.ModelSerializer):
     status = RoomStatusSerializer()
@@ -80,6 +117,7 @@ class RoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = ['id', 'number', 'type', 'status']
+
 
 class RoomSerializer2(serializers.ModelSerializer):
     class Meta:
@@ -109,7 +147,6 @@ class AvailableRoomSerializer2(serializers.ModelSerializer):
         fields = ['id', 'number', 'type', 'type_id','max_children', 'max_adult','status', 'price']
         
         
-
 class CurrentRoomBookings(serializers.ModelSerializer):
     room_type = serializers.CharField(source='room_type.name', read_only=True)
 

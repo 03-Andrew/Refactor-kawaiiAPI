@@ -1,24 +1,21 @@
-from django.shortcuts import render
+from django.db.models import Sum
+from django.db.models.functions import ExtractMonth
+
 from rest_framework.views import APIView
-from rest_framework import generics
 from rest_framework.response import Response
 
-from django.db.models import F, Sum, Q, Exists, OuterRef
-from datetime import date, timedelta, datetime
-from calendar import monthrange
+from datetime import timedelta, datetime
 from collections import defaultdict
 from datetime import timedelta
 
-
+# Models
 from transactions.models import Payment
-from django.db.models.functions import ExtractMonth
-
 from bookings.models import Room
-from transactions.models import Amenities, Activity, FoodBill, Payment, ExtraItems
+from transactions.models import Amenities, Activity, Payment
 
+#Serializers
 from receptionist.serializers import PaymentSerializer
 
-# Create your views here.
     
 class GetTotalEarningsPerMonth(APIView):
     def get(self, request):

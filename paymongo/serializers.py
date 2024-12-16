@@ -1,7 +1,5 @@
 from rest_framework import serializers
 from .models import WebhookEvent
-from transactions.models import Payment
-from rest_framework.serializers import ModelSerializer
 
 class LinkSerializer(serializers.Serializer):
     billing_id = serializers.CharField()
