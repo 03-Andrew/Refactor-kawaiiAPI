@@ -1,38 +1,31 @@
 from django.http import JsonResponse
-from django.shortcuts import render
 from django.views import View
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.decorators import api_view
-from bookings.models import Booking,Room
-from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing
-
-from transactions.serializers import BillingSerialzerBase
-from .serializers import BookingsSerializer,RoomStatusListSerializer, RoomBookingListSerializer, RoomStatusSerializer,BookingsListSerializer, AmenitiesSerializer,AmenitiesAvailedSerializer, AmenitiesAvailedListSerializer, ActivitiesSerializer,ActivitiesAvailedSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
-
-from rest_framework import generics
-from django.db.models import Count, Q, F, Subquery, OuterRef
-from datetime import date
-from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.pagination import PageNumberPagination
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-from django.db import transaction
-
-
-from rest_framework import status
-
-
-from django.views.decorators.csrf import csrf_protect
-from django.utils.decorators import method_decorator
+from django.db.models import Q, F
 from django.core.mail import send_mail
 from django.conf import settings
 
+from rest_framework import generics
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.pagination import PageNumberPagination
+from rest_framework import status
+
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from django.db import transaction
+from datetime import datetime
 import requests
 import logging
-from datetime import datetime
 
+# Models
+from bookings.models import Booking,Room
+from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing
 
+# Serializers
+from transactions.serializers import ActivitiesSerializer, ActivitiesAvailedSerializer, AmenitiesSerializer, AmenitiesAvailedSerializer, BillingSerializerBase
+from .serializers import RoomStatusListSerializer, RoomBookingListSerializer,BookingsListSerializer, AmenitiesAvailedListSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
+from bookings.serializers import BookingsAllSerializer, RoomStatusAllSerializer
 # Create your views here.
 class BookingPagination(PageNumberPagination):
     page_size = 10  # You can set a default page size
@@ -169,7 +162,7 @@ class RoomListStatus(generics.ListAPIView):
     serializer_class = RoomStatusListSerializer
 
 class RoomDetailStatus(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = RoomStatusSerializer
+    serializer_class = RoomStatusAllSerializer
     primary_key = 'pk'
     queryset = Room.objects.all()
 
@@ -195,7 +188,7 @@ class BookingListApproved(generics.ListAPIView):
         return get_bookingqueryset(self.request).filter(status='2')  # Filters booking (approved only)
 
 class BookingDetailPending(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = BookingsSerializer
+    serializer_class = BookingsAllSerializer
     primary_key = 'pk'
     queryset = Booking.objects.filter(status='1')  # Filters booking (pending only)
 
@@ -343,7 +336,7 @@ class UpadtePendingBookings(APIView):
             except Booking.DoesNotExist:
                 return Response({"detail": f"Booking {booking_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
             
-            serializer = BookingsSerializer(booking, data=data, partial=True)
+            serializer = BookingsAllSerializer(booking, data=data, partial=True)
 
             if serializer.is_valid():
                 serializer.save()
@@ -357,7 +350,7 @@ class UpadtePendingBookings(APIView):
             except Billing.DoesNotExist:
                 return Response({"detail", "Billing does not exist"}, status=status.HTTP_404_NOT_FOUND)
             
-            billing_serializer = BillingSerialzerBase(billing, data=updatedBilling, partial=True)
+            billing_serializer = BillingSerializerBase(billing, data=updatedBilling, partial=True)
 
             if billing_serializer.is_valid():
                 billing_serializer.save()

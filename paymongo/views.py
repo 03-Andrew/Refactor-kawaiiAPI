@@ -1,13 +1,12 @@
-from django.views import View
+from django.conf import settings
+from django.utils import timezone
+from django.contrib.contenttypes.models import ContentType
+from django.core.mail import send_mail
+from django_eventstream import send_event
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-
-from django.db.models import Count, Q
-
-from .serializers import WebhookEventSerializer, LinkSerializer
-from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus,PaymentFor
-from .models import WebhookEvent
 
 import logging
 import requests
@@ -16,20 +15,13 @@ import hashlib
 import base64
 import threading  
 
-from django.conf import settings
-from django.utils import timezone
-from django.contrib.contenttypes.models import ContentType
-from django.core.mail import send_mail
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync        
-
-from django_eventstream import send_event
-
-
-from django.http import HttpResponse, JsonResponse
-from time import sleep
-
+# Models
+from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus,PaymentFor
 from transactions.models import Customer, Billing
+from .models import WebhookEvent
+
+# Serializers
+from .serializers import WebhookEventSerializer, LinkSerializer
 
 
 class CreateLink(APIView):

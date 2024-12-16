@@ -1,131 +1,22 @@
-from rest_framework.serializers import ModelSerializer,IntegerField, CharField, DateField, StringRelatedField, SerializerMethodField
-from bookings.models import Booking, BookingStatus, Room
-from transactions.models import Billing, Payment, Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Customer, FoodBill, AdditonalPayment
-from datetime import date
 from django.db.models.functions import TruncDate
+from rest_framework.serializers import ModelSerializer,IntegerField, CharField, StringRelatedField, SerializerMethodField
+from datetime import date
 
+from bookings.models import Booking, Room
+from transactions.models import Payment, AmenitiesAvailed, ActivitiesAvailed, FoodBill
+from transactions.serializers import AmenitiesAvailedSerializer2, BillingAllSerializer, ActivitiesSerializer, AmenitiesSerializer, ActivitiesAvailedSerializer2, FoodBillSerializer2
+from bookings.serializers import BookingStatusSerializer, RoomSerializer, RoomTypeSerializer3, BookingCountSerializer
 
-
-class CustomerSerializer2(ModelSerializer):
-    class Meta:
-        model = Customer
-        fields = ['first_name', 'last_name']
-
-class BillingSerializer(ModelSerializer):
-    customer = CustomerSerializer2()
-    
-    class Meta:
-        model = Billing
-        fields = ['customer']
-
-
-class BookingStatusSerializer(ModelSerializer):
-    class Meta:
-        model = BookingStatus
-        fields = '__all__'
-
-class RoomTypeSerializer(ModelSerializer):
-    class Meta:
-        model = BookingStatus
-        fields = '__all__'
-
-class RoomSerializer(ModelSerializer):
-    type = RoomTypeSerializer()
-    class Meta:
-        model = Room
-        fields = '__all__'
-
-class RoomStatusSerializer(ModelSerializer):
-    class Meta:
-        model = Room
-        fields = '__all__'
-
-class CustomerSerializer(ModelSerializer):
-    class Meta:
-        model = Customer
-        fields = '__all__'
-
-class BillingSerializer(ModelSerializer):
-    customer = CustomerSerializer()
-    class Meta:
-        model = Billing
-        fields = '__all__'
-
-class BookingsSerializer(ModelSerializer):
-    class Meta:
-        model = Booking
-        fields = '__all__'
-
-class BookingsSerializer2(ModelSerializer):
-    class Meta:
-        model = Booking
-        fields = ['room', 'adult_count', 'children_count']
-
-class AmenitiesSerializer(ModelSerializer):
-    class Meta:
-        model = Amenities
-        fields = '__all__'
-
-class ActivitiesSerializer(ModelSerializer):
-    class Meta:
-        model = Activity
-        fields = '__all__'
-   
-   
-class ActivitiesAvailedSerializer(ModelSerializer):
-    class Meta:
-        model = ActivitiesAvailed
-        fields = '__all__'
-    
-class ActivitiesAvailedSerializer2(ModelSerializer):
-    activity = ActivitiesSerializer()
-    class Meta:
-        model = ActivitiesAvailed
-        fields = ['id', 'hours_availed', 'activity']
-    
-class AmenitiesAvailedSerializer(ModelSerializer):
-    class Meta:
-        model = AmenitiesAvailed
-        fields = '__all__'
-        
-class AmenitiesAvailedSerializer2(ModelSerializer):
-    class Meta:
-        model = AmenitiesAvailed
-        fields = ['id', 'head_count', 'amenity']
-
-class AmenitiesAvailedSerializer3(ModelSerializer):
-    amenity = AmenitiesSerializer()
-    class Meta:
-        model = AmenitiesAvailed
-        fields = ['id', 'head_count', 'amenity']
-
-class FoodBillSerializer(ModelSerializer):
-    class Meta:
-        model = FoodBill
-        fields = '__all__'
-        
-class FoodBillSerializer2(ModelSerializer):
-    class Meta:
-        model = FoodBill
-        fields = ['id', 'price', 'or_number']
-        
-
-
-class AdditionalPaymentSerializer(ModelSerializer):
-
-    class Meta:
-        model = AdditonalPayment
-        fields = '__all__'
 
 class BookingsListSerializer(ModelSerializer):
-    customer_bill=BillingSerializer()
+    customer_bill=BillingAllSerializer()
     room_info = StringRelatedField(source='__str__', read_only=True)
     number_of_nights = SerializerMethodField()
     total_cost = SerializerMethodField()
     downpayment= SerializerMethodField()
     status = BookingStatusSerializer()
     room = RoomSerializer()
-    room_type = RoomTypeSerializer()
+    room_type = RoomTypeSerializer3()
 
 
     def get_downpayment(self, obj):
@@ -175,7 +66,7 @@ class RoomBookingListSerializer(ModelSerializer):
         return None
     
 class AmenitiesAvailedListSerializer(ModelSerializer):
-    customer_bill = BillingSerializer()
+    customer_bill = BillingAllSerializer()
     amenity= AmenitiesSerializer()
     total_cost = SerializerMethodField()
 
@@ -193,7 +84,7 @@ class AmenitiesAvailedListSerializer(ModelSerializer):
         return obj.total_cost
     
 class ActivitiesAvailedListSerializer(ModelSerializer):
-    customer_bill = BillingSerializer()
+    customer_bill = BillingAllSerializer()
     activity = ActivitiesSerializer()
     total_cost = SerializerMethodField()
     
@@ -226,8 +117,6 @@ class RoomStatusListSerializer(ModelSerializer):
         today_booking = Booking.objects.filter(room=obj, check_in__lte=date.today(), check_out__gte=date.today()).order_by('check_in').first()
         return today_booking.check_out if today_booking else None
     
-
-
 class PaymentSerializer(ModelSerializer):
     paid_for = SerializerMethodField()
     paymentFor = CharField(source="paymentFor.name")
@@ -239,7 +128,7 @@ class PaymentSerializer(ModelSerializer):
     
     def get_paid_for(self, obj):
         if isinstance(obj.paid_for, Booking):
-            return BookingsSerializer2(obj.paid_for).data
+            return BookingCountSerializer(obj.paid_for).data
         elif isinstance(obj.paid_for, AmenitiesAvailed):
             return AmenitiesAvailedSerializer2(obj.paid_for).data
         elif isinstance(obj.paid_for, ActivitiesAvailed):
