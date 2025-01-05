@@ -13,6 +13,12 @@ from rest_framework.pagination import PageNumberPagination
 from django.db import transaction
 from datetime import datetime, timedelta, date
 
+# Auth Imports
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+
 # Models
 from .models import Room, Booking, RoomType
 
@@ -499,6 +505,8 @@ class RoomPagination(PageNumberPagination):
     max_page_size = 100  # Limit for the page size
   
 class GetAvailableRoomsNow(APIView):
+    # authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
     pagination_class = RoomPagination  # Set the pagination class
 
     def get(self, request):

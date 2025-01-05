@@ -12,6 +12,12 @@ from rest_framework import status
 
 from datetime import datetime
 
+# Auth
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+
 # Models
 from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill, GuestStatus, Food, AdditonalPayment, ActivitiesAvailed
 from bookings.models import Booking
@@ -113,6 +119,8 @@ class CreatePayment(APIView):
 
         
 class ListBillingBooking(generics.ListAPIView):
+    # authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
     serializer_class = PendingBookings
     def get_queryset(self):
         queryset = Billing.objects.filter(Q(bookings__isnull=False) & Q(bookings__status__exact=1)).distinct()

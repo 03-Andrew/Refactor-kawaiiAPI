@@ -1,5 +1,8 @@
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
+
 
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -16,39 +19,42 @@ from .models import UserProfile
 # Serializers
 from .serializers import UserSerializer
 
-# Create your views here.
-@api_view(['POST'])
-def login(request):
-    userP = get_object_or_404(User, username = request.data['username'])
-    if not userP.check_password(request.data['password']):
-        return Response({"detail":'Not found'}, status=status.HTTP_404_NOT_FOUND)
-    token, created = Token.objects.get_or_create(user=userP)
-    serializer = UserSerializer(instance=userP)
-    return Response({"token":token.key, "user":serializer.data})
+# # Create your views here.
+# @api_view(['POST'])
+# def login(request):
+#     userP = get_object_or_404(User, username = request.data['username'])
+#     if not userP.check_password(request.data['password']):
+#         return Response({"detail":'Not found'}, status=status.HTTP_404_NOT_FOUND)
+#     token, created = Token.objects.get_or_create(user=userP)
+#     serializer = UserSerializer(instance=userP)
+#     return Response({"token":token.key, "user":serializer.data})
 
 
 @api_view(['POST'])  # Ensure this view only accepts POST requests
-# def login(request):
-#     username = request.data.get('username')  # Use get() to avoid MultiValueDictKeyError
-#     password = request.data.get('password')
+def login(request):
+    username = request.data.get('username')  # Use get() to avoid MultiValueDictKeyError
+    password = request.data.get('password')
     
-#     # Check if username and password are provided
-#     if not username or not password:
-#         return Response({"detail": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+    # Check if username and password are provided
+    if not username or not password:
+        return Response({"detail": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
 
-#     # Attempt to retrieve the user
-#     userP = get_object_or_404(User, username=username)
+    # Attempt to retrieve the user
+    userP = authenticate(request, username=username, password=password)
 
-#     # Check the password
-#     if not userP.check_password(password):
-#         return Response({"detail": 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+    # Check the password
+    if userP is None:
+        return Response({"detail": "Invalid credentials."},
+                        status=status.HTTP_401_UNAUTHORIZED)
+    
+    # Generate or retrieve the token
+    refresh = RefreshToken.for_user(userP)
+    access_token = str(refresh.access_token)
+    refresh_token = str(refresh)
+    serializer = UserSerializer(instance=userP)
 
-#     # Generate or retrieve the token
-#     token, created = Token.objects.get_or_create(user=userP)
-#     serializer = UserSerializer(instance=userP)
-
-#     # Return the token and user details
-#     return Response({"token": token.key, "user": serializer.data})
+    # Return the token and user details
+    return Response({"access": access_token, "refresh": refresh_token, "user": serializer.data})
 
 @api_view(['POST'])
 def signup(request):

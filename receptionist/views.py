@@ -18,6 +18,12 @@ from datetime import datetime
 import requests
 import logging
 
+# Auth Imports
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+
 # Models
 from bookings.models import Booking,Room
 from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing
@@ -434,6 +440,8 @@ class UpadtePendingBookings(APIView):
         
 
 class GetPayments(generics.ListCreateAPIView):
+    # authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
     serializer_class = PaymentSerializer
 
     def get_queryset(self): 
