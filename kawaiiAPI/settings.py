@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    'rest_framework_simplejwt',
     
     'rest_framework',
     'rest_framework.authtoken',
@@ -117,19 +119,20 @@ ASGI_APPLICATION = 'kawaiiAPI.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'cleadb.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
 # Check for DATABASE_URL environment variable
-# DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = os.environ.get("DATABASE_URL")
+print(DATABASE_URL)
 
-# if DATABASE_URL:
-#     try:
-#         DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
-#     except Exception as e:
-#         # Log the exception or handle it as needed
-#         print(f"Failed to parse DATABASE_URL: {e}")
+if DATABASE_URL:
+    try:
+        DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
+    except Exception as e:
+        # Log the exception or handle it as needed
+        print(f"Failed to parse DATABASE_URL: {e}")
 
 # DATABASES = {
 #     'default': {
@@ -248,6 +251,10 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend'
     ],
+    # 'DEFAULT_AUTHENTICATION_CLASSES': [
+    #     'rest_framework_simplejwt.authentication.JWTAuthentication',
+    #     'rest_framework.authentication.SessionAuthentication',
+    # ],
 }
 
 

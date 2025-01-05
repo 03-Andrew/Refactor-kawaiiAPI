@@ -8,6 +8,12 @@ from datetime import timedelta, datetime
 from collections import defaultdict
 from datetime import timedelta
 
+# Auth
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+
 # Models
 from transactions.models import Payment
 from bookings.models import Room
@@ -18,6 +24,8 @@ from receptionist.serializers import PaymentSerializer
 
     
 class GetTotalEarningsPerMonth(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         year = request.query_params.get('year')
 
@@ -116,6 +124,9 @@ def initialize_data(rooms, amenities, activities):
     return data 
 
 class GetDailyReport(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def get(self, request): 
         rooms = Room.objects.all()
         amenities = Amenities.objects.all()
@@ -133,6 +144,8 @@ class GetDailyReport(APIView):
         return Response(data)
 
 class GetWeeklyReport(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         rooms = Room.objects.all()
         amenities = Amenities.objects.all()
@@ -173,6 +186,8 @@ class GetWeeklyReport(APIView):
         return Response(response_data)
     
 class GetMonthlyReport(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         rooms = Room.objects.all()
         amenities = Amenities.objects.all()
@@ -225,6 +240,8 @@ class GetMonthlyReport(APIView):
         return Response(response_data)
 
 class GetYearlyReport(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         rooms = Room.objects.all()
         amenities = Amenities.objects.all()
