@@ -1,13 +1,9 @@
 from rest_framework import serializers
 
 from bookings.models import Booking
-from .models import FoodBill, AdditonalPayment, Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, BillingStatus, Food
+from .models import FoodBill, AdditonalPayment, Billing, Customer, Payment, GuestList,GuestStatus, AmenitiesAvailed, ActivitiesAvailed, PaymentFor, BillingStatus, Food
 from bookings.serializers import BookingSerializer
-
-class ActivitiesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Activity
-        fields = '__all__'
+from offerings.serializers import ActivitiesSerializer, AmenitiesSerializer
 
 class ActivitiesAvailedSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,11 +15,6 @@ class ActivitiesAvailedSerializer2(serializers.ModelSerializer):
     class Meta:
         model = ActivitiesAvailed
         fields = ['id', 'hours_availed', 'activity']
-
-class AmenitiesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Amenities
-        fields = '__all__'
 
 class AmenitiesAvailedSerializer(serializers.ModelSerializer):
     class Meta:
@@ -278,9 +269,3 @@ class BillingDetailSerializer(serializers.ModelSerializer):
     
     def get_runningBalance(self, obj):
         return obj.running_balance 
-    
-class FoodListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Food
-        fields = '__all__'
-    

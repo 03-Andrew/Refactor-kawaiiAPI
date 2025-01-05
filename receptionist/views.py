@@ -201,10 +201,6 @@ class BookingDetailPending(generics.RetrieveUpdateDestroyAPIView):
     def get_object(self):
         return generics.get_object_or_404(self.queryset, **{self.primary_key: self.kwargs['pk']})
 
-class AmenitiesList(generics.ListCreateAPIView):
-    queryset = Amenities.objects.all()
-    serializer_class = AmenitiesSerializer
-
 class AmenitiesListAvailed(generics.ListCreateAPIView):
     queryset = AmenitiesAvailed.objects.all()
 
@@ -242,10 +238,6 @@ class AmenitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AmenitiesAvailedSerializer
     primary_key = 'pk'
     queryset = AmenitiesAvailed.objects.all()
-
-class ActivitiesList(generics.ListAPIView):
-    queryset = Activity.objects.all()
-    serializer_class = ActivitiesSerializer
 
 class ActivitiesListAvailed(generics.ListCreateAPIView):
     queryset = ActivitiesAvailed.objects.all()
@@ -325,8 +317,7 @@ class AddAmenitiesAndActivitiesAvailed(APIView):
             'created_amenities': created_amenities,
             'created_activities': created_activities
         }, status=status.HTTP_201_CREATED)
-        
-        
+            
 class UpadtePendingBookings(APIView):
 
     def patch(self, request, *args, **kwargs):
@@ -438,7 +429,6 @@ class UpadtePendingBookings(APIView):
         except Exception as e:
             logging.error(f"Error sending email: {str(e)}")
         
-
 class GetPayments(generics.ListCreateAPIView):
     # authentication_classes = [JWTAuthentication]
     # permission_classes = [IsAuthenticated]

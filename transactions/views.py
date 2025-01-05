@@ -23,7 +23,7 @@ from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, Foo
 from bookings.models import Booking
 
 # Serializers
-from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerializerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer, FoodListSerializer
+from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerializerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer
 from transactions.serializers import FoodBillSerializer, AdditionalPaymentSerializer
 
 # 1. List View - for listing all Billings
@@ -56,7 +56,6 @@ class BillingUpdate(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = BillingSerializerBase
     lookup_field = 'pk' 
 
-
 class CustomerListCreate(generics.ListCreateAPIView):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
@@ -64,7 +63,6 @@ class CustomerListCreate(generics.ListCreateAPIView):
 class PaymentListCreate(generics.ListCreateAPIView):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
-
 
 class CreatePayment(APIView):
     
@@ -116,8 +114,7 @@ class CreatePayment(APIView):
                         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({"created_payments": created_payments}, status=status.HTTP_201_CREATED)
-
-        
+   
 class ListBillingBooking(generics.ListAPIView):
     # authentication_classes = [JWTAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -246,8 +243,6 @@ class UpdateGuestListStatus(APIView):
 
         return Response({"newStatus": response_data}, status=status.HTTP_200_OK)
 
-
-
 class GuestListPerBilling(generics.RetrieveUpdateDestroyAPIView):
     queryset = Billing.objects.all()
     serializer_class = BillingGuestList
@@ -256,8 +251,11 @@ class GuestListPerBilling(generics.RetrieveUpdateDestroyAPIView):
 class AddGuest(generics.ListCreateAPIView):
     queryset = GuestList.objects.all()
     serializer_class = GuestListSerializerAll
-    
-    
+
+class GetGuestStatus(generics.ListAPIView):
+    serializer_class = GuestStatusSerializer
+    queryset = GuestStatus.objects.all()
+      
 class EditGuestListStatus(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = GuestListSerializer
     queryset = GuestList.objects.all()
@@ -269,15 +267,10 @@ class ActiveBookings(generics.ListCreateAPIView):
     def get_queryset(self):
         return Billing.objects.filter(status=1)
     
-class GetGuestStatus(generics.ListAPIView):
-    serializer_class = GuestStatusSerializer
-    queryset = GuestStatus.objects.all()
-
 class BillingDetails(generics.RetrieveAPIView):
     serializer_class = BillingDetailSerializer
     queryset = Billing.objects.all()
     lookup_field = 'pk'
-
 
 class AddFoodBill(generics.ListCreateAPIView):
     serializer_class = FoodBillSerializer
@@ -290,15 +283,6 @@ class AddFoodBill(generics.ListCreateAPIView):
 class ModifyFoodBill(generics.RetrieveUpdateAPIView):
     serializer_class = FoodBillSerializer
     queryset = FoodBill.objects.all()
-    lookup_field = 'pk'
-
-class AddFoodList(generics.ListCreateAPIView):
-    serializer_class = FoodListSerializer
-    queryset = Food.objects.all()
-
-class ModifyFoodList(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = FoodListSerializer
-    queryset = Food.objects.all()
     lookup_field = 'pk'
 
 class CreateAdditionalPayments(generics.ListCreateAPIView):

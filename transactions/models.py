@@ -2,6 +2,7 @@ from django.db import models
 from django.db.models import Sum, F
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from offerings.models import Amenities, Activity, Food, FoodType, ExtraItems
 
 # Create your models here.
 class Customer(models.Model):
@@ -101,7 +102,8 @@ class GuestList(models.Model):
     
     def __str__(self):
         return f"{self.customer_bill.id} {self.guest}"
-    
+
+# Items Availed 
 class FoodBill(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.SET_NULL, null=True, related_name="food_bill")
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -113,13 +115,6 @@ class FoodBill(models.Model):
     def __str__(self):
         return f"{self.customer_bill.id} - {self.or_number}"
     
-class Amenities(models.Model):
-    amenity = models.CharField(max_length=100)
-    rate_per_head = models.DecimalField(max_digits=10, decimal_places=2)
-
-    def __str__(self):
-        return f"{self.amenity}"
-
 class AmenitiesAvailed(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="amenities_availed")
     amenity = models.ForeignKey(Amenities, on_delete=models.PROTECT, related_name="amenities_availed")
@@ -132,13 +127,6 @@ class AmenitiesAvailed(models.Model):
     def total_cost(self):
         return self.amenity.rate_per_head * self.head_count if self.amenity else 0
     
-class Activity(models.Model):
-    activity = models.CharField(max_length=100)
-    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2)
-    
-    def __str__(self):
-        return self.activity
-
 class ActivitiesAvailed(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="activities_availed")
     activity = models.ForeignKey(Activity, on_delete=models.PROTECT)
@@ -150,21 +138,13 @@ class ActivitiesAvailed(models.Model):
     @property
     def total_cost(self):
         return self.activity.hourly_rate * self.hours_availed if self.activity else 0
-
-
-class ExtraItems(models.Model):
-    item = models.CharField(max_length=100)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-
-    def __str__(self):
-        return self.item
     
 class ExtraItemsAvailed(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.CASCADE, related_name="extra_items")
     extraItem = models.ForeignKey(ExtraItems, on_delete=models.CASCADE, related_name="extra_items")
     count = models.SmallIntegerField()
 
-
+# payments 
 class AdditonalPayment(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.CASCADE, related_name="additional_payment")
     reason = models.TextField()
@@ -172,8 +152,7 @@ class AdditonalPayment(models.Model):
     
     def __str__(self):
         return f"Additonal payments for {self.customer_bill.id} - {self.customer_bill.customer.last_name}, {self.customer_bill.customer.first_name}"
-
-
+    
 class PaymentMethod(models.Model):
     mode = models.CharField(max_length=100)
     
@@ -206,15 +185,4 @@ class Payment(models.Model):
     def __str__(self):
         return f"{self.customer_bill.id} {self.date}"
     
-class FoodType(models.Model):
-    name = models.CharField(max_length=100)
-    def __str__(self):
-        return f"{self.name}"
-    
-class Food(models.Model):
-    food_type = models.ForeignKey(FoodType, on_delete=models.CASCADE, related_name='food')
-    name = models.CharField(max_length=100)
-    description = models.TextField()
-    def __str__(self):
-        return f"{self.name} {self.description}"
-    
+        
