@@ -426,7 +426,7 @@ class CreateOnlineBooking(APIView):
             # Create payment link
             payment_link_data = {
                 'billing_id': str(billing.id),
-                'payment_for': 'Down payment',
+                'payment_for': 'Down Payment',
                 'payment_status': 'Down Payment',
                 'content_type': 'booking',
                 'object_id': ','.join(booking_ids),  # Join all booking IDs
