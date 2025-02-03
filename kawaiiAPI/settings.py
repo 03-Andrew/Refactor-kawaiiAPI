@@ -265,17 +265,30 @@ GRAPH_MODELS = {
 
 # AUTH_USER_MODEL = "user.CustomUser"
 
-# PAYMONGO DETAILS
-PAYMONGO_SECRET_KEY  = os.environ.get("PAYMONGO_SECRET_KEY")
-PAYMONGO_WEBHOOK_SECRET = os.environ.get("PAYMONGO_WEBHOOK_SECRET")
-print(PAYMONGO_SECRET_KEY)
-print(PAYMONGO_WEBHOOK_SECRET)
 
-# GMAIL DETAILS
+#PAYMONGO DETAILS
+PAYMONGO_SECRET_KEY = 'sk_test_Y4Sv1NEcDmqXYmkzfVa9L5uF' 
+PAYMONGO_WEBHOOK_SECRET = "whsk_cun6XeqBp5gf23bAXttwiXGA"
+
+#GMAIL DETAILS
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_HOST_USER = 'kawaiiresort123@gmail.com'
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
-print(EMAIL_HOST_PASSWORD)
+EMAIL_HOST_PASSWORD = 'jcjm lhxg ljsg lthk'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+# # PAYMONGO DETAILS
+# PAYMONGO_SECRET_KEY  = os.environ.get("PAYMONGO_SECRET_KEY")
+# PAYMONGO_WEBHOOK_SECRET = os.environ.get("PAYMONGO_WEBHOOK_SECRET")
+# print(PAYMONGO_SECRET_KEY)
+# print(PAYMONGO_WEBHOOK_SECRET)
+
+# # GMAIL DETAILS
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_HOST_USER = 'kawaiiresort123@gmail.com'
+# EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+# print(EMAIL_HOST_PASSWORD)
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
