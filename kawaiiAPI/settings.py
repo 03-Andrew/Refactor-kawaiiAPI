@@ -124,15 +124,15 @@ DATABASES = {
 }
 
 # Check for DATABASE_URL environment variable
-DATABASE_URL = os.environ.get("DATABASE_URL")
-print(DATABASE_URL)
+# DATABASE_URL = os.environ.get("DATABASE_URL")
+# print(DATABASE_URL)
 
-if DATABASE_URL:
-    try:
-        DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
-    except Exception as e:
-        # Log the exception or handle it as needed
-        print(f"Failed to parse DATABASE_URL: {e}")
+# if DATABASE_URL:
+#     try:
+#         DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
+#     except Exception as e:
+#         # Log the exception or handle it as needed
+#         print(f"Failed to parse DATABASE_URL: {e}")
 
 # DATABASES = {
 #     'default': {

@@ -25,8 +25,8 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
 # Models
-from bookings.models import Booking,Room
-from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing
+from bookings.models import Booking,Room,BookingStatus
+from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing, BillingStatus
 
 # Serializers
 from transactions.serializers import ActivitiesSerializer, ActivitiesAvailedSerializer, AmenitiesSerializer, AmenitiesAvailedSerializer, BillingSerializerBase
@@ -327,45 +327,93 @@ class AddAmenitiesAndActivitiesAvailed(APIView):
         }, status=status.HTTP_201_CREATED)
         
         
-class UpadtePendingBookings(APIView):
-
+class UpdatePendingBookings(APIView):
     def patch(self, request, *args, **kwargs):
-        updatedRooms = request.data.get('booking', [])
-        updatedBilling = request.data.get('billing', None)
+        updated_rooms = request.data.get('booking', [])
+        updated_billing = request.data.get('billing', None)
+        print(updated_rooms)
+        print(updated_billing['status'])
 
+        # Check if billing status is cancelled
+        if updated_billing:
+            billing = self.get_billing(updated_billing['id'])
+            print(billing)
+            if isinstance(billing, Response):
+                return billing
+
+            if updated_billing['status'] == 5:
+                print("cancelled")
+                self.cancel_bookings_and_billing(billing, updated_rooms)
+                return Response({"detail": "Billing and bookings have been cancelled."}, status=status.HTTP_200_OK)
+
+        response_data = self.update_bookings(updated_rooms)
+        if isinstance(response_data, Response):
+            return response_data
+
+        billing_response = self.update_billing(updated_billing)
+        if isinstance(billing_response, Response):
+            return billing_response
+
+        billing_id = billing_response.instance.id
+        self.send_email(billing_id, response_data[-1]['id'])
+
+        return Response({"updated_rooms": response_data, 'billing': billing_response.data}, status=status.HTTP_200_OK)
+
+    def update_bookings(self, updated_rooms):
         response_data = []
-        for data in updatedRooms:
+        for data in updated_rooms:
             booking_id = data.get('id')
 
-            try:
-                booking = Booking.objects.get(id=booking_id)
-            except Booking.DoesNotExist:
-                return Response({"detail": f"Booking {booking_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
-            
-            serializer = BookingsAllSerializer(booking, data=data, partial=True)
+            booking = self.get_booking(booking_id)
+            if isinstance(booking, Response):
+                return booking
 
+            serializer = BookingsAllSerializer(booking, data=data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 response_data.append(serializer.data)
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
-        if updatedBilling:
-            try:
-                billing = Billing.objects.get(id=updatedBilling['id'])
-            except Billing.DoesNotExist:
-                return Response({"detail", "Billing does not exist"}, status=status.HTTP_404_NOT_FOUND)
-            
-            billing_serializer = BillingSerializerBase(billing, data=updatedBilling, partial=True)
+        return response_data
 
+    def update_billing(self, updated_billing):
+        if updated_billing:
+            billing = self.get_billing(updated_billing['id'])
+            if isinstance(billing, Response):
+                return billing
+
+            billing_serializer = BillingSerializerBase(billing, data=updated_billing, partial=True)
             if billing_serializer.is_valid():
                 billing_serializer.save()
+                return billing_serializer
             else:
                 return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        billing_id = billing.id  # Get the billing ID here
-        self.send_email(billing_id, booking_id)
+        return None
 
-        return Response({"updated_rooms": response_data, 'billing':billing_serializer.data}, status=status.HTTP_200_OK)
+    def get_booking(self, booking_id):
+        try:
+            return Booking.objects.get(id=booking_id)
+        except Booking.DoesNotExist:
+            return Response({"detail": f"Booking {booking_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
+    def get_billing(self, billing_id):
+        try:
+            return Billing.objects.get(id=billing_id)
+        except Billing.DoesNotExist:
+            return Response({"detail": "Billing does not exist"}, status=status.HTTP_404_NOT_FOUND)
+
+    def cancel_bookings_and_billing(self, billing_instance, bookings_data):
+        # Update billing status to cancelled
+        billing_instance.status = BillingStatus.objects.get(status='cancelled')
+        billing_instance.save()
+
+        # Update each booking status to cancelled
+        for booking_data in bookings_data:
+            booking = self.get_booking(booking_data['id'])
+            if isinstance(booking, Booking):
+                booking.status = BookingStatus.objects.get(status='cancelled')
+                # print(1, booking)
+                booking.save()
 
     def send_email(self, billing_id, booking_id):
         subject = f'Kawaii Resort: Booking Confirmed #{billing_id}'

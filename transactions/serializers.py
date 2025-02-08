@@ -132,7 +132,7 @@ class BillingGuestList(serializers.ModelSerializer):
 class BillingStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = BillingStatus
-        fields = ['status']
+        fields = '__all__'
 
 class ConfirmedBooking(BookingSerializer):
     availed_boat_transfer = serializers.SerializerMethodField()

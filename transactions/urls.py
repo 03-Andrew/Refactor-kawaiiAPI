@@ -14,7 +14,7 @@ urlpatterns = [
     path("api/payment/multiple/", views.CreatePayment.as_view(), name="create-multiple-payment"),
     
     path("api/pending-billing-list/", views.ListBillingBooking.as_view()),
-    path("api/confirmed-bookings/", views.ListConfirmedBooking.as_view()),
+    path("api/room-bookings/", views.ListConfirmedBooking.as_view()),
     path("api/booking/edit/<int:pk>", views.EditBooking.as_view()),
 
     path("api/guests/", views.GuestListView.as_view(), name="guest-list"),

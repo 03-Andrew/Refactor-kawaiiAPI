@@ -39,10 +39,10 @@ class Room(models.Model):
 
 
 class BookingStatus(models.Model):
-    name = models.CharField(max_length=50, null=True, blank=True)
+    status = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return self.status
 
 class Booking(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT,  related_name='bookings')

@@ -123,7 +123,7 @@ class ListBillingBooking(generics.ListAPIView):
     # permission_classes = [IsAuthenticated]
     serializer_class = PendingBookings
     def get_queryset(self):
-        queryset = Billing.objects.filter(Q(bookings__isnull=False) & Q(bookings__status__exact=1)).distinct()
+        queryset = Billing.objects.filter(Q(bookings__isnull=False) & Q(status_id__exact=3)).distinct()
         customer = self.request.GET.get('customer')  
         sort = self.request.GET.get('sort')
 
@@ -150,12 +150,14 @@ class ListBillingBooking(generics.ListAPIView):
 class ListConfirmedBooking(generics.ListAPIView):
     serializer_class = ConfirmedBooking
     def get_queryset(self):
+
         customer = self.request.GET.get('customer')
         booking_id = self.request.GET.get('id')
         check_in = self.request.GET.get('check_in')
         sort = self.request.GET.get('sort')
+        status = self.request.GET.get('status')
 
-        queryset = Booking.objects.filter(status=2).order_by("-check_out")
+        queryset = Booking.objects.filter(status=status).order_by("-check_out")
 
         #Filter
         if customer:

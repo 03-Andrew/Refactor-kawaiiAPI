@@ -6,14 +6,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
 
-
-
-
         # Step 1: Add inclusions
         inclusions_data = ["Free WiFi", "Air Conditioning", "TV", "Breakfast Included"]
         inclusion_objects = [Inclusions.objects.get_or_create(inclusion=incl)[0] for incl in inclusions_data]
 
-        booking_status = ["pending", "approved"]
+        booking_status = ["pending", "approved", "cancelled"]
         for status in booking_status:
             BookingStatus.objects.get_or_create(name=status)
 
