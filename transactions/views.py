@@ -23,7 +23,7 @@ from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, Foo
 from bookings.models import Booking
 
 # Serializers
-from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerializerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer, FoodListSerializer
+from .serializers import BillingStatusSerializer, BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerializerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer, FoodListSerializer
 from transactions.serializers import FoodBillSerializer, AdditionalPaymentSerializer
 
 # 1. List View - for listing all Billings
@@ -56,6 +56,10 @@ class BillingUpdate(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = BillingSerializerBase
     lookup_field = 'pk' 
 
+class BillingUpdate2(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Billing.objects.all()
+    serializer_class = BillingStatusSerializer
+    lookup_field = 'pk' 
 
 class CustomerListCreate(generics.ListCreateAPIView):
     queryset = Customer.objects.all()
