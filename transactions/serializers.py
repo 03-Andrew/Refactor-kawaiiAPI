@@ -70,7 +70,7 @@ class BillingSerializerBase(serializers.ModelSerializer):
     class Meta:
         model = Billing
         fields = "__all__"
-
+        
 class BillingAllSerializer(serializers.ModelSerializer):
     customer = CustomerSerializer()
     class Meta:
@@ -130,9 +130,12 @@ class BillingGuestList(serializers.ModelSerializer):
         return GuestListSerializer(guest_list, many=True).data
 
 class BillingStatusSerializer(serializers.ModelSerializer):
+    status = serializers.PrimaryKeyRelatedField(queryset=BillingStatus.objects.all())
+
     class Meta:
         model = BillingStatus
         fields = '__all__'
+
 
 class ConfirmedBooking(BookingSerializer):
     availed_boat_transfer = serializers.SerializerMethodField()
