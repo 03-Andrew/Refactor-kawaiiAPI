@@ -130,7 +130,7 @@ ASGI_APPLICATION = 'kawaiiAPI.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgresqDO',       # The default database name or the one you created
+        'NAME': 'db',       # The default database name or the one you created
         'USER': 'db',
         'PASSWORD': 'AVNS_DEhHo1GLw7ba8v_7fBO',
         'HOST': 'app-0ae41417-1c78-4d1b-a770-5fdc72ec3dd5-do-user-18448138-0.e.db.ondigitalocean.com',
@@ -141,12 +141,15 @@ DATABASES = {
     }
 }
 
-# if DATABASE_URL:
-#     try:S
-#         DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
-#     except Exception as e:
-#         # Log the exception or handle it as needed
-#         print(f"Failed to parse DATABASE_URL: {e}")
+# Check for DATABASE_URL environment variable
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if DATABASE_URL:
+    try:
+        DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
+    except Exception as e:
+        # Log the exception or handle it as needed
+        print(f"Failed to parse DATABASE_URL: {e}")
 
 # DATABASES = {
 #     'default': {
