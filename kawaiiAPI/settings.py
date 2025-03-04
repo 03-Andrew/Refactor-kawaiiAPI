@@ -133,7 +133,7 @@ DATABASES = {
         'NAME': 'postgresqDO',       # The default database name or the one you created
         'USER': 'db',
         'PASSWORD': 'AVNS_DEhHo1GLw7ba8v_7fBO',
-        'HOST': ' app-0ae41417-1c78-4d1b-a770-5fdc72ec3dd5-do-user-18448138-0.e.db.ondigitalocean.com',
+        'HOST': 'app-0ae41417-1c78-4d1b-a770-5fdc72ec3dd5-do-user-18448138-0.e.db.ondigitalocean.com',
         'PORT': '25060', # Default port might be different
         'OPTIONS': {
             'sslmode': 'require',
