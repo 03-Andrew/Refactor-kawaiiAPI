@@ -13,11 +13,11 @@ class Command(BaseCommand):
         for status in payment_status_data:  
             PaymentStatus.objects.get_or_create(status=status)
 
-        payment_method_data = ['cash', 'gCash', 'card']
+        payment_method_data = ['cash', 'gcash', 'card']
         for method in payment_method_data:
             PaymentMethod.objects.get_or_create(mode=method)
 
-        payment_for_data = ['Down Payment', 'Room', 'Food', 'Amenities', 'Activities']
+        payment_for_data = ['Down payment', 'Room', 'Food', 'Amenities', 'Activities']
 
         for item in payment_for_data:
             PaymentFor.objects.get_or_create(name=item)
