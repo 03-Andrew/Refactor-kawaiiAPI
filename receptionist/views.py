@@ -23,7 +23,6 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-
 # Models
 from bookings.models import Booking,Room,BookingStatus
 from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing, BillingStatus
@@ -326,7 +325,6 @@ class AddAmenitiesAndActivitiesAvailed(APIView):
             'created_activities': created_activities
         }, status=status.HTTP_201_CREATED)
         
-        
 class UpdatePendingBookings(APIView):
     def patch(self, request, *args, **kwargs):
         updated_rooms = request.data.get('booking', [])
@@ -486,10 +484,9 @@ class UpdatePendingBookings(APIView):
         except Exception as e:
             logging.error(f"Error sending email: {str(e)}")
         
-
 class GetPayments(generics.ListCreateAPIView):
-    # authentication_classes = [JWTAuthentication]
-    # permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     serializer_class = PaymentSerializer
 
     def get_queryset(self): 

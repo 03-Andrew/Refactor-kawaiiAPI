@@ -66,9 +66,16 @@ class CustomerListCreate(generics.ListCreateAPIView):
     serializer_class = CustomerSerializer
 
 class PaymentListCreate(generics.ListCreateAPIView):
-    queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
+    
+    def get_queryset(self):
+        queryset = Payment.objects.all()
+        customer = self.request.query_params.get("customer_bill")
 
+        if status:
+            queryset = queryset.filter(customer_bill=customer)
+
+        return queryset
 
 class CreatePayment(APIView):
     
@@ -96,12 +103,13 @@ class CreatePayment(APIView):
 
         for key, config in item_mapping.items():
             item_ids = selected_items.get(key, [])
+            print(item_ids)
             if item_ids:
                 content_type = ContentType.objects.get_for_model(config["model"])
                 
                 for item in item_ids:  # item_ids is expected to be a list of dicts like [{id: 9, price: 22500}, ...]
                     object_id = item['id']          # Get the id from the dict
-                    amount = item['price']          # Get the price from the dict
+                    amount = item.get('price', item.get('subtotal'))  
                     payment_data = {
                         "customer_bill": customer_bill_id,
                         "amount": amount,            # Set the amount from the price
@@ -280,6 +288,8 @@ class GetGuestStatus(generics.ListAPIView):
     queryset = GuestStatus.objects.all()
 
 class BillingDetails(generics.RetrieveAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     serializer_class = BillingDetailSerializer
     queryset = Billing.objects.all()
     lookup_field = 'pk'
