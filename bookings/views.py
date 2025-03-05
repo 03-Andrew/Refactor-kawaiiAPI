@@ -567,6 +567,9 @@ class GetBookedNow(APIView):
     
 
 
+
+
+
 '''Trash code below'''
 
 # class RoomTypes(APIView):
