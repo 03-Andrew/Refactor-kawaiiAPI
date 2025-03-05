@@ -220,7 +220,12 @@ class PaymentSerializer2(serializers.ModelSerializer):
     def get_object_name(self, obj):
         if obj.content_type and obj.object_id:
             if obj.content_type.model == 'foodbill':
-                return "Food Bill"  
+                foodBill = FoodBill.objects.filter(id=obj.object_id).first()
+                if foodBill:
+                    formatted_time = foodBill.time.strftime("%I:%M %p") if foodBill.time else "N/A"
+
+                    return f"Food Bill #{str(foodBill.or_number)}"
+            
             elif obj.content_type.model == 'booking':
                 booking = Booking.objects.filter(id=obj.object_id).first()
                 if booking and booking.room:
@@ -233,6 +238,11 @@ class PaymentSerializer2(serializers.ModelSerializer):
                 activities = ActivitiesAvailed.objects.filter(id=obj.object_id).first()
                 if activities and activities.activity:
                     return str(activities.activity) 
+            elif obj.content_type.model == 'additonalpayment':
+                additional = AdditonalPayment.objects.filter(id=obj.object_id).first()
+                print("HEYEYE", additional)
+                if additional:
+                    return str(additional.reason)
         return None 
 
 class BillingDetailSerializer(serializers.ModelSerializer):

@@ -99,6 +99,7 @@ class CreatePayment(APIView):
             "selectedActivities": {"model": ActivitiesAvailed, "payment_for_id": 5},
             "selectedAmenities": {"model": AmenitiesAvailed, "payment_for_id": 4},
             "selectedFoodBills": {"model": FoodBill, "payment_for_id": 3},
+            "selectedAdditionalPayments": {"model": AdditonalPayment, "payment_for_id": 6},
         }
 
         for key, config in item_mapping.items():
@@ -288,12 +289,11 @@ class GetGuestStatus(generics.ListAPIView):
     queryset = GuestStatus.objects.all()
 
 class BillingDetails(generics.RetrieveAPIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    # authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
     serializer_class = BillingDetailSerializer
     queryset = Billing.objects.all()
     lookup_field = 'pk'
-
 
 class AddFoodBill(generics.ListCreateAPIView):
     serializer_class = FoodBillSerializer
