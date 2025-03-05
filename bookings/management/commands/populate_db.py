@@ -17,7 +17,7 @@ class Command(BaseCommand):
         for method in payment_method_data:
             PaymentMethod.objects.get_or_create(mode=method)
 
-        payment_for_data = ['Down payment', 'Room', 'Food', 'Amenities', 'Activities']
+        payment_for_data = ['Down payment', 'Room', 'Food', 'Amenities', 'Activities', 'Additional Payment']
 
         for item in payment_for_data:
             PaymentFor.objects.get_or_create(name=item)
