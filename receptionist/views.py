@@ -418,14 +418,14 @@ class UpdatePendingBookings(APIView):
         message = ''
 
         try:
-            response = requests.get(f'http://127.0.0.1:8000/api/billing-details/{billing_id}/')
+            response = requests.get(f'https://seal-app-nvafi.ondigitalocean.app/api/billing-details/{billing_id}/')
             response.raise_for_status()
             booking_data = response.json()
         except requests.exceptions.RequestException as e:
             logging.error(f"Error fetching booking details: {str(e)}")
 
         try:
-            response = requests.get(f'http://127.0.0.1:8000/api/confirmed-bookings/?id={booking_id}')
+            response = requests.get(f'https://seal-app-nvafi.ondigitalocean.app/api/confirmed-bookings/?id={booking_id}')
             response.raise_for_status() 
             booking_data2 = response.json()
             
