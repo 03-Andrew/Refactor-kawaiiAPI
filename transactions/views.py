@@ -221,19 +221,24 @@ class EditBooking(generics.RetrieveUpdateAPIView):
     lookup_field = 'pk'
     queryset = Booking.objects.all()
     
-class GuestListView(generics.ListCreateAPIView):
-    # queryset = GuestList.objects.all()
+class GuestListView(generics.ListAPIView):
     serializer_class = GuestListSerializerAll
+
     def get_queryset(self):
         sort = self.request.GET.get('sort')
-        queryset = GuestList.objects.filter(Q(customer_bill__status__status="processing") | Q(customer_bill__status__status="confirmed"))
+        queryset = GuestList.objects.all()
         customer = self.request.GET.get('customer')
+        customer_bill = self.request.GET.get('customer_bill')
 
         if customer:
             queryset = queryset.filter(
                 Q(guest__icontains=customer) | 
                 Q(guest__icontains=customer)
             )
+
+        if customer_bill:
+            queryset = queryset.filter(customer_bill=customer_bill)
+
         return queryset
 
 class UpdateGuestListStatus(APIView):
