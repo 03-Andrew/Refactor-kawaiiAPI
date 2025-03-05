@@ -39,8 +39,8 @@ class Command(BaseCommand):
 
         activity_base_data = [
             {"activity": "Kayak", "hourly_rate": 200},
-            {"activity": "Jetski", "hourly_rate": 3000},
-            {"activity": "Delta", "hourly_rate": 1500},
+            {"activity": "Jetski", "hourly_rate": 200},
+            {"activity": "Delta", "hourly_rate": 200},
             {"activity": "Darts", "hourly_rate": 200},
             {"activity": "Billiards", "hourly_rate": 200}, 
         ]
@@ -60,9 +60,9 @@ class Command(BaseCommand):
             {"amenity": "Day Tour", "rate_per_head": 200},
             {"amenity": "Vanishing Island", "rate_per_head": 200},
             {"amenity": "Party Boat", "rate_per_head": 200},
-            {"amenity": "Pillow", "rate_per_head": 50},
-            {"amenity": "Blanket", "rate_per_head": 100},
-            {"amenity": "Towel", "rate_per_head": 50}, 
+            {"amenity": "Pillow", "rate_per_head": 200},
+            {"amenity": "Blanket", "rate_per_head": 200},
+            {"amenity": "Towel", "rate_per_head": 200}, 
             {"amenity": "Comforter", "rate_per_head": 200},
         ]
 
