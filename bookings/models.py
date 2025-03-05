@@ -67,7 +67,7 @@ class Booking(models.Model):
 
     @property
     def number_of_guests(self):
-        return self.adult_count + self.children_count
+        return self.adult_count + self.children_count + self.extra_guest
 
 
     @property

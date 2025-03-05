@@ -30,7 +30,7 @@ class BookingSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Booking
-        fields = ['id', 'customer_bill', 'customer_name','room', 'room_type', 'check_in', 'check_out', 'adult_count', 'children_count', 'number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
+        fields = ['id', 'customer_bill', 'customer_name','room', 'room_type', 'check_in', 'check_out', 'adult_count', 'children_count', 'extra_guest','number_of_guests', 'status', 'created_at', 'number_of_nights', 'total_cost']
 
 
 class BookingSerializer2(serializers.ModelSerializer):
