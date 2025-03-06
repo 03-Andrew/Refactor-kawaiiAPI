@@ -287,7 +287,7 @@ class ActiveBookings(generics.ListCreateAPIView):
     serializer_class = BillingSerializer
     
     def get_queryset(self):
-        return Billing.objects.filter(status=1)
+        return Billing.objects.filter(Q(status=1) | Q(status=4))
     
 class GetGuestStatus(generics.ListAPIView):
     serializer_class = GuestStatusSerializer
