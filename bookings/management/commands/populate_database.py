@@ -12,7 +12,7 @@ class Command(BaseCommand):
 
         booking_status = ["pending", "approved", "cancelled"]
         for status in booking_status:
-            BookingStatus.objects.get_or_create(name=status)
+            BookingStatus.objects.get_or_create(status=status)
 
         # Step 2: Add room statuses
         statuses_data = ["available", "under maintenance"]

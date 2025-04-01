@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-le41^5*zazcf%@9r2vmkip1%h#f)uba6osnt1_4-v2o9f$(bmb
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['98.84.122.71', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['98.84.122.71', 'localhost', '127.0.0.1', 'kawaii-api.vercel.app']
 
 
 # Application definition
@@ -120,7 +120,7 @@ ASGI_APPLICATION = 'kawaiiAPI.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'db2.sqlite3',
     }
 }
 # Check for DATABASE_URL environment variable
