@@ -5,7 +5,7 @@ from datetime import date
 from bookings.models import Booking, Room
 from transactions.models import Payment, AmenitiesAvailed, ActivitiesAvailed, FoodBill
 from transactions.serializers import AmenitiesAvailedSerializer2, BillingAllSerializer, ActivitiesSerializer, AmenitiesSerializer, ActivitiesAvailedSerializer2, FoodBillSerializer2
-from bookings.serializers import BookingStatusSerializer, RoomSerializer, RoomTypeSerializer3, BookingCountSerializer
+from bookings.serializers import RoomSerializer ,BookingCountSerializer
 
 
 class BookingsListSerializer(ModelSerializer):
@@ -14,9 +14,8 @@ class BookingsListSerializer(ModelSerializer):
     number_of_nights = SerializerMethodField()
     total_cost = SerializerMethodField()
     downpayment= SerializerMethodField()
-    status = BookingStatusSerializer()
+    status = CharField(source='status.name', read_only=True)
     room = RoomSerializer()
-    room_type = RoomTypeSerializer3()
 
 
     def get_downpayment(self, obj):

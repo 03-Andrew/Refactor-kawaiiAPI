@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Booking, Room, RoomType, RoomStatus, BookingStatus
+from .models import Booking, Room, RoomType, BookingStatus
         
         
 class BookingsAllSerializer(serializers.ModelSerializer):
@@ -68,40 +68,12 @@ class BookingSerializer3(serializers.ModelSerializer):
         fields = ['id', 'customer_bill', 'room_type', 'check_in', 'check_out', 'adult_count', 'children_count', 'extra_guest','number_of_nights', 'total_cost']
 
 
-class BookingStatusSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BookingStatus
-        fields = '__all__'
-
-
-class RoomStatusSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RoomStatus
-        fields = ['id', 'name']
-
-
-class RoomStatusAllSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Room
-        fields = '__all__'
 
 
 class RoomTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = RoomType
         fields = ['id', 'name', 'price', 'description', 'good_for', 'max_children', 'max_adult']
-
-
-class RoomTypeSerializer2(serializers.ModelSerializer):
-    class Meta:
-        model = RoomType
-        fields = ['id', 'name']
-
-
-class RoomTypeSerializer3(serializers.ModelSerializer):
-    class Meta:
-        model = BookingStatus
-        fields = '__all__'
 
 
 class RoomAllSerializer(serializers.ModelSerializer):
@@ -112,11 +84,14 @@ class RoomAllSerializer(serializers.ModelSerializer):
 
 
 class RoomSerializer(serializers.ModelSerializer):
-    status = RoomStatusSerializer()
-    type = RoomTypeSerializer()
+    type = RoomTypeSerializer(read_only=True)
+    type_id = serializers.PrimaryKeyRelatedField(
+        queryset=RoomType.objects.all(), source='type', write_only=True
+    )
+    is_booked = serializers.BooleanField(default=False, read_only=True)
     class Meta:
         model = Room
-        fields = ['id', 'number', 'type', 'status']
+        fields = ['id', 'number', 'type', 'type_id', 'status', 'is_booked']
 
 
 class RoomSerializer2(serializers.ModelSerializer):

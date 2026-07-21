@@ -10,12 +10,6 @@ class Inclusions(models.Model):
         return self.inclusion
 
 
-class RoomStatus(models.Model):
-    name = models.CharField(max_length=100)
-
-    def __str__(self):
-        return self.name
-
 class RoomType(models.Model):
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -27,22 +21,26 @@ class RoomType(models.Model):
 
     def __str__(self):
         return self.name
+    
+class RoomStatus(models.TextChoices):
+    AVAILABLE = 'AVAILABLE', 'Available'
+    MAINTENANCE = 'MAINTENANCE', 'Maintenance'
+
 
 class Room(models.Model):
     number = models.CharField(max_length=100, unique=True)
     type = models.ForeignKey(RoomType, on_delete=models.PROTECT, related_name="room")
-    status = models.ForeignKey(RoomStatus, on_delete=models.PROTECT, related_name="room")
-    
+    status = models.CharField(max_length=20, choices=RoomStatus.choices, default=RoomStatus.AVAILABLE)
 
     def __str__(self):
         return f"Room {self.number} - {self.type.name}"
 
 
-class BookingStatus(models.Model):
-    status = models.CharField(max_length=50, null=True, blank=True)
-
-    def __str__(self):
-        return self.status
+class BookingStatus(models.TextChoices):
+    PENDING = 'PENDING', 'Pending'
+    APPROVED = 'APPROVED', 'Approved'
+    REJECTED = 'REJECTED', 'Rejected'
+    CANCELLED = 'CANCELLED', 'Cancelled'
 
 class Booking(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT,  related_name='bookings')
@@ -53,7 +51,7 @@ class Booking(models.Model):
     adult_count = models.PositiveSmallIntegerField()
     children_count = models.PositiveSmallIntegerField(default=0)
     extra_guest =  models.PositiveSmallIntegerField(null=True, blank=True, default=0)
-    status = models.ForeignKey(BookingStatus, on_delete=models.PROTECT, related_name='bookings', default=1)
+    status = models.CharField(max_length=20, choices=BookingStatus.choices, default=BookingStatus.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
