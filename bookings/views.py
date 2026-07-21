@@ -27,8 +27,26 @@ from .serializers import BookingSerializer, RoomSerializer, AvailableRoomSeriali
 from transactions.serializers import ActivitiesAvailedSerializer, CustomerSerializer, BillingSerializerBase, AmenitiesAvailedSerializer, GuestListSerializer
 
 
+from datetime import datetime
+from django.http import JsonResponse
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+
+
 def home(request):
-    return render(request, 'base/home.html')
+    return JsonResponse({
+        'root': 'Kawaii API',
+        'time': datetime.now().isoformat(),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([])
+@authentication_classes([])
+def health_check(request):
+    return JsonResponse({
+        'status': 'ok',
+        'time': datetime.now().isoformat(),
+    })
 
 class RoomTypes(generics.ListAPIView):
     serializer_class = RoomTypeSerializer

@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
-import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 
@@ -23,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-le41^5*zazcf%@9r2vmkip1%h#f)uba6osnt1_4-v2o9f$(bmb'
+SECRET_KEY = os.environ.get("SECRET_KEY", "secret_key")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -43,12 +42,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    'rest_framework_swagger',
     'rest_framework_simplejwt',
-    
     'rest_framework',
     'rest_framework.authtoken',
+    'drf_spectacular',
     'corsheaders',
     'django_filters',
     'django_extensions',
@@ -114,65 +111,14 @@ ASGI_APPLICATION = 'kawaiiAPI.asgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
-
 # Default to SQLite
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db2.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-# Check for DATABASE_URL environment variable
-# DATABASE_URL = os.environ.get("DATABASE_URL")
-# print(DATABASE_URL)
 
-# DIGITALOCEAN DB
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'db',       # The default database name or the one you created
-#         'USER': 'db',
-#         'PASSWORD': 'AVNS_DEhHo1GLw7ba8v_7fBO',
-#         'HOST': 'app-0ae41417-1c78-4d1b-a770-5fdc72ec3dd5-do-user-18448138-0.e.db.ondigitalocean.com',
-#         'PORT': '25060', # Default port might be different
-#         'OPTIONS': {
-#             'sslmode': 'require',
-#             },
-#     }
-# }
-
-# # Check for DATABASE_URL environment variable
-# DATABASE_URL = os.environ.get("DATABASE_URL")
-
-# if DATABASE_URL:
-#     try:
-#         DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
-#     except Exception as e:
-#         # Log the exception or handle it as needed
-#         print(f"Failed to parse DATABASE_URL: {e}")
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': "postgres",
-#         'USER': "postgres.fvjdxdyzdxjgcxocbczs",
-#         'PASSWORD': "KawaiiResort2024!",
-#         'HOST': "aws-0-ap-southeast-1.pooler.supabase.com",
-#         'PORT': '6543',  # Default PostgreSQL port
-#     }
-# }
-
-# DATABASES = {
-#    'default': {
-#        'ENGINE': 'django.db.backends.postgresql',
-#        'NAME': 'postgres',
-#        'USER': 'postgres',
-#        'PASSWORD': 'postgres',
-#        'HOST': 'db',
-#        'PORT': '5432',
-#    }
-# }
 # CSRF HEHE
 CSRF_TRUSTED_ORIGINS = [
     'https://kawaii-api.vercel.app',  
@@ -181,28 +127,6 @@ CSRF_TRUSTED_ORIGINS = [
     'https://kawaii-app-nb6lb.ondigitalocean.app',     
     'https://kawaii-booking-front.vercel.app'       
 ]
-
-# CSRF_COOKIE_SECURE = True 
-# CSRF_COOKIE_HTTPONLY = False  
-# CSRF_USE_SESSIONS = False  
-# SECURE_SSL_REDIRECT = True
-
-# DATABASES = {
-#    'default': {
-#        'ENGINE': 'django.db.backends.postgresql',
-#        'NAME': 'railway',
-#        'USER': 'postgres',
-#        'PASSWORD': 'IhBdVXegOCPEExHtDjzUpOArgfBRYXsw',
-#        'HOST': 'junction.proxy.rlwy.net',
-#        'PORT': '19216',
-#    }
-# }
-
-
-# DATABASES['default'] = dj_database_url.config(
-#     conn_max_age=600,
-#     conn_health_checks=True,
-# )
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
@@ -257,8 +181,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5174",  # Add your frontend URL here
     "https://kawaii-project-front-sw7d.vercel.app",
     "https://kawaii-booking-front.vercel.app",
-    #"https://kawaii-project-front-sw7d-git-main-andreis-projects-d8ee1fa3.vercel.app/",
-
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -269,10 +191,48 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend'
     ],
+    'DEFAULT_SCHEMA_CLASS': 'kawaiiAPI.settings.AppTagAutoSchema',
     # 'DEFAULT_AUTHENTICATION_CLASSES': [
     #     'rest_framework_simplejwt.authentication.JWTAuthentication',
     #     'rest_framework.authentication.SessionAuthentication',
     # ],
+}
+
+from drf_spectacular.openapi import AutoSchema
+
+
+class AppTagAutoSchema(AutoSchema):
+    APP_TAG_MAP = {
+        'bookings': 'Bookings',
+        'transactions': 'Transactions',
+        'receptionist': 'Receptionist',
+        'user': 'Users',
+        'paymongo': 'PayMongo',
+        'reports': 'Reports',
+    }
+
+    def get_tags(self):
+        module = self.view.__module__
+        for app_key, tag in self.APP_TAG_MAP.items():
+            if app_key in module:
+                return [tag]
+        return super().get_tags()
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Kawaii API',
+    'DESCRIPTION': 'Kawaii Hotel Booking & Management API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'TAGS': [
+        {'name': 'Bookings', 'description': 'Room bookings, availability, and room management'},
+        {'name': 'Transactions', 'description': 'Billing, payments, guests, and food orders'},
+        {'name': 'Receptionist', 'description': 'Room status, pending/approved bookings, amenities, activities'},
+        {'name': 'Users', 'description': 'Authentication — login, signup, JWT tokens'},
+        {'name': 'PayMongo', 'description': 'Payment links, webhooks, and SSE events'},
+        {'name': 'Reports', 'description': 'Daily, weekly, monthly, and yearly revenue reports'},
+    ],
+    'SCHEMA_PATH_PREFIX': '/api/',
 }
 
 
@@ -285,28 +245,13 @@ GRAPH_MODELS = {
 
 
 #PAYMONGO DETAILS
-PAYMONGO_SECRET_KEY = 'sk_test_Y4Sv1NEcDmqXYmkzfVa9L5uF' 
-PAYMONGO_WEBHOOK_SECRET = "whsk_cun6XeqBp5gf23bAXttwiXGA"
+PAYMONGO_SECRET_KEY  = os.environ.get("PAYMONGO_SECRET_KEY")
+PAYMONGO_WEBHOOK_SECRET = os.environ.get("PAYMONGO_WEBHOOK_SECRET")
 
 #GMAIL DETAILS
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_HOST_USER = 'kawaiiresort123@gmail.com'
-EMAIL_HOST_PASSWORD = 'jcjm lhxg ljsg lthk'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-
-# # PAYMONGO DETAILS
-# PAYMONGO_SECRET_KEY  = os.environ.get("PAYMONGO_SECRET_KEY")
-# PAYMONGO_WEBHOOK_SECRET = os.environ.get("PAYMONGO_WEBHOOK_SECRET")
-# print(PAYMONGO_SECRET_KEY)
-# print(PAYMONGO_WEBHOOK_SECRET)
-
-# # GMAIL DETAILS
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_HOST_USER = 'kawaiiresort123@gmail.com'
-# EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
-# print(EMAIL_HOST_PASSWORD)
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.environ.get("EMAIL_HOST")
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+EMAIL_PORT = os.environ.get("EMAIL_PORT")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS") == 'True'
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND")
