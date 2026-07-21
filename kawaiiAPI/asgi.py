@@ -13,7 +13,7 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 import receptionist.routing  # Make sure this path is correct
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kawaiiAPI.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kawaiiAPI.settings.prod')
 
 django_asgi_app = get_asgi_application()
 

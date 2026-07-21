@@ -1,5 +1,7 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
+
+User = get_user_model()
 from django.contrib.auth import authenticate
 
 from rest_framework.response import Response

@@ -2,7 +2,11 @@ from django.conf import settings
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.core.mail import send_mail
-from django_eventstream import send_event
+try:
+    from django_eventstream import send_event
+except ImportError:
+    def send_event(channel, event, data):
+        pass
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
