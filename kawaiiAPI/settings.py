@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 
@@ -25,9 +28,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY", "secret_key")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "False") == 'True'
 
-ALLOWED_HOSTS = ['47.130.3.155', 'localhost', '127.0.0.1', 'kawaii-api.vercel.app']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -119,7 +122,7 @@ DATABASES = {
     }
 }
 
-# CSRF HEHE
+# CSRF
 CSRF_TRUSTED_ORIGINS = [
     'https://kawaii-api.vercel.app',  
     'http://localhost:3000', 
@@ -127,6 +130,10 @@ CSRF_TRUSTED_ORIGINS = [
     'https://kawaii-app-nb6lb.ondigitalocean.app',     
     'https://kawaii-booking-front.vercel.app'       
 ]
+# CSRF_COOKIE_SECURE = not DEBUG 
+# CSRF_COOKIE_HTTPONLY = not DEBUG  
+# CSRF_USE_SESSIONS = not DEBUG
+# SECURE_SSL_REDIRECT = not DEBUG
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
