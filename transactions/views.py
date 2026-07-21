@@ -13,7 +13,6 @@ from rest_framework import status
 from datetime import datetime
 
 # Auth
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 

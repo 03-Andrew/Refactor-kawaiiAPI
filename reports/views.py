@@ -9,7 +9,6 @@ from collections import defaultdict
 from datetime import timedelta
 
 # Auth
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 

@@ -14,7 +14,6 @@ from django.db import transaction
 from datetime import datetime, timedelta, date
 
 # Auth Imports
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
