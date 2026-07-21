@@ -1,36 +1,26 @@
 from django.contrib.auth.models import User
-from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 
-
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
-from rest_framework import status
-from rest_framework.authtoken.models import Token
+from drf_spectacular.utils import extend_schema
 
-# Models
-from .models import UserProfile
-
-# Serializers
-from .serializers import UserSerializer
-
-# # Create your views here.
-# @api_view(['POST'])
-# def login(request):
-#     userP = get_object_or_404(User, username = request.data['username'])
-#     if not userP.check_password(request.data['password']):
-#         return Response({"detail":'Not found'}, status=status.HTTP_404_NOT_FOUND)
-#     token, created = Token.objects.get_or_create(user=userP)
-#     serializer = UserSerializer(instance=userP)
-#     return Response({"token":token.key, "user":serializer.data})
+from .serializers import UserSerializer, UserAuthSerializer, UserLoginSerializer
 
 
-@api_view(['POST'])  # Ensure this view only accepts POST requests
+@extend_schema(
+    tags=['Users'],
+    description='Login with username and password. Returns JWT access and refresh tokens.',
+    request=UserLoginSerializer,
+    responses={200: {'description': 'JWT tokens + user data'}}
+)
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def login(request):
     username = request.data.get('username')  # Use get() to avoid MultiValueDictKeyError
     password = request.data.get('password')
@@ -56,38 +46,48 @@ def login(request):
     # Return the token and user details
     return Response({"access": access_token, "refresh": refresh_token, "user": serializer.data})
 
+@extend_schema(
+    tags=['Users'],
+    description='Register a new user account. Returns JWT access and refresh tokens.',
+    request=UserAuthSerializer,
+    responses={201: {'description': 'JWT tokens + user data'}},
+)
 @api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def signup(request):
-    serializer = UserSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        user = User.objects.get(username=request.data['username'])
-        user.set_password(request.data['password'])
-        user.save()
-        token = Token.objects.create(user=user)
-        return Response({"token":token.key, "user":serializer.data})
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if 'email' not in request.data or 'username' not in request.data or 'password' not in request.data:
+        return Response({"detail": "Email, username, and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+    user = User.objects.create_user(
+        username=request.data['username'],
+        password=request.data['password'],
+        email=request.data['email'],
+    )
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+        "user": UserSerializer(instance=user).data,
+    })
 
+@extend_schema(
+    tags=['Users'],
+    description='Verify JWT token is valid. Returns "passed!" if authenticated.',
+)
 @api_view(['GET'])
-@authentication_classes([SessionAuthentication, TokenAuthentication])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def test_token(request):
     return Response("passed!")
 
 
+@extend_schema(
+    tags=['Users'],
+    description='Get current authenticated user info from JWT token.',
+)
 @api_view(['GET'])
-@authentication_classes([SessionAuthentication, TokenAuthentication])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def get_user(request):
-    # Print the user to the console (for debugging purposes)
-    print(f"Authenticated user: {request.user}")
-
-    # Return the user's information as part of the response
-    user_data = {
-        "id": request.user.id,
-        "username": request.user.username,
-        "email": request.user.email,
-        # You can include other user-related fields as needed
-    }
-    
-    return Response(user_data)
+    serializer = UserSerializer(instance=request.user)
+    return Response(serializer.data)
