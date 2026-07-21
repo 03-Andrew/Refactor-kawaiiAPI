@@ -4,6 +4,21 @@ from receptionist.consumers import ReceptionistConsumer
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 
+class PublicSchemaView(SpectacularAPIView):
+    authentication_classes = []
+    permission_classes = []
+
+
+class PublicSwaggerView(SpectacularSwaggerView):
+    authentication_classes = []
+    permission_classes = []
+
+
+class PublicRedocView(SpectacularRedocView):
+    authentication_classes = []
+    permission_classes = []
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/', include('rest_framework.urls')),
@@ -14,12 +29,11 @@ urlpatterns = [
     path('', include('paymongo.urls')),
     path('', include('reports.urls')),
 
-    # Swagger / OpenAPI
-    path('schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path('schema/', PublicSchemaView.as_view(), name='schema'),
+    path('docs/', PublicSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('redoc/', PublicRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 
 websocket_urlpatterns = [
-    path('ws/receptionist/', ReceptionistConsumer.as_asgi()),  # WebSocket route
+    path('ws/receptionist/', ReceptionistConsumer.as_asgi()),
 ]

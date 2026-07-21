@@ -1,18 +1,19 @@
-from django.urls import path, include
+from django.urls import path
 from .views import CreateLink, WebhookNotif, ConfirmPayment
-from . import sse
 
-#from .views import PaymentIntentList
 
 urlpatterns = [
-    # For Link
     path('api/payment-link/', CreateLink.as_view(), name='create_link'),
-
-    # Webhook testing
-    path('api/webhook/', WebhookNotif.as_view(), name='view_webhook_notif'), #FOR TESTING
-
-    path('events/', include('django_eventstream.urls'), {'channels': ['payments']}),
-    path('test-event/', sse.trigger_payment),
+    path('api/webhook/', WebhookNotif.as_view(), name='view_webhook_notif'),
     path('confirm-payment/', ConfirmPayment.as_view()),
-
 ]
+
+try:
+    from django.urls import include
+    from . import sse
+    urlpatterns += [
+        path('events/', include('django_eventstream.urls'), {'channels': ['payments']}),
+        path('test-event/', sse.trigger_payment),
+    ]
+except ImportError:
+    pass
