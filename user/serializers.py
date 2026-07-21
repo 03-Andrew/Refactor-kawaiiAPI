@@ -3,21 +3,25 @@ from django.contrib.auth.models import User
 from .models import UserProfile
 
 
-class UserProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserProfile
-        fields = ['role']
-    
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        representation['role'] = instance.role 
-        return representation
-        
+class UserLoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+
+class UserAuthSerializer(UserLoginSerializer):
+    email = serializers.EmailField()
+
+
 class UserSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
-    class Meta(object):
+
+    class Meta:
         model = User
-        fields = ['id', 'username', 'password', 'email', 'role']
+        fields = ['id', 'username', 'email', 'role']
+        read_only_fields = fields
 
     def get_role(self, obj):
-        return obj.user_profile.role if obj.user_profile and obj.user_profile.role else None
+        try:
+            return obj.user_profile.role
+        except UserProfile.DoesNotExist:
+            return None

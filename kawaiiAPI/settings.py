@@ -219,11 +219,15 @@ class AppTagAutoSchema(AutoSchema):
     }
 
     def get_tags(self):
+        if hasattr(self.view, '_spectacular_annotation'):
+            tags = getattr(self.view._spectacular_annotation, 'tags', None)
+            if tags:
+                return tags
         module = self.view.__module__
         for app_key, tag in self.APP_TAG_MAP.items():
             if app_key in module:
                 return [tag]
-        return super().get_tags()
+        return []
 
 
 SPECTACULAR_SETTINGS = {
