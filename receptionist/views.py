@@ -29,7 +29,7 @@ from transactions.models import Amenities, AmenitiesAvailed, Activity,Activities
 # Serializers
 from transactions.serializers import ActivitiesSerializer, ActivitiesAvailedSerializer, AmenitiesSerializer, AmenitiesAvailedSerializer, BillingSerializerBase
 from .serializers import RoomStatusListSerializer, RoomBookingListSerializer,BookingsListSerializer, AmenitiesAvailedListSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
-from bookings.serializers import BookingsAllSerializer, RoomStatusAllSerializer
+from bookings.serializers import BookingsAllSerializer
 # Create your views here.
 class BookingPagination(PageNumberPagination):
     page_size = 10  # You can set a default page size
@@ -166,7 +166,7 @@ class RoomListStatus(generics.ListAPIView):
     serializer_class = RoomStatusListSerializer
 
 class RoomDetailStatus(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = RoomStatusAllSerializer
+    
     primary_key = 'pk'
     queryset = Room.objects.all()
 

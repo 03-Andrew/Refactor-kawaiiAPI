@@ -1,25 +1,34 @@
+from datetime import datetime
+
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import path, include
-from receptionist.consumers import ReceptionistConsumer
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+from receptionist.consumers import ReceptionistConsumer
 
 
-class PublicSchemaView(SpectacularAPIView):
-    authentication_classes = []
-    permission_classes = []
+def home(request):
+    return JsonResponse({
+        'root': 'Kawaii API',
+        'time': datetime.now().isoformat(),
+    })
 
 
-class PublicSwaggerView(SpectacularSwaggerView):
-    authentication_classes = []
-    permission_classes = []
-
-
-class PublicRedocView(SpectacularRedocView):
-    authentication_classes = []
-    permission_classes = []
+@api_view(['GET'])
+@permission_classes([])
+@authentication_classes([])
+def health_check(request):
+    return JsonResponse({
+        'status': 'ok',
+        'time': datetime.now().isoformat(),
+    })
 
 
 urlpatterns = [
+    path('', home, name='home'),
+    path('api/health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),
     path('api-auth/', include('rest_framework.urls')),
     path('', include('bookings.urls')),
@@ -29,9 +38,9 @@ urlpatterns = [
     path('', include('paymongo.urls')),
     path('', include('reports.urls')),
 
-    path('schema/', PublicSchemaView.as_view(), name='schema'),
-    path('docs/', PublicSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('redoc/', PublicRedocView.as_view(url_name='schema'), name='redoc'),
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 
 websocket_urlpatterns = [

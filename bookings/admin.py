@@ -35,10 +35,8 @@ class BookingAdmin(AllFieldsAdmin):
 
 # Register your models here with the custom admin class
 admin.site.register(Room, AllFieldsAdmin)
-admin.site.register(RoomStatus, AllFieldsAdmin)
 admin.site.register(RoomType, AllFieldsAdmin)
 admin.site.register(Inclusions, AllFieldsAdmin)
-admin.site.register(BookingStatus, AllFieldsAdmin)
 admin.site.register(Booking, BookingAdmin)
 
 
