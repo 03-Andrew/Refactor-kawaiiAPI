@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import datetime
 
 import requests
 from django.db import transaction
@@ -14,6 +14,10 @@ from bookings.models import Booking, BookingStatus, RoomStatus, RoomType
 from bookings.serializers import (
     BookingSerializer, BookingSerializer3, CurrentRoomBookings,
     OnlineBookingRequestSerializer,
+)
+from bookings.services.lock import (
+    acquire_room_type_lock, get_locked_count, holder_has_lock,
+    release_room_type_lock,
 )
 from transactions.models import BillingStatus, GuestStatus
 from transactions.serializers import (
@@ -266,13 +270,15 @@ class CreateOnlineBooking(APIView):
         serializer = OnlineBookingRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-
-        availability_error = self._check_availability(data['rooms'])
-        if availability_error:
-            return availability_error
+        holder_id = request.data.get('holder_id')
 
         try:
             with transaction.atomic():
+                self._lock_room_types(data['rooms'])
+                availability_error = self._check_availability(data['rooms'], holder_id)
+                if availability_error:
+                    return availability_error
+
                 customer = self._create_customer(data['customer'])
                 billing = self._create_billing(customer)
                 created_bookings = self._create_bookings(billing, data['rooms'])
@@ -282,6 +288,8 @@ class CreateOnlineBooking(APIView):
                 {'error': 'Online booking failed', 'details': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        self._release_holder_locks(data['rooms'], holder_id)
 
         response_data = {
             'customer': CustomerSerializer(customer).data,
@@ -323,7 +331,7 @@ class CreateOnlineBooking(APIView):
             created.append(serializer.data)
         return created
 
-    def _check_availability(self, rooms):
+    def _check_availability(self, rooms, holder_id=None):
         errors = []
         for room_data in rooms:
             try:
@@ -343,7 +351,17 @@ class CreateOnlineBooking(APIView):
                 & Q(status__in=[BookingStatus.APPROVED, BookingStatus.PENDING]),
             ).count()
 
-            available = total - maintenance - booked
+            db_available = total - maintenance - booked
+            try:
+                locked = get_locked_count(room_type.id, str(check_in), str(check_out))
+            except Exception:
+                locked = 0
+
+            if holder_id and holder_has_lock(room_type.id, str(check_in), str(check_out), holder_id):
+                available = db_available  # holder already claimed a slot
+            else:
+                available = db_available - locked
+
             if available <= 0:
                 errors.append(
                     f"'{room_type.name}' is fully booked for {check_in} to {check_out}"
@@ -355,6 +373,24 @@ class CreateOnlineBooking(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
         return None
+
+    def _lock_room_types(self, rooms):
+        """Acquire row-level locks on RoomType rows to serialize concurrent bookings."""
+        room_type_ids = {room['room_type'] for room in rooms}
+        list(RoomType.objects.select_for_update().filter(id__in=room_type_ids))
+
+    def _release_holder_locks(self, rooms, holder_id):
+        """Release all Redis locks held by holder_id for given rooms."""
+        if not holder_id:
+            return
+        for room in rooms:
+            try:
+                release_room_type_lock(
+                    room['room_type'], str(room['check_in']),
+                    str(room['check_out']), holder_id,
+                )
+            except Exception:
+                pass
 
     def _create_boat(self, billing, boat_list):
         tourist_added = []
@@ -402,3 +438,96 @@ class CreateOnlineBooking(APIView):
             if hasattr(e, 'response') and e.response is not None:
                 detail = e.response.json() if e.response.headers.get('content-type', '').startswith('application/json') else {'body': e.response.text[:500]}
             raise Exception(f'Payment link API failed: {detail}') from e
+
+
+class LockRoomType(APIView):
+    """Acquire a 10-minute lock on a room-type count for a date range.
+
+    Called when user selects a room type on the booking form.
+    Lock expires after 10 minutes if not consumed by CreateOnlineBooking."""
+
+    def post(self, request):
+        room_type_id = request.data.get('room_type')
+        check_in = request.data.get('check_in')
+        check_out = request.data.get('check_out')
+
+        errors = {}
+        if not room_type_id:
+            errors['room_type'] = 'This field is required.'
+        if not check_in:
+            errors['check_in'] = 'This field is required.'
+        if not check_out:
+            errors['check_out'] = 'This field is required.'
+        if errors:
+            return Response({'error': errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            room_type = RoomType.objects.get(id=room_type_id)
+        except RoomType.DoesNotExist:
+            return Response(
+                {'error': f"Room type {room_type_id} not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        total = room_type.room.count()
+        maintenance = room_type.room.filter(status=RoomStatus.MAINTENANCE).count()
+        booked = room_type.bookings.filter(
+            Q(check_in__lt=check_out)
+            & Q(check_out__gt=check_in)
+            & Q(status__in=[BookingStatus.APPROVED, BookingStatus.PENDING]),
+        ).count()
+        db_available = total - maintenance - booked
+
+        try:
+            held, holder_id = acquire_room_type_lock(
+                room_type_id, check_in, check_out,
+                max_available=db_available, ttl=600,
+            )
+        except Exception:
+            return Response(
+                {'error': 'Lock service unavailable'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not held:
+            return Response({
+                'held': False,
+                'available': db_available,
+                'message': f"'{room_type.name}' is fully booked for {check_in} to {check_out}",
+            })
+
+        return Response({
+            'held': True,
+            'holder_id': holder_id,
+            'expires_in': 600,
+            'room_type': room_type.name,
+            'check_in': check_in,
+            'check_out': check_out,
+        })
+
+
+class ReleaseRoomType(APIView):
+    """Explicitly release a room-type lock.
+
+    Called when user navigates away from booking form or closes tab."""
+
+    def post(self, request):
+        room_type_id = request.data.get('room_type')
+        check_in = request.data.get('check_in')
+        check_out = request.data.get('check_out')
+        holder_id = request.data.get('holder_id')
+
+        if not all([room_type_id, check_in, check_out, holder_id]):
+            return Response(
+                {'error': 'room_type, check_in, check_out, and holder_id are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            released = release_room_type_lock(
+                room_type_id, check_in, check_out, holder_id,
+            )
+        except Exception:
+            released = False
+
+        return Response({'released': released})
