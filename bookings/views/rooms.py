@@ -8,6 +8,7 @@ from rest_framework.response import Response
 
 from bookings.models import Booking, Room, RoomStatus, RoomType, BookingStatus
 from bookings.serializers import RoomSerializer, RoomTypeSerializer, AvailableRoomSerializer2
+from bookings.services.lock import get_locked_count
 
 ROOM_QUERY_PARAMS = [
     OpenApiParameter('check_in', type=str, description='Filter available rooms (YYYY-MM-DD)'),
@@ -130,9 +131,16 @@ class RoomTypesListView(generics.ListCreateAPIView):
         data = []
         for rt in queryset:
             serialized = self.get_serializer(rt).data
+            locked = 0
+            if check_in and check_out:
+                try:
+                    locked = get_locked_count(rt.id, check_in, check_out)
+                except Exception:
+                    pass
             serialized['total_rooms'] = rt.total_count
             serialized['booked_rooms'] = rt.booked_count
-            serialized['available_rooms'] = rt.total_count - rt.booked_count - rt.maintenance_count
+            serialized['locked_rooms'] = locked
+            serialized['available_rooms'] = rt.total_count - rt.booked_count - rt.maintenance_count - locked
             serialized['maintenance_rooms'] = rt.maintenance_count
             data.append(serialized)
         return Response(data)
