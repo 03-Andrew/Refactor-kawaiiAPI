@@ -24,7 +24,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # Models
 from bookings.models import Booking,Room,BookingStatus
-from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing, BillingStatus
+from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing
 
 # Serializers
 from transactions.serializers import ActivitiesSerializer, ActivitiesAvailedSerializer, AmenitiesSerializer, AmenitiesAvailedSerializer, BillingSerializerBase
@@ -338,7 +338,7 @@ class UpdatePendingBookings(APIView):
             if isinstance(billing, Response):
                 return billing
 
-            if updated_billing['status'] == 5:
+            if updated_billing['status'] == Billing.BillingStatus.CANCELLED:
                 print("cancelled")
                 self.cancel_bookings_and_billing(billing, updated_rooms)
                 return Response({"detail": "Billing and bookings have been cancelled."}, status=status.HTTP_200_OK)
@@ -401,7 +401,7 @@ class UpdatePendingBookings(APIView):
 
     def cancel_bookings_and_billing(self, billing_instance, bookings_data):
         # Update billing status to cancelled
-        billing_instance.status = BillingStatus.objects.get(status='cancelled')
+        billing_instance.status = Billing.BillingStatus.CANCELLED
         billing_instance.save()
 
         # Update each booking status to cancelled

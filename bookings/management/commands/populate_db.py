@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from transactions.models import Activity, Amenities, PaymentStatus, PaymentMethod, PaymentFor, GuestStatus, BillingStatus
+from transactions.models import Activity, Amenities, PaymentStatus, PaymentMethod, PaymentFor
 
 
 class Command(BaseCommand):
@@ -24,18 +24,9 @@ class Command(BaseCommand):
 
         guest_status_data = ['Not Arrived', 'In Port', 'In Boat', 'In Resort', 'In Boat (Leaving)', 'Checked Out']
 
-        for status in guest_status_data:
-            GuestStatus.objects.get_or_create(status=status)
+        # for status in guest_status_data:
+        #     GuestStatus.objects.get_or_create(status=status)
         
-        billing_status_data = ['Processing', 'Complete', 'Pending', 'Confirmed', 'Cancelled']
-
-        for status in billing_status_data:
-            billing_status, created = BillingStatus.objects.get_or_create(status=status)
-            if created:
-                print(f"Created billing status: {status}")
-            else:
-                print(f"Billing status already exists: {status}")
-
 
         activity_base_data = [
             {"activity": "Kayak", "hourly_rate": 200},

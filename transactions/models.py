@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models import Sum, F
+from django.db.models import  Sum, F
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
@@ -14,16 +14,16 @@ class Customer(models.Model):
     def __str__(self):
         return f"{self.last_name}, {self.first_name}"
 
-class BillingStatus(models.Model):
-    status = models.CharField(max_length=100)
-
-    def __str__(self):
-        return self.status
+class BillingStatus(models.TextChoices):
+    PROCESSING = 'Processing', 'Processing'
+    COMPLETE = 'Complete', 'Complete'
+    PENDING = 'Pending', 'Pending'
+    CANCELLED = 'Cancelled', 'Cancelled'
 
 class Billing(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
-    status = models.ForeignKey(BillingStatus, on_delete=models.PROTECT, default=1)
+    status = models.CharField(max_length=20, choices=BillingStatus.choices, default=BillingStatus.PROCESSING)
     
     def __str__(self):
         return f"Bill {self.id} for {self.customer}"
@@ -88,17 +88,17 @@ class Billing(models.Model):
     def guests(self):
         return [guest.guest for guest in self.guestlist_set.all()]
     
-class GuestStatus(models.Model):
-    status = models.CharField(max_length=100)
+class GuestStatus(models.TextChoices):
+    CHECKED_IN = 'CHECKED_IN', 'Checked In'
+    CHECKED_OUT = 'CHECKED_OUT', 'Checked Out'
+    PENDING = 'PENDING', 'Pending'
     
-    def __str__(self):
-        return self.status
 
 class GuestList(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT)
     guest = models.CharField(max_length=100)
-    status = models.ForeignKey(GuestStatus, on_delete=models.PROTECT)
-    
+    status = models.CharField(max_length=20, choices=GuestStatus.choices, default=GuestStatus.PENDING)
+
     def __str__(self):
         return f"{self.customer_bill.id} {self.guest}"
     

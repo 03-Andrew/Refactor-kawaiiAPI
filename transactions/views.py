@@ -18,11 +18,11 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
 # Models
-from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill, GuestStatus, Food, AdditonalPayment, ActivitiesAvailed
+from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, FoodBill, GuestStatus, Food, AdditonalPayment, ActivitiesAvailed, BillingStatus
 from bookings.models import Booking
 
 # Serializers
-from .serializers import BillingStatusSerializer, BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerializerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, GuestStatusSerializer, FoodListSerializer
+from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerializerBase, PendingBookings, BillingGuestList, GuestListSerializer, GuestListSerializerAll, BillingDetailSerializer, ConfirmedBooking, FoodListSerializer
 from transactions.serializers import FoodBillSerializer, AdditionalPaymentSerializer
 
 # 1. List View - for listing all Billings
@@ -57,7 +57,7 @@ class BillingUpdate(generics.RetrieveUpdateDestroyAPIView):
 
 class BillingUpdate2(generics.RetrieveUpdateDestroyAPIView):
     queryset = Billing.objects.all()
-    serializer_class = BillingStatusSerializer
+    serializer_class = BillingSerializerBase
     lookup_field = 'pk' 
 
 class CustomerListCreate(generics.ListCreateAPIView):
@@ -135,7 +135,7 @@ class ListBillingBooking(generics.ListAPIView):
     # permission_classes = [IsAuthenticated]
     serializer_class = PendingBookings
     def get_queryset(self):
-        queryset = Billing.objects.filter(Q(bookings__isnull=False) & Q(status_id__exact=3)).distinct()
+        queryset = Billing.objects.filter(Q(bookings__isnull=False) & Q(status=Billing.BillingStatus.PENDING)).distinct()
         customer = self.request.GET.get('customer')  
         sort = self.request.GET.get('sort')
 
@@ -286,11 +286,11 @@ class ActiveBookings(generics.ListCreateAPIView):
     serializer_class = BillingSerializer
     
     def get_queryset(self):
-        return Billing.objects.filter(Q(status=1) | Q(status=4))
+        return Billing.objects.filter(Q(status=BillingStatus.PROCESSING) | Q(status=BillingStatus.PENDING)).distinct()
     
-class GetGuestStatus(generics.ListAPIView):
-    serializer_class = GuestStatusSerializer
-    queryset = GuestStatus.objects.all()
+# class GetGuestStatus(generics.ListAPIView):
+#     serializer_class = GuestStatusSerializer
+#     queryset = GuestStatus.objects.all()
 
 class BillingDetails(generics.RetrieveAPIView):
     # authentication_classes = [JWTAuthentication]

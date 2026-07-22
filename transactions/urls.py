@@ -22,7 +22,7 @@ urlpatterns = [
     path("api/guests/add/", views.AddGuest.as_view(), name="add-guest-list"),
     path("api/guests/<int:pk>/", views.GuestListPerBilling.as_view(), name="guest-list-per-billing"),
     path("api/guests-status/edit/<int:pk>/", views.EditGuestListStatus.as_view(), name="edit-guest-list"),
-    path("api/guest-list-status/get/", views.GetGuestStatus.as_view(), name='guest-status-list'),
+    # path("api/guest-list-status/get/", views.GetGuestStatus.as_view(), name='guest-status-list'),
     path("api/guest-list-status/update/", views.UpdateGuestListStatus.as_view(), name="update-guest-list-status"),
     
     path("api/foodbill/add/", views.AddFoodBill.as_view(), name="add-food-bill"),

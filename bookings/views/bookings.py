@@ -1,20 +1,56 @@
-from datetime import datetime
+from datetime import date, datetime
 
 import requests
 from django.db import transaction
-from django.db.models import ExpressionWrapper, F, IntegerField, Q
+from django.db.models import Count, ExpressionWrapper, F, IntegerField, Q
 
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import generics, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from bookings.models import Booking
-from bookings.serializers import BookingSerializer, BookingSerializer3, CurrentRoomBookings
+from bookings.models import Booking, BookingStatus, RoomStatus, RoomType
+from bookings.serializers import (
+    BookingSerializer, BookingSerializer3, CurrentRoomBookings,
+    OnlineBookingRequestSerializer,
+)
+from transactions.models import BillingStatus, GuestStatus
 from transactions.serializers import (
     ActivitiesAvailedSerializer, AmenitiesAvailedSerializer,
     BillingSerializerBase, CustomerSerializer, GuestListSerializer,
 )
+
+ONLINE_BOOKING_EXAMPLE = {
+    "customer": {
+        "first_name": "Juan",
+        "last_name": "Dela Cruz",
+        "contact_number": "09123456789",
+        "email": "juan@example.com",
+    },
+    "rooms": [
+        {
+            "room_type": 1,
+            "check_in": "2026-08-01",
+            "check_out": "2026-08-03",
+            "adult_count": 2,
+            "children_count": 1,
+            "extra_guest": 0,
+            "price": 5000.00,
+            "number_of_guests": 3,
+        },
+    ],
+    "boat": [
+        {
+            "head_count": 3,
+            "time": "10:00",
+            "guests": ["Juan Dela Cruz", "Maria Dela Cruz", "Baby Dela Cruz"],
+        },
+    ],
+    "payment": {
+        "amount": 2500.00,
+    },
+}
 
 
 class RoomPagination(PageNumberPagination):
@@ -195,7 +231,7 @@ class CreateStayInBooking(APIView):
             datetime.fromisoformat(d.replace("Z", "+00:00")).strftime("%Y-%m-%d")
             for d in rBooking['dateRange']
         ]
-        rBooking['status'] = 2
+        rBooking['status'] = GuestStatus.PENDING
         rBooking['room'] = int(rBooking['roomNumber'])
         rBooking['room_type'] = int(rBooking['room_type'])
         rBooking['children_count'] = int(rBooking['children_count'])
@@ -203,99 +239,166 @@ class CreateStayInBooking(APIView):
 
 
 class CreateOnlineBooking(APIView):
+    @extend_schema(
+        tags=['Bookings'],
+        description='Create an online booking with customer info, room bookings, optional boat transfers, and a down-payment link.',
+        request=OnlineBookingRequestSerializer,
+        examples=[
+            OpenApiExample(
+                'Example booking',
+                value=ONLINE_BOOKING_EXAMPLE,
+                request_only=True,
+            ),
+        ],
+        responses={
+            201: {
+                'description': 'Booking created. Returns customer, billing, bookings, and payment link.',
+                'example': {
+                    'customer': {'id': 1, 'first_name': 'Juan', 'last_name': 'Dela Cruz', 'contact_number': '09123456789', 'email': 'juan@example.com'},
+                    'billing': {'id': 1, 'customer': 1, 'status': 'Pending'},
+                    'bookings': [{'id': 1, 'room_type': 1, 'check_in': '2026-08-01', 'check_out': '2026-08-03'}],
+                    'payment': {'payment_url': 'https://pay.example.com/link/abc123'},
+                },
+            },
+        },
+    )
     def post(self, request):
-        customer_data = request.data.get('customer')
-        bookings = request.data.get('rooms')
-        boat = request.data.get('boat')
-        payment_data = request.data.get('payment')
+        serializer = OnlineBookingRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-        with transaction.atomic():
-            customer_serializer = CustomerSerializer(data=customer_data)
-            if not customer_serializer.is_valid():
-                return Response(customer_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            customer = customer_serializer.save()
+        availability_error = self._check_availability(data['rooms'])
+        if availability_error:
+            return availability_error
 
-            billing_serializer = BillingSerializerBase(data={
-                'customer': customer.id,
-                'status': 3,
-            })
-            if not billing_serializer.is_valid():
-                return Response(billing_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            billing = billing_serializer.save()
+        try:
+            with transaction.atomic():
+                customer = self._create_customer(data['customer'])
+                billing = self._create_billing(customer)
+                created_bookings = self._create_bookings(billing, data['rooms'])
+                boat_ids, tourist_added = self._create_boat(billing, data.get('boat', []))
+        except Exception as e:
+            return Response(
+                {'error': 'Online booking failed', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-            created_bookings = []
-            booking_ids = []
-            for booking in bookings:
-                booking['customer_bill'] = billing.id
-                booking['room'] = ""
-                booking['status'] = 1
-                booking['total_cost'] = booking['price']
-                booking_serializer = BookingSerializer3(data=booking)
-                if booking_serializer.is_valid():
-                    b = booking_serializer.save()
-                    created_bookings.append(booking_serializer.data)
-                    booking_ids.append(str(b.id))
-                else:
-                    raise Exception(booking_serializer.errors)
-
-            tourist_added = []
-            boat_ids = []
-            if boat:
-                for availed_boat in boat:
-                    availed_boat['customer_bill'] = billing.id
-                    availed_boat['amenity'] = 1
-                    amenities_serializer = AmenitiesAvailedSerializer(data=availed_boat)
-                    if not amenities_serializer.is_valid():
-                        return Response(amenities_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-                    saved = amenities_serializer.save()
-                    boat_ids.append(saved.id)
-
-                    for tourist in availed_boat['guests']:
-                        tourist_serializer = GuestListSerializer(data={
-                            'customer_bill': billing.id,
-                            'guest': tourist,
-                            'status': 2,
-                        })
-                        tourist_serializer.is_valid(raise_exception=True)
-                        tourist_serializer.save()
-                        tourist_added.append(tourist_serializer.data)
-
-            payment_link_data = {
-                'billing_id': str(billing.id),
-                'payment_for': 'Down Payment',
-                'payment_status': 'Down Payment',
-                'content_type': 'booking',
-                'object_id': ','.join(booking_ids),
-                'amount': payment_data.get('amount', 0),
-                'description': f"Booking for customer {customer.id}",
-                'remarks': f"Booking for customer {customer.id}",
-            }
-
-            try:
-                response = requests.post(
-                    'https://seal-app-nvafi.ondigitalocean.app/api/payment-link/',
-                    json=payment_link_data,
-                )
-                if response.status_code != 200:
-                    return Response(
-                        {"error": "Payment link creation failed", "details": response.json()},
-                        status=response.status_code,
-                    )
-                payment_info = response.json()
-            except requests.RequestException as e:
-                return Response(
-                    {"error": "Failed to send request to payment API", "details": str(e)},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-
-        data = {
-            'customer': customer_serializer.data,
-            'billing': billing_serializer.data,
+        response_data = {
+            'customer': CustomerSerializer(customer).data,
+            'billing': BillingSerializerBase(billing).data,
             'bookings': created_bookings,
-            'payment': payment_info,
         }
         if boat_ids:
-            data['boat'] = boat_ids
-            data['guests'] = tourist_added
+            response_data['boat'] = boat_ids
+            response_data['guests'] = tourist_added
 
-        return Response(data, status=status.HTTP_201_CREATED)
+        return Response(response_data, status=status.HTTP_201_CREATED)
+
+    # ── helpers ────────────────────────────────────────────────
+
+    def _create_customer(self, data):
+        serializer = CustomerSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        return serializer.save()
+
+    def _create_billing(self, customer):
+        serializer = BillingSerializerBase(data={
+            'customer': customer.id,
+            'status': BillingStatus.PENDING,
+        })
+        serializer.is_valid(raise_exception=True)
+        return serializer.save()
+
+    def _create_bookings(self, billing, rooms):
+        created = []
+        for room in rooms:
+            room['customer_bill'] = billing.id
+            room['room'] = ''
+            room['status'] = BookingStatus.PENDING
+            room['total_cost'] = room['price']
+            serializer = BookingSerializer3(data=room)
+            if not serializer.is_valid():
+                raise Exception(serializer.errors)
+            serializer.save()
+            created.append(serializer.data)
+        return created
+
+    def _check_availability(self, rooms):
+        errors = []
+        for room_data in rooms:
+            try:
+                room_type = RoomType.objects.get(id=room_data['room_type'])
+            except RoomType.DoesNotExist:
+                errors.append(f"Room type {room_data['room_type']} not found")
+                continue
+
+            check_in = room_data['check_in']
+            check_out = room_data['check_out']
+
+            total = room_type.room.count()
+            maintenance = room_type.room.filter(status=RoomStatus.MAINTENANCE).count()
+            booked = room_type.bookings.filter(
+                Q(check_in__lt=check_out)
+                & Q(check_out__gt=check_in)
+                & Q(status__in=[BookingStatus.APPROVED, BookingStatus.PENDING]),
+            ).count()
+
+            available = total - maintenance - booked
+            if available <= 0:
+                errors.append(
+                    f"'{room_type.name}' is fully booked for {check_in} to {check_out}"
+                )
+
+        if errors:
+            return Response(
+                {'error': 'No availability', 'details': errors},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return None
+
+    def _create_boat(self, billing, boat_list):
+        tourist_added = []
+        boat_ids = []
+        for availed_boat in boat_list:
+            availed_boat['customer_bill'] = billing.id
+            availed_boat['amenity'] = 1
+            serializer = AmenitiesAvailedSerializer(data=availed_boat)
+            serializer.is_valid(raise_exception=True)
+            saved = serializer.save()
+            boat_ids.append(saved.id)
+
+            for tourist in availed_boat['guests']:
+                guest_serializer = GuestListSerializer(data={
+                    'customer_bill': billing.id,
+                    'guest': tourist,
+                    'status': GuestStatus.PENDING,
+                })
+                guest_serializer.is_valid(raise_exception=True)
+                guest_serializer.save()
+                tourist_added.append(guest_serializer.data)
+        return boat_ids, tourist_added
+
+    def _create_payment_link(self, billing, customer, booking_ids, payment_data):
+        payload = {
+            'billing_id': str(billing.id),
+            'payment_for': 'Down Payment',
+            'payment_status': 'Down Payment',
+            'content_type': 'booking',
+            'object_id': ','.join(booking_ids),
+            'amount': payment_data['amount'],
+            'description': f'Booking for customer {customer.id}',
+            'remarks': f'Booking for customer {customer.id}',
+        }
+        try:
+            response = requests.post(
+                'https://seal-app-nvafi.ondigitalocean.app/api/payment-link/',
+                json=payload,
+                timeout=10,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            detail = str(e)
+            if hasattr(e, 'response') and e.response is not None:
+                detail = e.response.json() if e.response.headers.get('content-type', '').startswith('application/json') else {'body': e.response.text[:500]}
+            raise Exception(f'Payment link API failed: {detail}') from e
