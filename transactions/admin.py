@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Billing, Customer, FoodBill, Amenities, AmenitiesAvailed, AdditonalPayment, GuestList, GuestStatus, Activity, ActivitiesAvailed, PaymentMethod, Payment, PaymentFor, PaymentStatus, BillingStatus, ExtraItems, ExtraItemsAvailed, Food, FoodType
+from .models import Billing, Customer, FoodBill, Amenities, AmenitiesAvailed, AdditonalPayment, GuestList, Activity, ActivitiesAvailed, PaymentMethod, Payment, PaymentFor, PaymentStatus, ExtraItems, ExtraItemsAvailed, Food, FoodType
 
 class AllFieldsAdmin(admin.ModelAdmin):
     def get_list_display(self, request):
@@ -68,13 +68,12 @@ class BookingAdmin(AllFieldsAdmin):
 
 # Register your models here.
 admin.site.register(Billing, BookingAdmin)
-admin.site.register(BillingStatus, AllFieldsAdmin)
+
 admin.site.register(Customer, AllFieldsAdmin)
 admin.site.register(FoodBill, AllFieldsAdmin)
 admin.site.register(Amenities, AllFieldsAdmin)
 admin.site.register(AmenitiesAvailed, AllFieldsAdmin)
 admin.site.register(GuestList, AllFieldsAdmin)
-admin.site.register(GuestStatus, AllFieldsAdmin)
 admin.site.register(Activity, AllFieldsAdmin)
 admin.site.register(ActivitiesAvailed, AllFieldsAdmin)
 admin.site.register(PaymentMethod, AllFieldsAdmin)

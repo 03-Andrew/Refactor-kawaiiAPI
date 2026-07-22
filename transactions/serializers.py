@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from bookings.models import Booking
-from .models import FoodBill, AdditonalPayment, Billing, Customer, Payment, GuestList,GuestStatus ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, BillingStatus, Food
+from .models import FoodBill, AdditonalPayment, Billing, Customer, Payment, GuestList ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, Food
 from bookings.serializers import BookingSerializer
 
 class ActivitiesSerializer(serializers.ModelSerializer):
@@ -101,10 +101,6 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = "__all__"
 
-class GuestStatusSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = GuestStatus
-        fields = ['id','status']
 
 class GuestListSerializer(serializers.ModelSerializer):
     class Meta:
@@ -112,7 +108,6 @@ class GuestListSerializer(serializers.ModelSerializer):
         fields = '__all__'
         
 class GuestListSerializerAll(serializers.ModelSerializer):
-    status = GuestStatusSerializer()
     class Meta:
         model = GuestList
         fields = ['id', 'customer_bill', 'guest', 'status']
@@ -128,14 +123,6 @@ class BillingGuestList(serializers.ModelSerializer):
         # Fetch and serialize the guest list associated with this Billing
         guest_list = GuestList.objects.filter(customer_bill=obj)
         return GuestListSerializer(guest_list, many=True).data
-
-class BillingStatusSerializer(serializers.ModelSerializer):
-    status = serializers.PrimaryKeyRelatedField(queryset=BillingStatus.objects.all())
-
-    class Meta:
-        model = BillingStatus
-        fields = '__all__'
-
 
 class ConfirmedBooking(BookingSerializer):
     availed_boat_transfer = serializers.SerializerMethodField()
@@ -160,7 +147,7 @@ class PendingBookings(serializers.ModelSerializer):
     availed_boat_transfer = serializers.SerializerMethodField()
     booking_payment = serializers.SerializerMethodField()
     total_booking_bill = serializers.SerializerMethodField()
-    status = BillingStatusSerializer()
+    status = serializers.CharField(source='get_status_display', read_only=True)
     total_guests = serializers.SerializerMethodField()
     class Meta:
         model = Billing

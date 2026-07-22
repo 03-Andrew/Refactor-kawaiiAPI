@@ -11,6 +11,6 @@ urlpatterns = [
     # path('api/booking/', bookings.BookingListCreate.as_view(), name='booking'),
     # path('api/booking/current/', bookings.GetBookedRoomsNow.as_view(), name='booked_rooms_now'),
     # path('api/create-stayin-booking/', bookings.CreateStayInBooking.as_view(), name='create_stayin_booking'),
-    path('api/create-online-booking/', bookings.CreateOnlineBooking.as_view(), name='create_online_booking'),
+    path('api/bookings/online', bookings.CreateOnlineBooking.as_view(), name='create_online_booking'),
     # path('api/create-daytour-guest/', bookings.CreateDayTourGuest.as_view(), name='create_day_tour'),
 ]

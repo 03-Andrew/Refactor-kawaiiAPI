@@ -1,5 +1,78 @@
+from datetime import date
+
 from rest_framework import serializers
+
 from .models import Booking, Room, RoomType, BookingStatus
+
+
+# ── Online Booking Request Schemas ──────────────────────────────
+
+class OnlineBookingCustomerSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=100, help_text="Customer's first name")
+    last_name = serializers.CharField(max_length=100, help_text="Customer's last name")
+    contact_number = serializers.CharField(max_length=11, help_text="11-digit contact number")
+    email = serializers.EmailField(help_text="Customer's email address")
+
+    class Meta:
+        ref_name = "OnlineBookingCustomer"
+
+
+class OnlineBookingRoomSerializer(serializers.Serializer):
+    room_type = serializers.IntegerField(help_text="Room type ID")
+    check_in = serializers.DateField(help_text="Check-in date (YYYY-MM-DD)")
+    check_out = serializers.DateField(help_text="Check-out date (YYYY-MM-DD)")
+    adult_count = serializers.IntegerField(min_value=1, help_text="Number of adults")
+    children_count = serializers.IntegerField(default=0, min_value=0, help_text="Number of children")
+    extra_guest = serializers.IntegerField(default=0, min_value=0, help_text="Extra guests beyond room capacity")
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, help_text="Total price for this room booking")
+    number_of_guests = serializers.IntegerField(min_value=1, help_text="Total guest count")
+
+    class Meta:
+        ref_name = "OnlineBookingRoom"
+
+    def validate_room_type(self, value):
+        if not RoomType.objects.filter(id=value).exists():
+            raise serializers.ValidationError(f"Room type {value} does not exist.")
+        return value
+
+    def validate(self, data):
+        today = date.today()
+        check_in = data['check_in']
+        check_out = data['check_out']
+
+        if check_in < today:
+            raise serializers.ValidationError({'check_in': 'Check-in date cannot be in the past.'})
+        if check_out <= check_in:
+            raise serializers.ValidationError({'check_out': 'Check-out must be after check-in.'})
+        return data
+
+
+class OnlineBookingBoatSerializer(serializers.Serializer):
+    head_count = serializers.IntegerField(min_value=1, help_text="Number of guests boarding the boat")
+    time = serializers.TimeField(required=False, default="10:00", help_text="Boat departure time (HH:MM)")
+    guests = serializers.ListField(
+        child=serializers.CharField(), help_text="List of guest names for boat transfer"
+    )
+
+    class Meta:
+        ref_name = "OnlineBookingBoat"
+
+
+class OnlineBookingPaymentSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2, help_text="Down payment amount")
+
+    class Meta:
+        ref_name = "OnlineBookingPayment"
+
+
+class OnlineBookingRequestSerializer(serializers.Serializer):
+    customer = OnlineBookingCustomerSerializer(help_text="Customer information")
+    rooms = OnlineBookingRoomSerializer(many=True, help_text="Room bookings (one or more)")
+    boat = OnlineBookingBoatSerializer(many=True, required=False, help_text="Optional boat transfers")
+    payment = OnlineBookingPaymentSerializer(help_text="Payment details")
+
+    class Meta:
+        ref_name = "OnlineBookingRequest"
         
         
 class BookingsAllSerializer(serializers.ModelSerializer):
