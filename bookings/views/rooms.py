@@ -7,7 +7,7 @@ from rest_framework import generics
 from rest_framework.response import Response
 
 from bookings.models import Booking, Room, RoomStatus, RoomType, BookingStatus
-from bookings.serializers import RoomSerializer, RoomTypeSerializer, AvailableRoomSerializer2
+from bookings.serializers import RoomSerializer, RoomTypeSerializer
 from bookings.services.lock import get_locked_count
 
 ROOM_QUERY_PARAMS = [

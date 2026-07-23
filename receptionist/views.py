@@ -29,7 +29,7 @@ from transactions.models import Amenities, AmenitiesAvailed, Activity,Activities
 # Serializers
 from transactions.serializers import ActivitiesSerializer, ActivitiesAvailedSerializer, AmenitiesSerializer, AmenitiesAvailedSerializer, BillingSerializerBase
 from .serializers import RoomStatusListSerializer, RoomBookingListSerializer,BookingsListSerializer, AmenitiesAvailedListSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
-from bookings.serializers import BookingsAllSerializer
+from bookings.serializers import BookingSerializer
 # Create your views here.
 class BookingPagination(PageNumberPagination):
     page_size = 10  # You can set a default page size
@@ -192,9 +192,13 @@ class BookingListApproved(generics.ListAPIView):
         return get_bookingqueryset(self.request).filter(status='2')  # Filters booking (approved only)
 
 class BookingDetailPending(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = BookingsAllSerializer
+    serializer_class = BookingSerializer
     primary_key = 'pk'
-    queryset = Booking.objects.filter(status='1')  # Filters booking (pending only)
+    queryset = Booking.objects.select_related(
+        'customer_bill__customer',
+        'room',
+        'room_type',
+    ).filter(status=BookingStatus.PENDING)
 
     def get_object(self):
         return generics.get_object_or_404(self.queryset, **{self.primary_key: self.kwargs['pk']})
@@ -365,7 +369,7 @@ class UpdatePendingBookings(APIView):
             if isinstance(booking, Response):
                 return booking
 
-            serializer = BookingsAllSerializer(booking, data=data, partial=True)
+            serializer = BookingSerializer(booking, data=data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 response_data.append(serializer.data)

@@ -11,6 +11,10 @@ class Customer(models.Model):
     email = models.EmailField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
     def __str__(self):
         return f"{self.last_name}, {self.first_name}"
 
@@ -31,19 +35,6 @@ class Billing(models.Model):
     def total_booking_cost(self):
         # Calculate total cost for all related bookings
         return sum(booking.total_cost for booking in self.bookings.all())
-
-    # def total_food_bill(self):
-    #     return sum(foodbill.price for foodbill in self.foodbill_set.all())
-    
-    # def total_amenities(self):
-    #     return self.amenitiesavailed_set.aggregate(
-    #         total=Sum(F('head_count') * F('amenity__rate_per_head'))
-    #     )['total'] or 0
-
-    # def total_activities(self):
-    #     return self.activitiesavailed_set.aggregate(
-    #         total=Sum(F('hours_availed') * F('activity__hourly_rate'))
-    #     )['total'] or 0
 
     def total_food_bill(self):
         # Calculate total food bill on the database side

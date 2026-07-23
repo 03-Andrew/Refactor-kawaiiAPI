@@ -32,9 +32,7 @@ SUBMIT_BODY = {
             "number_of_guests": 2,
         },
     ],
-    "payment": {
-        "amount": 5000.00,
-    },
+    "payment": 5000.00,
 }
 
 results = {"success": 0, "conflict": 0, "error": 0}
