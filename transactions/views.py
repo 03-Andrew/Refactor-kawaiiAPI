@@ -135,7 +135,13 @@ class ListBillingBooking(generics.ListAPIView):
     # permission_classes = [IsAuthenticated]
     serializer_class = PendingBookings
     def get_queryset(self):
-        queryset = Billing.objects.filter(Q(bookings__isnull=False) & Q(status=Billing.BillingStatus.PENDING)).distinct()
+        queryset = Billing.objects.filter(
+            Q(bookings__isnull=False) & Q(status=Billing.BillingStatus.PENDING)
+        ).prefetch_related(
+            'bookings__customer_bill__customer',
+            'bookings__room',
+            'bookings__room_type',
+        ).select_related('customer').distinct()
         customer = self.request.GET.get('customer')  
         sort = self.request.GET.get('sort')
 
@@ -169,7 +175,11 @@ class ListConfirmedBooking(generics.ListAPIView):
         sort = self.request.GET.get('sort')
         status = self.request.GET.get('status')
 
-        queryset = Booking.objects.filter(status=status).order_by("-check_out")
+        queryset = Booking.objects.select_related(
+            'customer_bill__customer',
+            'room',
+            'room_type',
+        ).filter(status=status).order_by("-check_out")
 
         #Filter
         if customer:
@@ -218,7 +228,11 @@ class ListConfirmedBooking(generics.ListAPIView):
 class EditBooking(generics.RetrieveUpdateAPIView):
     serializer_class = ConfirmedBooking
     lookup_field = 'pk'
-    queryset = Booking.objects.all()
+    queryset = Booking.objects.select_related(
+        'customer_bill__customer',
+        'room',
+        'room_type',
+    )
     
 class GuestListView(generics.ListAPIView):
     serializer_class = GuestListSerializerAll
@@ -296,7 +310,11 @@ class BillingDetails(generics.RetrieveAPIView):
     # authentication_classes = [JWTAuthentication]
     # permission_classes = [IsAuthenticated]
     serializer_class = BillingDetailSerializer
-    queryset = Billing.objects.all()
+    queryset = Billing.objects.prefetch_related(
+        'bookings__customer_bill__customer',
+        'bookings__room',
+        'bookings__room_type',
+    ).select_related('customer')
     lookup_field = 'pk'
 
 class AddFoodBill(generics.ListCreateAPIView):

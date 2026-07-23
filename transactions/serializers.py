@@ -14,6 +14,7 @@ class ActivitiesAvailedSerializer(serializers.ModelSerializer):
         model = ActivitiesAvailed
         fields = '__all__'
 
+# Dupe
 class ActivitiesAvailedSerializer2(serializers.ModelSerializer):
     activity = ActivitiesSerializer()
     class Meta:
@@ -30,11 +31,13 @@ class AmenitiesAvailedSerializer(serializers.ModelSerializer):
         model = AmenitiesAvailed
         fields = '__all__'
 
+# Dupe
 class AmenitiesAvailedSerializer2(serializers.ModelSerializer):
     class Meta:
         model = AmenitiesAvailed
         fields = ['id', 'head_count', 'amenity']
 
+# Dupe
 class AmenitiesAvailedSerializer3(serializers.ModelSerializer):
     amenity = AmenitiesSerializer()
     class Meta:
@@ -46,6 +49,7 @@ class FoodBillSerializer(serializers.ModelSerializer):
         model = FoodBill
         fields = '__all__'
 
+# Dupe
 class FoodBillSerializer2(serializers.ModelSerializer):
     class Meta:
         model = FoodBill
@@ -61,6 +65,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = '__all__'
 
+# Dupe
 class CustomerSerializer2(serializers.ModelSerializer):
     class Meta:
         model = Customer
