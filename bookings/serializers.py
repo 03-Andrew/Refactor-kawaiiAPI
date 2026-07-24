@@ -3,7 +3,7 @@ from datetime import date
 from rest_framework import serializers
 
 from .models import Booking, Room, RoomType
-
+from transactions.models import AmenitiesAvailed
 
 class BookingCustomerSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=100)
@@ -126,6 +126,16 @@ class BookingSerializer(serializers.ModelSerializer):
             'number_of_nights', 'total_cost',
         ]
         read_only_fields = ['created_at']
+
+        def get_availed_boat_transfer(self, obj):
+        # Get the AmenitiesAvailed object with 'boat transfer' amenity
+            boat_transfer = AmenitiesAvailed.objects.filter(
+                customer_bill=obj.customer_bill, amenity__amenity='boat transfer'
+            ).first()
+            
+            # If the boat transfer exists, return the time; otherwise return None
+            return boat_transfer.time if boat_transfer else "Not Availed"
+
 
 class RoomTypeSerializer(serializers.ModelSerializer):
     class Meta:

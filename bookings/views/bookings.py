@@ -1,30 +1,31 @@
 import requests
 from django.db import transaction
-from django.db.models import Count, Q
 import os
 from dotenv import load_dotenv
 
 from drf_spectacular.utils import OpenApiExample, extend_schema
-from rest_framework import status
+from rest_framework import generics, serializers, status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from bookings.models import BookingStatus, RoomStatus, RoomType
+from bookings.models import Booking
 from bookings.serializers import (
+    BookingSerializer,
     DayTourRequestSerializer,
     OnlineBookingRequestSerializer,
     OnsiteBookingRequestSerializer,
 )
+from bookings.services.availability import get_room_type_available
 from bookings.services.lock import (
-    acquire_room_type_lock, get_locked_count, holder_has_lock,
-    release_room_type_lock,
+    acquire_room_type_lock, release_room_type_lock,
 )
 from transactions.models import BillingStatus, GuestStatus, ActivitiesAvailed, AmenitiesAvailed, GuestList
 from transactions.serializers import (
     ActivitiesAvailedSerializer, AmenitiesAvailedSerializer,
     BillingSerializerBase, CustomerSerializer, GuestListSerializer,
 )
-from mixins import BillingCreationMixin, BookingCreateMixin
+from ..mixins import BillingCreationMixin, BookingCreateMixin
 load_dotenv()
 
 
@@ -146,8 +147,8 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
         booking_data = []
         for room in data['booking']:
             booking_data.append({
-                'check_in': room['check_in'].isoformat(),
-                'check_out': room['check_out'].isoformat(),
+                'check_in': room['check_in'],
+                'check_out': room['check_out'],
                 'room_type': room['room_type'],
                 'room': room['room_number'],
                 'adult_count': room['adult_count'],
@@ -168,6 +169,12 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
                 )
                 created_bookings = self._create_bookings(billing, booking_data, assign_room=True)
 
+        except serializers.ValidationError as e:
+            self._release_holder_locks(booking_data, holder_id)
+            return Response(
+                {'error': 'Validation failed', 'details': e.detail},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except Exception as e:
             return Response(
                 {'error': 'Booking failed', 'details': str(e)},
@@ -234,6 +241,12 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
                 billing = self._create_billing(customer)
                 created_bookings = self._create_bookings(billing, data['rooms'])
                 boat_ids, tourist_added = self._create_boat(billing, data.get('boat', []))
+        except serializers.ValidationError as e:
+            self._release_holder_locks(data['rooms'], holder_id)
+            return Response(
+                {'error': 'Validation failed', 'details': e.detail},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except Exception as e:
             return Response(
                 {'error': 'Online booking failed', 'details': str(e)},
@@ -314,12 +327,157 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
                 detail = e.response.json() if e.response.headers.get('content-type', '').startswith('application/json') else {'body': e.response.text[:500]}
             raise Exception(f'Payment link API failed: {detail}') from e
 
+class BookingPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'limit'
+    max_page_size = 100
+
+
+class ListBookings(generics.ListAPIView):
+    serializer_class = BookingSerializer
+    pagination_class = BookingPagination
+
+    @extend_schema(
+        tags=['Bookings'],
+        description='List all bookings with optional filters.',
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        qs = Booking.objects.select_related(
+            'customer_bill__customer', 'room_type', 'room',
+        ).all()
+
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        room_type = self.request.query_params.get('room_type')
+        if room_type:
+            qs = qs.filter(room_type_id=room_type)
+
+        room = self.request.query_params.get('room')
+        if room:
+            qs = qs.filter(room_id=room)
+
+        check_in_from = self.request.query_params.get('check_in_from')
+        if check_in_from:
+            qs = qs.filter(check_in__gte=check_in_from)
+
+        check_in_to = self.request.query_params.get('check_in_to')
+        if check_in_to:
+            qs = qs.filter(check_in__lte=check_in_to)
+
+        check_out_from = self.request.query_params.get('check_out_from')
+        if check_out_from:
+            qs = qs.filter(check_out__gte=check_out_from)
+
+        check_out_to = self.request.query_params.get('check_out_to')
+        if check_out_to:
+            qs = qs.filter(check_out__lte=check_out_to)
+
+        billing = self.request.query_params.get('customer_bill')
+        if billing:
+            qs = qs.filter(customer_bill_id=billing)
+
+        return qs.order_by('-created_at')
+
+
+class EditBooking(APIView):
+    @extend_schema(
+        tags=['Bookings'],
+        description='Get a single booking by ID.',
+    )
+    def get(self, request, pk):
+        try:
+            booking = Booking.objects.select_related(
+                'customer_bill__customer', 'room_type', 'room',
+            ).get(pk=pk)
+        except Booking.DoesNotExist:
+            return Response(
+                {'error': 'Booking not found'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(BookingSerializer(booking).data)
+
+    @extend_schema(
+        tags=['Bookings'],
+        description='Edit a booking. Re-checks availability when dates or room type change.',
+        request=BookingSerializer,
+    )
+    def patch(self, request, pk):
+        try:
+            booking = Booking.objects.select_related(
+                'customer_bill__customer', 'room_type',
+            ).get(pk=pk)
+        except Booking.DoesNotExist:
+            return Response(
+                {'error': 'Booking not found'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = BookingSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        new_room_type = data.get('room_type', booking.room_type)
+        new_check_in = data.get('check_in', booking.check_in)
+        new_check_out = data.get('check_out', booking.check_out)
+
+        dates_changed = (
+            'check_in' in data
+            or 'check_out' in data
+            or 'room_type' in data
+        )
+
+        if dates_changed:
+            rt_id = new_room_type.id if hasattr(new_room_type, 'id') else new_room_type
+            availability_error = self._check_edit_availability(
+                rt_id, new_check_in, new_check_out, booking.id,
+            )
+            if availability_error:
+                return availability_error
+
+        for field, value in data.items():
+            setattr(booking, field, value)
+        booking.save()
+
+        booking.refresh_from_db()
+        return Response(
+            BookingSerializer(booking).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def _check_edit_availability(self, room_type_id, check_in, check_out, exclude_id):
+        available, detail = get_room_type_available(
+            room_type_id, check_in, check_out, exclude_booking_id=exclude_id,
+        )
+        if detail.get('error'):
+            return Response(
+                {'error': detail['error']},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not available:
+            return Response({
+                'error': 'No availability',
+                'details': [
+                    f"'{detail['name']}' is fully booked for {check_in} to {check_out}"
+                ],
+            }, status=status.HTTP_409_CONFLICT)
+        return None
+
+
 class LockRoomType(APIView):
     """Acquire a 10-minute lock on a room-type count for a date range.
 
     Called when user selects a room type on the booking form.
     Lock expires after 10 minutes if not consumed by CreateOnlineBooking."""
 
+    @extend_schema(
+        tags=['Bookings'],
+        description='Acquire a 10-minute lock on a room-type for a date range.',
+    )
     def post(self, request):
         room_type_id = request.data.get('room_type')
         check_in = request.data.get('check_in')
@@ -335,22 +493,14 @@ class LockRoomType(APIView):
         if errors:
             return Response({'error': errors}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            room_type = RoomType.objects.get(id=room_type_id)
-        except RoomType.DoesNotExist:
+        available, detail = get_room_type_available(room_type_id, check_in, check_out)
+        if detail.get('error'):
             return Response(
-                {'error': f"Room type {room_type_id} not found"},
+                {'error': detail['error']},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        total = room_type.room.count()
-        maintenance = room_type.room.filter(status=RoomStatus.MAINTENANCE).count()
-        booked = room_type.bookings.filter(
-            Q(check_in__lt=check_out)
-            & Q(check_out__gt=check_in)
-            & Q(status__in=[BookingStatus.APPROVED, BookingStatus.PENDING]),
-        ).count()
-        db_available = total - maintenance - booked
+        db_available = detail['db_available']
 
         try:
             held, holder_id = acquire_room_type_lock(
@@ -367,14 +517,14 @@ class LockRoomType(APIView):
             return Response({
                 'held': False,
                 'available': db_available,
-                'message': f"'{room_type.name}' is fully booked for {check_in} to {check_out}",
+                'message': f"'{detail['name']}' is fully booked for {check_in} to {check_out}",
             })
 
         return Response({
             'held': True,
             'holder_id': holder_id,
             'expires_in': 600,
-            'room_type': room_type.name,
+            'room_type': detail['name'],
             'check_in': check_in,
             'check_out': check_out,
         })
@@ -384,6 +534,10 @@ class ReleaseRoomType(APIView):
 
     Called when user navigates away from booking form or closes tab."""
 
+    @extend_schema(
+        tags=['Bookings'],
+        description='Release a previously acquired room-type lock.',
+    )
     def post(self, request):
         room_type_id = request.data.get('room_type')
         check_in = request.data.get('check_in')
