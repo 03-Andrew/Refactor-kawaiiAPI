@@ -106,13 +106,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = "__all__"
 
-
 class GuestListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = GuestList
-        fields = '__all__'
-        
-class GuestListSerializerAll(serializers.ModelSerializer):
     class Meta:
         model = GuestList
         fields = ['id', 'customer_bill', 'guest', 'status']
@@ -128,72 +122,6 @@ class BillingGuestList(serializers.ModelSerializer):
         # Fetch and serialize the guest list associated with this Billing
         guest_list = GuestList.objects.filter(customer_bill=obj)
         return GuestListSerializer(guest_list, many=True).data
-
-class ConfirmedBooking(BookingSerializer):
-    availed_boat_transfer = serializers.SerializerMethodField()
-    room_type = serializers.CharField(source='room_type.name')
-
-    class Meta:
-        model = Booking
-        fields = '__all__'
-    
-    def get_availed_boat_transfer(self, obj):
-    # Get the AmenitiesAvailed object with 'boat transfer' amenity
-        boat_transfer = AmenitiesAvailed.objects.filter(
-            customer_bill=obj.customer_bill, amenity__amenity='boat transfer'
-        ).first()
-        
-        # If the boat transfer exists, return the time; otherwise return None
-        return boat_transfer.time if boat_transfer else "Not Availed"
-
-class PendingBookings(serializers.ModelSerializer):
-    customer = CustomerSerializer()
-    booking = BookingSerializer(many=True, read_only=True, source='bookings')
-    availed_boat_transfer = serializers.SerializerMethodField()
-    booking_payment = serializers.SerializerMethodField()
-    total_booking_bill = serializers.SerializerMethodField()
-    status = serializers.CharField(source='get_status_display', read_only=True)
-    total_guests = serializers.SerializerMethodField()
-    class Meta:
-        model = Billing
-        fields = ['id', 'customer', 'booking', 'total_guests','total_booking_bill', 'availed_boat_transfer', 'booking_payment', 'status']
-
-    
-    def get_availed_boat_transfer(self, obj):
-    # Get the AmenitiesAvailed object with 'boat transfer' amenity
-        boat_transfer = AmenitiesAvailed.objects.filter(
-            customer_bill=obj, amenity__amenity='boat transfer'
-        ).first()
-        
-        # If the boat transfer exists, return the time; otherwise return None
-        return boat_transfer.time if boat_transfer else "Not Availed"
-
-    def get_booking_payment(self, obj):
-        # Get the 'Down Payment' PaymentFor instance
-        downpayment_payment_for = PaymentFor.objects.filter(name__iexact='Down Payment').first()
-
-        if downpayment_payment_for:
-            # Retrieve the first Payment linked to this Billing that is for down payment
-            payment = obj.payment.filter(paymentFor=downpayment_payment_for).first()  
-            
-            if payment:
-                return {
-                    "amount": payment.amount,  # Convert amount to string if needed
-                    "mode_of_payment": payment.mop.mode  # Return the mode of payment
-                }
-        
-        return {
-            "amount": 0,  # Convert amount to string if needed
-            "mode_of_payment": None  # Return the mode of payment
-        }
-    
-    def get_total_booking_bill(self, obj):
-        # Utilize the existing total_booking_cost method
-        return obj.total_booking_cost()
-    
-    def get_total_guests(self, obj):
-        bookingss = obj.bookings.all()  # Use related_name if it's set
-        return sum(booking.number_of_guests for booking in bookingss)
 
 
 class PaymentSerializer2(serializers.ModelSerializer):

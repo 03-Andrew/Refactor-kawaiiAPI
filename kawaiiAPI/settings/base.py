@@ -186,7 +186,7 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'TAGS': [
-        {'name': 'Bookings', 'description': 'Room bookings, availability, and room management'},
+        # {'name': 'Bookings', 'description': 'Online/onsite bookings, day tours, and room-type locks'},
         {'name': 'Transactions', 'description': 'Billing, payments, guests, and food orders'},
         {'name': 'Receptionist', 'description': 'Room status, pending/approved bookings, amenities, activities'},
         {'name': 'Users', 'description': 'Authentication — login, signup, JWT tokens'},
@@ -194,6 +194,9 @@ SPECTACULAR_SETTINGS = {
         {'name': 'Reports', 'description': 'Daily, weekly, monthly, and yearly revenue reports'},
     ],
     'SCHEMA_PATH_PREFIX': '/api/',
+    'SWAGGER_UI_SETTINGS': {
+        'docExpansion': 'none',
+    },
 }
 
 

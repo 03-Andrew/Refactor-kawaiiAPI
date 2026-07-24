@@ -172,6 +172,26 @@ def holder_has_lock(room_type_id, check_in, check_out, holder_id):
     return bool(result)
 
 
+def bulk_get_locked_counts(room_requests):
+    """Pipeline GET_LOCKED_COUNT_LUA calls. 1 Redis round-trip.
+
+    room_requests: list of (room_type_id, check_in, check_out)
+    Returns dict mapping (room_type_id, check_in, check_out) -> max_locked_count.
+    """
+    if not room_requests:
+        return {}
+    r = _get_redis()
+    pipe = r.pipeline()
+    for room_type_id, check_in, check_out in room_requests:
+        count_keys, _ = _build_date_keys(room_type_id, check_in, check_out)
+        pipe.eval(GET_LOCKED_COUNT_LUA, len(count_keys), *count_keys, len(count_keys))
+    results = pipe.execute()
+    return {
+        req: (int(r) if r else 0)
+        for req, r in zip(room_requests, results)
+    }
+
+
 def bulk_acquire(room_requests, ttl=600):
     """
     Acquire locks for multiple room-type/date-range combinations.
