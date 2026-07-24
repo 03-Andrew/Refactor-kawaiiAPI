@@ -173,7 +173,7 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend'
     ],
-    'DEFAULT_SCHEMA_CLASS': 'kawaiiAPI.schema.AppTagAutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
@@ -185,14 +185,6 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Kawaii Hotel Booking & Management API',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    'TAGS': [
-        # {'name': 'Bookings', 'description': 'Online/onsite bookings, day tours, and room-type locks'},
-        {'name': 'Transactions', 'description': 'Billing, payments, guests, and food orders'},
-        {'name': 'Receptionist', 'description': 'Room status, pending/approved bookings, amenities, activities'},
-        {'name': 'Users', 'description': 'Authentication — login, signup, JWT tokens'},
-        {'name': 'PayMongo', 'description': 'Payment links, webhooks, and SSE events'},
-        {'name': 'Reports', 'description': 'Daily, weekly, monthly, and yearly revenue reports'},
-    ],
     'SCHEMA_PATH_PREFIX': '/api/',
     'SWAGGER_UI_SETTINGS': {
         'docExpansion': 'none',

@@ -8,6 +8,7 @@ except ImportError:
     def send_event(channel, event, data):
         pass
 
+from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -28,6 +29,7 @@ from .models import WebhookEvent
 from .serializers import WebhookEventSerializer, LinkSerializer
 
 
+@extend_schema(tags=['Payments'])
 class CreateLink(APIView):
     def post(self, request, *args, **kwargs):
         # Serializer
@@ -92,6 +94,7 @@ class CreateLink(APIView):
         else:
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
        
+@extend_schema(tags=['Payments'])
 class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
         # Validate the signature
@@ -304,6 +307,7 @@ class WebhookNotif(APIView):
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
+@extend_schema(tags=['Payments'])
 class ConfirmPayment(APIView):
     def get_customer_id(self, fName, lName, number):
         # Build the query dynamically based on the available parameters

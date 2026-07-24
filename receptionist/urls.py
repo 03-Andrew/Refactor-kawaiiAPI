@@ -3,20 +3,6 @@ from . import views
 from .views import WebSocketTestView
 
 urlpatterns = [
-    #For viewing room status
-    path('api/room-status/',views.RoomListStatus.as_view(),name = "room-status"), 
-    #For updating room status
-    path('api/room-status-detail/<str:pk>/',views.RoomDetailStatus.as_view(),name = "room-detail-status"), 
-    #For viewing today's room bookings
-    path('api/room-booking/',views.RoomBookingList.as_view(),name = "room-booking"), 
-
-    #For viewing pending bookings
-    path('api/booking-pending/',views.BookingListPending.as_view(),name = "booking-pending"),
-    #For viewing approved bookings
-    path('api/booking-approved/',views.BookingListApproved.as_view(),name = "booking-approved"), 
-    #For updating(approving)/deleting bookings
-    path('api/booking-pending-detail/<str:pk>/',views.BookingDetailPending.as_view(),name = "booking-pending-detail"),
-
     #For viewing all amenities
     path('api/amenities/',views.AmenitiesList.as_view(),name = "amenities"), 
     #For viewing/adding all amenities availed
@@ -33,11 +19,6 @@ urlpatterns = [
     
     # To add both amenities and activities availed
     path('api/activites-amenities-availed/add/', views.AddAmenitiesAndActivitiesAvailed.as_view(), name="add-amenity-activity-availed"),
-
-
-    # Update pending bookings
-    path('api/update-pending-bookings/', views.UpdatePendingBookings.as_view(), name="update-pending-bookings"),
-
 
     # Test modified Payment if it works
     path('api/all-payments/', views.GetPayments.as_view(), name='get-payments'),
