@@ -12,5 +12,5 @@ urlpatterns = [
     path('api/bookings/online/', bookings.CreateOnlineBooking.as_view(), name='create_online_booking'),
     path('api/bookings/lock-room-type/', bookings.LockRoomType.as_view(), name='lock_room_type'),
     path('api/bookings/release-room-type/', bookings.ReleaseRoomType.as_view(), name='release_room_type'),
-    path('api/bookings/daytour-guest/', bookings.CreateDayTourGuest.as_view(), name='create_day_tour'),
+    path('api/bookings/daytour/', bookings.CreateDayTourGuest.as_view(), name='create_day_tour'),
 ]

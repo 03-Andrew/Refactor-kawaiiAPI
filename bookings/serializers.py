@@ -68,7 +68,7 @@ class OnsiteBookingRequestSerializer(serializers.Serializer):
 
 class DayTourAmenitySerializer(serializers.Serializer):
     id = serializers.IntegerField(min_value=1)
-    hours = serializers.IntegerField(min_value=1)
+    head_count = serializers.IntegerField(min_value=1)
 
     class Meta:
         ref_name = "DayTourAmenity"
@@ -83,12 +83,12 @@ class DayTourActivitySerializer(serializers.Serializer):
 
 
 class DayTourRequestSerializer(serializers.Serializer):
-    personalInfo = BookingCustomerSerializer()
-    touristList = serializers.ListField(
+    customer = BookingCustomerSerializer()
+    guest_list = serializers.ListField(
         child=serializers.CharField(), required=False, default=list,
     )
-    selectedAmenities = DayTourAmenitySerializer(many=True, required=False, default=list)
-    selectedActivities = DayTourActivitySerializer(many=True, required=False, default=list)
+    selected_amenities = DayTourAmenitySerializer(many=True, required=False, default=list)
+    selected_activities = DayTourActivitySerializer(many=True, required=False, default=list)
 
     class Meta:
         ref_name = "DayTourRequest"

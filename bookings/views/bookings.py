@@ -1,16 +1,16 @@
 import requests
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
+import os
+from dotenv import load_dotenv
 
 from drf_spectacular.utils import OpenApiExample, extend_schema
-from rest_framework import generics, status
-from rest_framework.pagination import PageNumberPagination
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from bookings.models import BookingStatus, RoomStatus, RoomType
 from bookings.serializers import (
-    BookingSerializer,
     DayTourRequestSerializer,
     OnlineBookingRequestSerializer,
     OnsiteBookingRequestSerializer,
@@ -19,187 +19,96 @@ from bookings.services.lock import (
     acquire_room_type_lock, get_locked_count, holder_has_lock,
     release_room_type_lock,
 )
-from transactions.models import BillingStatus, GuestStatus
+from transactions.models import BillingStatus, GuestStatus, ActivitiesAvailed, AmenitiesAvailed, GuestList
 from transactions.serializers import (
     ActivitiesAvailedSerializer, AmenitiesAvailedSerializer,
     BillingSerializerBase, CustomerSerializer, GuestListSerializer,
 )
+from mixins import BillingCreationMixin, BookingCreateMixin
+load_dotenv()
 
-class RoomPagination(PageNumberPagination):
-    page_size = 10
-    page_size_query_param = 'limit'
-    max_page_size = 100
 
-class CreateDayTourGuest(APIView):
+class CreateDayTourGuest(BillingCreationMixin, APIView):
+    @extend_schema(
+        tags=['Bookings'],
+        description='Create a day tour booking with customer info, guest list, selected amenities, and selected activities.',
+        request=DayTourRequestSerializer
+    )
     def post(self, request):
         serializer = DayTourRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
         with transaction.atomic():
-            customer = self._create_customer(data['personalInfo'])
+            customer = self._create_customer(data['customer'])
             billing = self._create_billing(customer, billing_status=BillingStatus.PROCESSING)
-
-            tourist_added = []
-            for name in data['touristList']:
-                guest = GuestListSerializer(data={
-                    'customer_bill': billing.id,
-                    'guest': name,
-                    'status': GuestStatus.PENDING,
-                })
-                guest.is_valid(raise_exception=True)
-                guest.save()
-                tourist_added.append(guest.data)
-
-            amenities_added = []
-            for item in data['selectedAmenities']:
-                amenity = AmenitiesAvailedSerializer(data={
-                    'amenity': item['id'],
-                    'customer_bill': billing.id,
-                    'head_count': item['hours'],
-                })
-                amenity.is_valid(raise_exception=True)
-                amenity.save()
-                amenities_added.append(amenity.data)
-
-            activities_added = []
-            for item in data['selectedActivities']:
-                activity = ActivitiesAvailedSerializer(data={
-                    'activity': item['id'],
-                    'customer_bill': billing.id,
-                    'hours_availed': item['hours'],
-                })
-                activity.is_valid(raise_exception=True)
-                activity.save()
-                activities_added.append(activity.data)
+            guests = self._create_guest_list(billing, data.get('guest_list', []))
+            amenities_added = self._create_amenities(billing, data.get('selected_amenities', []))
+            activities_added = self._create_activities(billing, data.get('selected_activities', []))
 
         return Response({
             'customer': CustomerSerializer(customer).data,
             'billing': BillingSerializerBase(billing).data,
             'amenities': amenities_added,
             'activities': activities_added,
+            'guests': guests,
         }, status=status.HTTP_201_CREATED)
 
-    def _create_customer(self, data):
-        serializer = CustomerSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        return serializer.save()
 
-    def _create_billing(self, customer, billing_status=None):
-        serializer = BillingSerializerBase(data={
-            'customer': customer.id,
-            'status': billing_status or BillingStatus.PENDING,
-        })
-        serializer.is_valid(raise_exception=True)
-        return serializer.save()
+    def _create_guest_list(self, billing, guest_list):
+        validated = []
+        for name in guest_list:
+            serializer = GuestListSerializer(data={
+                'customer_bill': billing.id,
+                'guest': name,
+                'status': GuestStatus.CHECKED_IN,
+            })
+            serializer.is_valid(raise_exception=True)
+            validated.append(serializer.validated_data)
+
+        objs = GuestList.objects.bulk_create([
+            GuestList(**v) for v in validated
+        ])
+        return GuestListSerializer(objs, many=True).data
+
+    def _create_amenities(self, billing, amenities):
+        if not amenities:
+            return []
+
+        validated = []
+        for item in amenities:
+            serializer = AmenitiesAvailedSerializer(data={
+                'amenity': item['id'],
+                'customer_bill': billing.id,
+                'head_count': item['head_count'],
+            })
+            serializer.is_valid(raise_exception=True)
+            validated.append(serializer.validated_data)
 
 
-class BookingCreateMixin:
-    """
-    Shared booking creation logic used by both CreateStayInBooking (onsite)
-    and CreateOnlineBooking (online).
+        objs = AmenitiesAvailed.objects.bulk_create([
+            AmenitiesAvailed(**v) for v in validated
+        ])
+        return AmenitiesAvailedSerializer(objs, many=True).data
+        
+    def _create_activities(self, billing, activities):
+        if not activities:
+            return []
 
-    Both flows share availability checking, DB row locking, customer/billing
-    creation, booking writes, and Redis lock release. Only two things differ:
-      - Onsite: room is assigned at creation time (receptionist picks it).
-      - Online: room=None at creation, assigned later on approval.
-    """
+        validated = []
+        for item in activities:
+            serializer = ActivitiesAvailedSerializer(data={
+                'activity': item['id'],
+                'customer_bill': billing.id,
+                'hours_availed': item['hours'],
+            })
+            serializer.is_valid(raise_exception=True)
+            validated.append(serializer.validated_data)
 
-    def _lock_room_types(self, rooms):
-        """Acquire DB row-level locks on RoomType rows to serialise concurrent writes."""
-        room_type_ids = {room['room_type'] for room in rooms}
-        list(RoomType.objects.select_for_update().filter(id__in=room_type_ids))
-
-    def _check_availability(self, rooms, holder_id=None):
-        """Return a 409 Response if any room type is fully booked, else None."""
-        errors = []
-        for room_data in rooms:
-            try:
-                room_type = RoomType.objects.get(id=room_data['room_type'])
-            except RoomType.DoesNotExist:
-                errors.append(f"Room type {room_data['room_type']} not found")
-                continue
-
-            check_in = room_data['check_in']
-            check_out = room_data['check_out']
-
-            total = room_type.room.count()
-            maintenance = room_type.room.filter(status=RoomStatus.MAINTENANCE).count()
-            booked = room_type.bookings.filter(
-                Q(check_in__lt=check_out)
-                & Q(check_out__gt=check_in)
-                & Q(status__in=[BookingStatus.APPROVED, BookingStatus.PENDING]),
-            ).count()
-
-            db_available = total - maintenance - booked
-            try:
-                locked = get_locked_count(room_type.id, str(check_in), str(check_out))
-            except Exception:
-                locked = 0
-
-            if holder_id and holder_has_lock(room_type.id, str(check_in), str(check_out), holder_id):
-                available = db_available  # holder already claimed a slot
-            else:
-                available = db_available - locked
-
-            if available <= 0:
-                errors.append(
-                    f"'{room_type.name}' is fully booked for {check_in} to {check_out}"
-                )
-
-        if errors:
-            return Response(
-                {'error': 'No availability', 'details': errors},
-                status=status.HTTP_409_CONFLICT,
-            )
-        return None
-
-    def _create_customer(self, data):
-        serializer = CustomerSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        return serializer.save()
-
-    def _create_billing(self, customer, billing_status=None):
-        serializer = BillingSerializerBase(data={
-            'customer': customer.id,
-            'status': billing_status or BillingStatus.PENDING,
-        })
-        serializer.is_valid(raise_exception=True)
-        return serializer.save()
-
-    def _create_bookings(self, billing, rooms, assign_room=False):
-        """
-        Write Booking rows for each room in the list.
-
-        assign_room=True  — onsite: room FK is set from the incoming data.
-        assign_room=False — online: room is left None, assigned later on approval.
-        """
-        created = []
-        for room in rooms:
-            room['customer_bill'] = billing.id
-            room['status'] = BookingStatus.PENDING
-            if not assign_room:
-                room['room'] = None
-            serializer = BookingSerializer(data=room)
-            if not serializer.is_valid():
-                raise Exception(serializer.errors)
-            serializer.save()
-            created.append(serializer.data)
-        return created
-
-    def _release_holder_locks(self, rooms, holder_id):
-        """Release all Redis locks held by holder_id for the given rooms."""
-        if not holder_id:
-            return
-        for room in rooms:
-            try:
-                release_room_type_lock(
-                    room['room_type'], str(room['check_in']),
-                    str(room['check_out']), holder_id,
-                )
-            except Exception:
-                pass
-
+        objs = ActivitiesAvailed.objects.bulk_create([
+            ActivitiesAvailed(**v) for v in validated
+        ])
+        return ActivitiesAvailedSerializer(objs, many=True).data
 
 class CreateStayInBooking(BookingCreateMixin, APIView):
     @extend_schema(
@@ -272,7 +181,6 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
             'billing': BillingSerializerBase(billing).data,
             'bookings': created_bookings,
         }, status=status.HTTP_201_CREATED)
-
 
 class CreateOnlineBooking(BookingCreateMixin, APIView):
     @extend_schema(
@@ -348,15 +256,17 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
     # ── helpers (boat + payment are online-only) ───────────────
 
     def _create_boat(self, billing, boat_list):
-        tourist_added = []
-        boat_ids = []
+        if not boat_list:
+            return [], []
+
+        amenity_objs = []
+        guest_objs = []
         for availed_boat in boat_list:
             availed_boat['customer_bill'] = billing.id
             availed_boat['amenity'] = 1
             serializer = AmenitiesAvailedSerializer(data=availed_boat)
             serializer.is_valid(raise_exception=True)
-            saved = serializer.save()
-            boat_ids.append(saved.id)
+            amenity_objs.append(AmenitiesAvailed(**serializer.validated_data))
 
             for tourist in availed_boat['guests']:
                 guest_serializer = GuestListSerializer(data={
@@ -365,8 +275,18 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
                     'status': GuestStatus.PENDING,
                 })
                 guest_serializer.is_valid(raise_exception=True)
-                guest_serializer.save()
-                tourist_added.append(guest_serializer.data)
+                guest_objs.append(GuestList(**guest_serializer.validated_data))
+
+        AmenitiesAvailed.objects.bulk_create(amenity_objs)
+        boat_ids = list(
+            AmenitiesAvailed.objects.filter(customer_bill=billing, amenity=1)
+            .values_list('id', flat=True)
+        )
+
+        GuestList.objects.bulk_create(guest_objs)
+        created_guests = GuestList.objects.filter(customer_bill=billing)
+        tourist_added = GuestListSerializer(created_guests, many=True).data
+
         return boat_ids, tourist_added
 
     def _create_payment_link(self, billing, customer, booking_ids, payment_data):
@@ -382,7 +302,7 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
         }
         try:
             response = requests.post(
-                'https://seal-app-nvafi.ondigitalocean.app/api/payment-link/',
+                os.environ.get('PAYMENT_LINK_URL'),
                 json=payload,
                 timeout=10,
             )
@@ -393,7 +313,6 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
             if hasattr(e, 'response') and e.response is not None:
                 detail = e.response.json() if e.response.headers.get('content-type', '').startswith('application/json') else {'body': e.response.text[:500]}
             raise Exception(f'Payment link API failed: {detail}') from e
-
 
 class LockRoomType(APIView):
     """Acquire a 10-minute lock on a room-type count for a date range.
@@ -459,7 +378,6 @@ class LockRoomType(APIView):
             'check_in': check_in,
             'check_out': check_out,
         })
-
 
 class ReleaseRoomType(APIView):
     """Explicitly release a room-type lock.
