@@ -4,6 +4,7 @@ from django.db.models import Q, F
 from django.core.mail import send_mail
 from django.conf import settings
 
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -28,7 +29,7 @@ from transactions.models import Amenities, AmenitiesAvailed, Activity,Activities
 
 # Serializers
 from transactions.serializers import ActivitiesSerializer, ActivitiesAvailedSerializer, AmenitiesSerializer, AmenitiesAvailedSerializer, BillingSerializerBase
-from .serializers import RoomStatusListSerializer, RoomBookingListSerializer,BookingsListSerializer, AmenitiesAvailedListSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
+from .serializers import RoomBookingListSerializer,BookingsListSerializer, AmenitiesAvailedListSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
 from bookings.serializers import BookingSerializer
 # Create your views here.
 class BookingPagination(PageNumberPagination):
@@ -161,52 +162,13 @@ def get_activitiesavailedqueryset(request):
 
     return queryset
 
-class RoomListStatus(generics.ListAPIView):
-    queryset = Room.objects.all()
-    serializer_class = RoomStatusListSerializer
 
-class RoomDetailStatus(generics.RetrieveUpdateDestroyAPIView):
-    
-    primary_key = 'pk'
-    queryset = Room.objects.all()
-
-class RoomBookingList(generics.ListAPIView):
-    pagination_class = LimitOffsetPagination
-    serializer_class = RoomBookingListSerializer
-    def get_queryset(self):
-        return get_roombookingqueryset(self.request)
-
-class BookingListPending(generics.ListAPIView):
-    pagination_class = LimitOffsetPagination
-    serializer_class = BookingsListSerializer
-
-    def get_queryset(self):
-        return get_bookingqueryset(self.request).filter(status='1')  # Filters booking (pending only)
-
-
-class BookingListApproved(generics.ListAPIView):
-    pagination_class = LimitOffsetPagination
-    serializer_class = BookingsListSerializer
-
-    def get_queryset(self):
-        return get_bookingqueryset(self.request).filter(status='2')  # Filters booking (approved only)
-
-class BookingDetailPending(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = BookingSerializer
-    primary_key = 'pk'
-    queryset = Booking.objects.select_related(
-        'customer_bill__customer',
-        'room',
-        'room_type',
-    ).filter(status=BookingStatus.PENDING)
-
-    def get_object(self):
-        return generics.get_object_or_404(self.queryset, **{self.primary_key: self.kwargs['pk']})
-
+@extend_schema(tags=['Amenities'])
 class AmenitiesList(generics.ListCreateAPIView):
     queryset = Amenities.objects.all()
     serializer_class = AmenitiesSerializer
 
+@extend_schema(tags=['Amenities'])
 class AmenitiesListAvailed(generics.ListCreateAPIView):
     queryset = AmenitiesAvailed.objects.all()
 
@@ -240,15 +202,18 @@ class AmenitiesListAvailed(generics.ListCreateAPIView):
     def get_queryset(self):
         return get_amenitiesavailedqueryset(self.request)
 
+@extend_schema(tags=['Amenities'])
 class AmenitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AmenitiesAvailedSerializer
     primary_key = 'pk'
     queryset = AmenitiesAvailed.objects.all()
 
+@extend_schema(tags=['Activities'])
 class ActivitiesList(generics.ListAPIView):
     queryset = Activity.objects.all()
     serializer_class = ActivitiesSerializer
 
+@extend_schema(tags=['Activities'])
 class ActivitiesListAvailed(generics.ListCreateAPIView):
     queryset = ActivitiesAvailed.objects.all()
 
@@ -282,11 +247,13 @@ class ActivitiesListAvailed(generics.ListCreateAPIView):
     def get_queryset(self):
         return get_activitiesavailedqueryset(self.request)
 
+@extend_schema(tags=['Activities'])
 class ActivitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ActivitiesAvailedSerializer
     primary_key = 'pk'
     queryset = ActivitiesAvailed.objects.all()
 
+@extend_schema(tags=['Amenities & Activities'])
 class AddAmenitiesAndActivitiesAvailed(APIView):
      def get(self, request, format=None):
         return Response({"message": "Use POST to submit amenities and activities."}, status=200)
@@ -328,6 +295,7 @@ class AddAmenitiesAndActivitiesAvailed(APIView):
             'created_activities': created_activities
         }, status=status.HTTP_201_CREATED)
         
+@extend_schema(tags=['Bookings'])
 class UpdatePendingBookings(APIView):
     def patch(self, request, *args, **kwargs):
         updated_rooms = request.data.get('booking', [])
@@ -487,6 +455,7 @@ class UpdatePendingBookings(APIView):
         except Exception as e:
             logging.error(f"Error sending email: {str(e)}")
         
+@extend_schema(tags=['Payments'])
 class GetPayments(generics.ListCreateAPIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -518,6 +487,7 @@ class GetPayments(generics.ListCreateAPIView):
 
         return queryset
     
+@extend_schema(tags=['WebSocket'], exclude=True)
 class WebSocketTestView(View):
     def get(self, request, *args, **kwargs):
         # Get the channel layer

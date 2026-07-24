@@ -1,6 +1,7 @@
 from django.db.models import Sum
 from django.db.models.functions import ExtractMonth
 
+from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
@@ -22,6 +23,7 @@ from transactions.models import Amenities, Activity, Payment
 from receptionist.serializers import PaymentSerializer
 
     
+@extend_schema(tags=['Reports'])
 class GetTotalEarningsPerMonth(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -122,6 +124,7 @@ def initialize_data(rooms, amenities, activities):
 
     return data 
 
+@extend_schema(tags=['Reports'])
 class GetDailyReport(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -142,6 +145,7 @@ class GetDailyReport(APIView):
         data = process_payments(data, serialized_data)
         return Response(data)
 
+@extend_schema(tags=['Reports'])
 class GetWeeklyReport(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -184,6 +188,7 @@ class GetWeeklyReport(APIView):
 
         return Response(response_data)
     
+@extend_schema(tags=['Reports'])
 class GetMonthlyReport(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -238,6 +243,7 @@ class GetMonthlyReport(APIView):
 
         return Response(response_data)
 
+@extend_schema(tags=['Reports'])
 class GetYearlyReport(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
