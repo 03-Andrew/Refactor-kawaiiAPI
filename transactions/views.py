@@ -85,7 +85,7 @@ class BillingDetails(generics.RetrieveAPIView):
     lookup_field = 'pk'
 
 @extend_schema(tags=['Customer'])
-class CustomerListCreate(generics.ListAPIView):
+class CustomerList(generics.ListAPIView):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
 
@@ -94,20 +94,8 @@ class CustomerSingleEntity(generics.RetrieveUpdateDestroyAPIView):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
 
-@extend_schema(tags=['Payment'])
-class PaymentListCreate(generics.ListCreateAPIView):
-    serializer_class = PaymentSerializer
-    
-    def get_queryset(self):
-        queryset = Payment.objects.all()
-        customer = self.request.query_params.get("customer_bill")
 
-        if status:
-            queryset = queryset.filter(customer_bill=customer)
-
-        return queryset
-
-@extend_schema(tags=['Payment'])
+@extend_schema(tags=['Payments'])
 class CreatePayment(APIView):
     def post(self, request):
         data = request.data
@@ -192,11 +180,6 @@ class GuestListSingleEntity(generics.RetrieveUpdateDestroyAPIView):
     queryset = GuestList.objects.all()
     lookup_field = 'pk'
 
-@extend_schema(tags=['Guests'])
-class GuestListPerBilling(generics.RetrieveAPIView):
-    queryset = Billing.objects.all()
-    serializer_class = BillingGuestList
-    lookup_field = 'pk'
 
 @extend_schema(tags=['Food'])
 class AddFoodBill(generics.ListCreateAPIView):

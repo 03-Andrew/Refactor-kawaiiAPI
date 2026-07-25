@@ -209,7 +209,7 @@ class AmenitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     queryset = AmenitiesAvailed.objects.all()
 
 @extend_schema(tags=['Activities'])
-class ActivitiesList(generics.ListAPIView):
+class ActivitiesList(generics.ListCreateAPIView):
     queryset = Activity.objects.all()
     serializer_class = ActivitiesSerializer
 
