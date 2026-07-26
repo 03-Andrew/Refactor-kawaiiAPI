@@ -4,12 +4,12 @@ from datetime import date
 
 from bookings.models import Booking, Room
 from transactions.models import Payment, AmenitiesAvailed, ActivitiesAvailed, FoodBill
-from transactions.serializers import AmenitiesAvailedSerializer2, BillingAllSerializer, ActivitiesSerializer, AmenitiesSerializer, ActivitiesAvailedSerializer2, FoodBillSerializer2
+from transactions.serializers import AmenitiesAvailedNestedSerializer, BillingSerializer, ActivitiesSerializer, AmenitiesSerializer, ActivitiesAvailedNestedSerializer, FoodBillSummarySerializer
 from bookings.serializers import RoomSerializer ,BookingCountSerializer
 
 
 class BookingsListSerializer(ModelSerializer):
-    customer_bill=BillingAllSerializer()
+    customer_bill=BillingSerializer()
     room_info = StringRelatedField(source='__str__', read_only=True)
     number_of_nights = SerializerMethodField()
     total_cost = SerializerMethodField()
@@ -65,7 +65,7 @@ class RoomBookingListSerializer(ModelSerializer):
         return None
     
 class AmenitiesAvailedListSerializer(ModelSerializer):
-    customer_bill = BillingAllSerializer()
+    customer_bill = BillingSerializer()
     amenity= AmenitiesSerializer()
     total_cost = SerializerMethodField()
 
@@ -83,7 +83,7 @@ class AmenitiesAvailedListSerializer(ModelSerializer):
         return obj.total_cost
     
 class ActivitiesAvailedListSerializer(ModelSerializer):
-    customer_bill = BillingAllSerializer()
+    customer_bill = BillingSerializer()
     activity = ActivitiesSerializer()
     total_cost = SerializerMethodField()
     
@@ -99,23 +99,7 @@ class ActivitiesAvailedListSerializer(ModelSerializer):
     
     def get_total_cost(self, obj):
         return obj.total_cost
-    
-class RoomStatusListSerializer(ModelSerializer):
-    room_type = CharField(source='type.name')
-    max_adult = IntegerField(source='type.max_adult')
-    max_children = IntegerField(source='type.max_children')
-    room_status = CharField(source='status.name')
-    check_out = SerializerMethodField()
-
-    class Meta:
-        model = Room
-        fields = '__all__'
-
-    def get_check_out(self, obj):
-    # Get today's check out (if there is)
-        today_booking = Booking.objects.filter(room=obj, check_in__lte=date.today(), check_out__gte=date.today()).order_by('check_in').first()
-        return today_booking.check_out if today_booking else None
-    
+      
 class PaymentSerializer(ModelSerializer):
     paid_for = SerializerMethodField()
     paymentFor = CharField(source="paymentFor.name")
@@ -129,11 +113,11 @@ class PaymentSerializer(ModelSerializer):
         if isinstance(obj.paid_for, Booking):
             return BookingCountSerializer(obj.paid_for).data
         elif isinstance(obj.paid_for, AmenitiesAvailed):
-            return AmenitiesAvailedSerializer2(obj.paid_for).data
+            return AmenitiesAvailedNestedSerializer(obj.paid_for).data
         elif isinstance(obj.paid_for, ActivitiesAvailed):
-            return ActivitiesAvailedSerializer2(obj.paid_for).data
+            return ActivitiesAvailedNestedSerializer(obj.paid_for).data
         elif isinstance(obj.paid_for, FoodBill):
-            return FoodBillSerializer2(obj.paid_for).data
+            return FoodBillSummarySerializer(obj.paid_for).data
         else:
             return None
         

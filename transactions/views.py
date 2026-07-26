@@ -22,7 +22,7 @@ from .models import Billing, Customer, Payment, AmenitiesAvailed, GuestList, Foo
 from bookings.models import Booking
 
 # Serializers
-from .serializers import BillingSerializer, CustomerSerializer, PaymentSerializer, BillingSerializerBase, BillingGuestList, GuestListSerializer, BillingDetailSerializer, FoodListSerializer
+from .serializers import BillingSerializer, CustomerSerializer, PaymentBaseSerializer, BillingSerializerBase, GuestListSerializer, BillingDetailSerializer, FoodListSerializer
 from transactions.serializers import FoodBillSerializer, AdditionalPaymentSerializer
 
 
@@ -139,7 +139,7 @@ class CreatePayment(APIView):
                         "content_type": content_type.id,
                         "object_id": object_id,
                     }
-                    serializer = PaymentSerializer(data=payment_data)
+                    serializer = PaymentBaseSerializer(data=payment_data)
                     if serializer.is_valid():
                         payment = serializer.save()
                         created_payments.append(serializer.data)
