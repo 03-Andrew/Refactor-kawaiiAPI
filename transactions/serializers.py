@@ -14,8 +14,7 @@ class ActivitiesAvailedSerializer(serializers.ModelSerializer):
         model = ActivitiesAvailed
         fields = '__all__'
 
-# Dupe
-class ActivitiesAvailedSerializer2(serializers.ModelSerializer):
+class ActivitiesAvailedNestedSerializer(serializers.ModelSerializer):
     activity = ActivitiesSerializer()
     class Meta:
         model = ActivitiesAvailed
@@ -32,17 +31,12 @@ class AmenitiesAvailedSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 # Dupe
-class AmenitiesAvailedSerializer2(serializers.ModelSerializer):
-    class Meta:
-        model = AmenitiesAvailed
-        fields = ['id', 'head_count', 'amenity']
-
-# Dupe
-class AmenitiesAvailedSerializer3(serializers.ModelSerializer):
+class AmenitiesAvailedNestedSerializer(serializers.ModelSerializer):
     amenity = AmenitiesSerializer()
     class Meta:
         model = AmenitiesAvailed
         fields = ['id', 'head_count', 'amenity']
+
 
 class FoodBillSerializer(serializers.ModelSerializer):
     class Meta:
@@ -50,7 +44,7 @@ class FoodBillSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 # Dupe
-class FoodBillSerializer2(serializers.ModelSerializer):
+class FoodBillSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = FoodBill
         fields = ['id', 'price', 'or_number']
@@ -65,22 +59,12 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = '__all__'
 
-# Dupe
-class CustomerSerializer2(serializers.ModelSerializer):
-    class Meta:
-        model = Customer
-        fields = ['first_name', 'last_name']
 
 class BillingSerializerBase(serializers.ModelSerializer):
     class Meta:
         model = Billing
         fields = "__all__"
         
-class BillingAllSerializer(serializers.ModelSerializer):
-    customer = CustomerSerializer()
-    class Meta:
-        model = Billing
-        fields = '__all__'
 
 class BillingSerializer(serializers.ModelSerializer):
     total_cost = serializers.SerializerMethodField()
@@ -101,7 +85,7 @@ class BillingSerializer(serializers.ModelSerializer):
     def get_running_balance(self, obj):
         return obj.running_balance or 0
 
-class PaymentSerializer(serializers.ModelSerializer):
+class PaymentBaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = "__all__"
@@ -111,20 +95,7 @@ class GuestListSerializer(serializers.ModelSerializer):
         model = GuestList
         fields = ['id', 'customer_bill', 'guest', 'status']
 
-class BillingGuestList(serializers.ModelSerializer):
-    guests_list = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Billing
-        fields = ['id', 'customer', 'guests_list']
-
-    def get_guests_list(self, obj):
-        # Fetch and serialize the guest list associated with this Billing
-        guest_list = GuestList.objects.filter(customer_bill=obj)
-        return GuestListSerializer(guest_list, many=True).data
-
-
-class PaymentSerializer2(serializers.ModelSerializer):
+class PaymentDetailSerializer(serializers.ModelSerializer):
     content_type = serializers.SerializerMethodField()
     object_name = serializers.SerializerMethodField()
 
@@ -168,10 +139,10 @@ class PaymentSerializer2(serializers.ModelSerializer):
 class BillingDetailSerializer(serializers.ModelSerializer):
     customer = CustomerSerializer()
     booking = BookingSerializer(many=True, read_only=True, source='bookings')
-    payments = PaymentSerializer2(many=True, read_only=True, source='payment')
-    amenitiesAvailed = AmenitiesAvailedSerializer3(many=True, read_only=True, source="amenities_availed")
-    activitiesAvailed = ActivitiesAvailedSerializer2(many=True, read_only=True, source="activities_availed")
-    foodBill = FoodBillSerializer2(many=True, read_only=True, source="food_bill")
+    payments = PaymentDetailSerializer(many=True, read_only=True, source='payment')
+    amenitiesAvailed = AmenitiesAvailedNestedSerializer(many=True, read_only=True, source="amenities_availed")
+    activitiesAvailed = ActivitiesAvailedNestedSerializer(many=True, read_only=True, source="activities_availed")
+    foodBill = FoodBillSummarySerializer(many=True, read_only=True, source="food_bill")
     additionalPayment = AdditionalPaymentSerializer(many=True, read_only=True, source='additional_payment')
     bookingTotal = serializers.SerializerMethodField()
     amenityTotal = serializers.SerializerMethodField()
