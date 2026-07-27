@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from bookings.models import Booking
-from .models import FoodBill, AdditonalPayment, Billing, Customer, Payment, GuestList ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, PaymentFor, Food
+from .models import FoodBill, AdditonalPayment, Billing, Customer, Payment, GuestList ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Food
 from bookings.serializers import BookingSerializer
 
 class ActivitiesSerializer(serializers.ModelSerializer):
@@ -30,7 +30,6 @@ class AmenitiesAvailedSerializer(serializers.ModelSerializer):
         model = AmenitiesAvailed
         fields = '__all__'
 
-# Dupe
 class AmenitiesAvailedNestedSerializer(serializers.ModelSerializer):
     amenity = AmenitiesSerializer()
     class Meta:
@@ -43,7 +42,6 @@ class FoodBillSerializer(serializers.ModelSerializer):
         model = FoodBill
         fields = '__all__'
 
-# Dupe
 class FoodBillSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = FoodBill
@@ -187,4 +185,85 @@ class FoodListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Food
         fields = '__all__'
+
+
+# ── CreatePayment request serializers ────────────────────────────
+
+class PaymentItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField(min_value=1)
+    price = serializers.DecimalField(max_digits=20, decimal_places=2, required=False)
+    subtotal = serializers.DecimalField(max_digits=20, decimal_places=2, required=False)
+
+    def get_amount(self):
+        return self.validated_data.get("price") or self.validated_data.get("subtotal", 0)
+
+
+class SelectedItemsSerializer(serializers.Serializer):
+    selectedRooms = PaymentItemSerializer(many=True, required=False, default=list)
+    selectedActivities = PaymentItemSerializer(many=True, required=False, default=list)
+    selectedAmenities = PaymentItemSerializer(many=True, required=False, default=list)
+    selectedFoodBills = PaymentItemSerializer(many=True, required=False, default=list)
+    selectedAdditionalPayments = PaymentItemSerializer(many=True, required=False, default=list)
+
+
+class CustomerInfoSerializer(serializers.Serializer):
+    customer_bill = serializers.IntegerField(min_value=1)
+    date = serializers.DateField()
+    mop = serializers.IntegerField(min_value=1)
+    status = serializers.IntegerField(min_value=1)
+
+
+class CreatePaymentSerializer(serializers.Serializer):
+    customerInfo = CustomerInfoSerializer()
+    amount = serializers.DecimalField(max_digits=20, decimal_places=2, default=0)
+    selectedItems = SelectedItemsSerializer()
+
+    def create(self, validated_data):
+        from django.contrib.contenttypes.models import ContentType
+        from django.utils.timezone import make_aware
+        from datetime import datetime
+
+        customer_info = validated_data["customerInfo"]
+        selected_items = validated_data["selectedItems"]
+
+        customer_bill_id = customer_info["customer_bill"]
+        date = make_aware(datetime.combine(customer_info["date"], datetime.min.time()))
+        mop_id = customer_info["mop"]
+        status_id = customer_info["status"]
+
+        item_mapping = {
+            "selectedRooms": (Booking, "Room"),
+            "selectedActivities": (ActivitiesAvailed, "Activities"),
+            "selectedAmenities": (AmenitiesAvailed, "Amenities"),
+            "selectedFoodBills": (FoodBill, "Food"),
+            "selectedAdditionalPayments": (AdditonalPayment, "Additional"),
+        }
+
+        created_payments = []
+
+        for key, (model, payment_for) in item_mapping.items():
+            items = selected_items.get(key, [])
+            if not items:
+                continue
+
+            content_type = ContentType.objects.get_for_model(model)
+
+            for item in items:
+                amount = item.get("price") or item.get("subtotal", 0)
+                payment_data = {
+                    "customer_bill": customer_bill_id,
+                    "amount": amount,
+                    "date": date,
+                    "mop": mop_id,
+                    "paymentFor": payment_for,
+                    "status": status_id,
+                    "content_type": content_type.id,
+                    "object_id": item["id"],
+                }
+                payment_serializer = PaymentBaseSerializer(data=payment_data)
+                payment_serializer.is_valid(raise_exception=True)
+                payment = payment_serializer.save()
+                created_payments.append(payment_serializer.data)
+
+        return created_payments
     

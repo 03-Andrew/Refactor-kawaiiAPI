@@ -161,6 +161,15 @@ class PaymentMethod(models.Model):
     def __str__(self):
         return self.mode
     
+class PaymentForChoices(models.TextChoices):
+    ROOM = 'Room', 'Room'
+    DOWN_PAYMENT = 'Down payment', 'Down payment'
+    ACTIVITIES = 'Activities', 'Activities'
+    AMENITIES = 'Amenities', 'Amenities'
+    FOOD = 'Food', 'Food'
+    ADDITIONAL = 'Additional', 'Additional'
+
+
 class PaymentFor(models.Model):
     name = models.CharField(max_length=100)
 
@@ -172,13 +181,13 @@ class PaymentStatus(models.Model):
 
     def __str__(self):
         return self.status
-    
+
 class Payment(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="payment")
     amount = models.DecimalField(max_digits=20, decimal_places=2)
     date = models.DateTimeField()
     mop = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT, related_name="payment")
-    paymentFor = models.ForeignKey(PaymentFor, on_delete=models.PROTECT, null=True, blank=True, related_name="payment")
+    paymentFor = models.CharField(max_length=20, choices=PaymentForChoices.choices, null=True, blank=True)
     status = models.ForeignKey(PaymentStatus, on_delete=models.PROTECT, null=True, blank=True, related_name="payment")
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)

@@ -21,7 +21,7 @@ import base64
 import threading  
 
 # Models
-from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus,PaymentFor
+from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus
 from transactions.models import Customer, Billing
 from .models import WebhookEvent
 
@@ -195,11 +195,10 @@ class WebhookNotif(APIView):
             amount_per_payment = amount / num_of_objects   # Calculate the amount for each payment
 
             try:
-                payment_for = PaymentFor.objects.get(name=payment_for_name)
                 payment_status = PaymentStatus.objects.get(status=payment_status_name)
                 payment_method = PaymentMethod.objects.get(mode=payment_type)
                 content_type = ContentType.objects.get(model=content_type_name)
-            except (PaymentFor.DoesNotExist, PaymentStatus.DoesNotExist, PaymentMethod.DoesNotExist, ContentType.DoesNotExist) as e:
+            except (PaymentStatus.DoesNotExist, PaymentMethod.DoesNotExist, ContentType.DoesNotExist) as e:
                 logging.error(f"Error creating Payment record: {e}")
                 return
 
@@ -210,7 +209,7 @@ class WebhookNotif(APIView):
                     amount=amount_per_payment / 100,  # convert cents to pesos
                     date=timezone.now(),
                     mop=payment_method,
-                    paymentFor=payment_for,
+                    paymentFor=payment_for_name,
                     status=payment_status,
                     content_type=content_type,
                     object_id=object_id,
