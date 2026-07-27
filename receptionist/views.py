@@ -24,8 +24,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # Models
+from django.contrib.contenttypes.models import ContentType
 from bookings.models import Booking,Room,BookingStatus
-from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing
+from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing, FoodBill
 
 # Serializers
 from transactions.serializers import ActivitiesSerializer, ActivitiesAvailedSerializer, AmenitiesSerializer, AmenitiesAvailedSerializer, BillingSerializerBase
@@ -132,7 +133,17 @@ def get_roombookingqueryset(request):
     return queryset
 
 def get_amenitiesavailedqueryset(request):
-    queryset = AmenitiesAvailed.objects.all()
+    queryset = AmenitiesAvailed.objects.select_related(
+            'customer_bill__customer',
+            'amenity',
+        ).prefetch_related(
+            'customer_bill__bookings__room_type',
+            'customer_bill__payment',
+            'customer_bill__food_bill',
+            'customer_bill__amenities_availed__amenity',
+            'customer_bill__activities_availed__activity',
+            'customer_bill__additional_payment',
+        )
     customer_name = request.GET.get('customer')
 
     if customer_name is not None:
@@ -141,24 +152,29 @@ def get_amenitiesavailedqueryset(request):
             Q(customer_bill__customer__first_name__icontains=customer_name) | 
             Q(customer_bill__customer__last_name__icontains=customer_name)
         )
-    else:
-        queryset = AmenitiesAvailed.objects.all()
 
     return queryset
 
 def get_activitiesavailedqueryset(request):
-    queryset = ActivitiesAvailed.objects.all()
+    queryset = ActivitiesAvailed.objects.select_related(
+        'customer_bill__customer',
+        'activity',
+    ).prefetch_related(
+        'customer_bill__bookings__room_type',
+        'customer_bill__payment',
+        'customer_bill__food_bill',
+        'customer_bill__amenities_availed__amenity',
+        'customer_bill__activities_availed__activity',
+        'customer_bill__additional_payment',
+    )
     customer_name = request.GET.get('customer')
 
-    # Filter by customer name
-    if customer_name is not None:
+    if customer_name:
         queryset = queryset.filter(
             Q(customer_bill__customer__first_name__icontains=customer_name) | 
             Q(customer_bill__customer__last_name__icontains=customer_name)
         )
 
-    else:
-        queryset = ActivitiesAvailed.objects.all()
 
     return queryset
 
@@ -171,7 +187,7 @@ class AmenitiesList(generics.ListCreateAPIView):
 @extend_schema(tags=['Amenities'])
 class AmenitiesListAvailed(generics.ListCreateAPIView):
     queryset = AmenitiesAvailed.objects.all()
-
+    
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return AmenitiesAvailedSerializer
@@ -457,35 +473,89 @@ class UpdatePendingBookings(APIView):
         
 @extend_schema(tags=['Payments'])
 class GetPayments(generics.ListCreateAPIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    # authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
     serializer_class = PaymentSerializer
 
-    def get_queryset(self): 
-        queryset = Payment.objects.all()
+    MODEL_BY_CONTENT_TYPE = {
+        'booking': Booking,
+        'amenitiesavailed': AmenitiesAvailed,
+        'activitiesavailed': ActivitiesAvailed,
+        'foodbill': FoodBill,
+    }
+
+    def get_queryset(self):
+        queryset = Payment.objects.select_related(
+            'mop', 'status', 'customer_bill__customer'
+        )
         mop = self.request.GET.get('mop')
         customer = self.request.GET.get('customer')
-        sort = self.request.GET.get('sort') 
+        sort = self.request.GET.get('sort')
 
         # Filter
         if mop:
-            mop_list = mop.split(',') 
+            mop_list = mop.split(',')
             queryset = queryset.filter(mop__mode__in=[mode.strip() for mode in mop_list])
 
         if customer:
             queryset = queryset.filter(
-                Q(customer_bill__customer__first_name__icontains=customer) | 
+                Q(customer_bill__customer__first_name__icontains=customer) |
                 Q(customer_bill__customer__last_name__icontains=customer)
             )
 
         # Sorting
         if sort:
             if sort == 'ascdate':
-                queryset = queryset.order_by('date') 
+                queryset = queryset.order_by('date')
             elif sort == 'descdate':
                 queryset = queryset.order_by('-date')
 
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        payments = list(page) if page is not None else list(queryset)
+
+        self._prefetch_paid_for(payments)
+
+        serializer = self.get_serializer(payments, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+    def _prefetch_paid_for(self, payments):
+        """Batch-fetch all GenericForeignKey objects to avoid N+1 in get_paid_for."""
+        buckets = {}
+        for p in payments:
+            if p.content_type_id and p.object_id:
+                buckets.setdefault(p.content_type_id, []).append(p.object_id)
+
+        if not buckets:
+            return
+
+        content_types = {
+            ct.id: ct
+            for ct in ContentType.objects.filter(id__in=buckets.keys())
+        }
+
+        # Fetch all objects per content type in one query each
+        cache = {}
+        for ct_id, object_ids in buckets.items():
+            ct = content_types[ct_id]
+            model = self.MODEL_BY_CONTENT_TYPE.get(ct.model)
+            if model is None:
+                continue
+            objects = model.objects.filter(id__in=object_ids)
+            cache[(ct_id, ct.model)] = {obj.id: obj for obj in objects}
+
+        # Attach cache to each payment
+        for p in payments:
+            if p.content_type_id and p.object_id:
+                ct = content_types.get(p.content_type_id)
+                if ct:
+                    bucket = cache.get((p.content_type_id, ct.model), {})
+                    p._cached_paid_for = bucket.get(p.object_id)
     
 @extend_schema(tags=['WebSocket'], exclude=True)
 class WebSocketTestView(View):

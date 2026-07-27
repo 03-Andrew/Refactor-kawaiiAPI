@@ -102,7 +102,7 @@ class ActivitiesAvailedListSerializer(ModelSerializer):
       
 class PaymentSerializer(ModelSerializer):
     paid_for = SerializerMethodField()
-    paymentFor = CharField(source="paymentFor.name")
+    paymentFor = CharField(source="get_paymentFor_display")
     mop = CharField(source="mop.mode")
     customer_bill = SerializerMethodField()
     class Meta:
@@ -110,14 +110,17 @@ class PaymentSerializer(ModelSerializer):
         fields = '__all__'
     
     def get_paid_for(self, obj):
-        if isinstance(obj.paid_for, Booking):
-            return BookingCountSerializer(obj.paid_for).data
-        elif isinstance(obj.paid_for, AmenitiesAvailed):
-            return AmenitiesAvailedNestedSerializer(obj.paid_for).data
-        elif isinstance(obj.paid_for, ActivitiesAvailed):
-            return ActivitiesAvailedNestedSerializer(obj.paid_for).data
-        elif isinstance(obj.paid_for, FoodBill):
-            return FoodBillSummarySerializer(obj.paid_for).data
+        paid_for = getattr(obj, '_cached_paid_for', None) or obj.paid_for
+        if paid_for is None:
+            return None
+        if isinstance(paid_for, Booking):
+            return BookingCountSerializer(paid_for).data
+        elif isinstance(paid_for, AmenitiesAvailed):
+            return AmenitiesAvailedNestedSerializer(paid_for).data
+        elif isinstance(paid_for, ActivitiesAvailed):
+            return ActivitiesAvailedNestedSerializer(paid_for).data
+        elif isinstance(paid_for, FoodBill):
+            return FoodBillSummarySerializer(paid_for).data
         else:
             return None
         
