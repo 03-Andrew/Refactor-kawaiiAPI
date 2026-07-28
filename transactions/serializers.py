@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from bookings.models import Booking
-from .models import FoodBill, AdditonalPayment, Billing, Customer, Payment, GuestList ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Food
+from .models import FoodBill, AdditonalPayment, Billing, Customer, Payment, GuestList ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Food, PaymentForChoices
 from bookings.serializers import BookingSerializer
 
 class ActivitiesSerializer(serializers.ModelSerializer):
@@ -102,37 +102,38 @@ class PaymentDetailSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_content_type(self, obj):
-        if obj.content_type:
-            return obj.content_type.model  
-        return None 
+        return obj.paymentFor
     
     def get_object_name(self, obj):
-        if obj.content_type and obj.object_id:
-            if obj.content_type.model == 'foodbill':
-                foodBill = FoodBill.objects.filter(id=obj.object_id).first()
-                if foodBill:
-                    formatted_time = foodBill.time.strftime("%I:%M %p") if foodBill.time else "N/A"
+        if not obj.paymentFor or not obj.object_id:
+            return None
 
-                    return f"Food Bill #{str(foodBill.or_number)}"
-            
-            elif obj.content_type.model == 'booking':
-                booking = Booking.objects.filter(id=obj.object_id).first()
-                if booking and booking.room:
-                    return str(booking.room) 
-            elif obj.content_type.model == 'amenitiesavailed':
-                amenities = AmenitiesAvailed.objects.filter(id=obj.object_id).first()
-                if amenities and amenities.amenity:
-                    return str(amenities.amenity) 
-            elif obj.content_type.model == 'activitiesavailed':
-                activities = ActivitiesAvailed.objects.filter(id=obj.object_id).first()
-                if activities and activities.activity:
-                    return str(activities.activity) 
-            elif obj.content_type.model == 'additonalpayment':
-                additional = AdditonalPayment.objects.filter(id=obj.object_id).first()
-                print("HEYEYE", additional)
-                if additional:
-                    return str(additional.reason)
-        return None 
+        if obj.paymentFor == PaymentForChoices.FOOD:
+            foodBill = FoodBill.objects.filter(id=obj.object_id).first()
+            if foodBill:
+                return f"Food Bill #{foodBill.or_number}"
+
+        elif obj.paymentFor == PaymentForChoices.ROOM:
+            booking = Booking.objects.filter(id=obj.object_id).first()
+            if booking and booking.room:
+                return str(booking.room)
+
+        elif obj.paymentFor == PaymentForChoices.AMENITIES:
+            amenities = AmenitiesAvailed.objects.filter(id=obj.object_id).first()
+            if amenities and amenities.amenity:
+                return str(amenities.amenity)
+
+        elif obj.paymentFor == PaymentForChoices.ACTIVITIES:
+            activities = ActivitiesAvailed.objects.filter(id=obj.object_id).first()
+            if activities and activities.activity:
+                return str(activities.activity)
+
+        elif obj.paymentFor == PaymentForChoices.ADDITIONAL:
+            additional = AdditonalPayment.objects.filter(id=obj.object_id).first()
+            if additional:
+                return str(additional.reason)
+
+        return None
 
 class BillingDetailSerializer(serializers.ModelSerializer):
     customer = CustomerSerializer()

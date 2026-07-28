@@ -3,7 +3,7 @@
 from collections import Counter
 from django.db.models import Count, Q
 
-from bookings.models import Booking, BookingStatus, RoomStatus, RoomType
+from bookings.models import Booking, BookingStatus, Room, RoomStatus, RoomType
 from bookings.services.lock import get_locked_count, holder_has_lock
 
 
@@ -94,3 +94,18 @@ def get_room_type_available(room_type_id, check_in, check_out,
         'db_available': db_available,
         'available': available_count,
     }
+
+
+def find_available_room(room_type, check_in, check_out):
+    """Return first available Room of given type for the date range, or None."""
+    booked_rooms = Booking.objects.filter(
+        room_type=room_type,
+        status__in=[BookingStatus.APPROVED, BookingStatus.PENDING],
+        check_in__lt=check_out,
+        check_out__gt=check_in,
+    ).values_list('room', flat=True)
+
+    return Room.objects.filter(
+        type=room_type,
+        status=RoomStatus.AVAILABLE,
+    ).exclude(id__in=booked_rooms).first()
