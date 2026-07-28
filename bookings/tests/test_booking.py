@@ -1,15 +1,19 @@
 import time
 
-from django.test import TestCase, RequestFactory
+from django.test import TestCase
+from rest_framework.test import APIRequestFactory
 
 from bookings.models import Booking, Room, RoomType, BookingStatus, RoomStatus
-from bookings.views.bookings import CreateOnlineBooking, CreateStayInBooking, CreateDayTourGuest
-from transactions.models import Billing, Customer, Amenities, AmenitiesAvailed, GuestList, ActivitiesAvailed, Activity
+from bookings.views.bookings import (
+    ApproveBooking, CancelBooking,
+    CreateDayTourGuest, CreateOnlineBooking, CreateStayInBooking,
+)
+from transactions.models import Billing, Customer, Amenities, AmenitiesAvailed, GuestList, ActivitiesAvailed, Activity, BillingStatus
 
 
 class BookingSystemTestCase(TestCase):
     def setUp(self):
-        self.factory = RequestFactory()
+        self.factory = APIRequestFactory()
         
         # Shared Room Type
         self.room_type = RoomType.objects.create(
@@ -275,6 +279,219 @@ class BookingSystemTestCase(TestCase):
         self.assertEqual(booking_count, bookings_to_create)
         print(f"\n  Bulk create {bookings_to_create} bookings: {elapsed*1000:.1f}ms")
 
+    # ── PATCH booking/{id} tests ───────────────────────────────
+
+    def _create_online_booking(self, email="patch-test@example.com"):
+        """Helper: create an online booking and return (response, booking_id, billing_id)."""
+
+        request_data = {
+            "customer": {
+                "first_name": "Patch",
+                "last_name": "Test",
+                "contact_number": "09123456789",
+                "email": email,
+            },
+            "rooms": [{
+                "room_type": self.room_type.id,
+                "check_in": "2027-10-01",
+                "check_out": "2027-10-03",
+                "adult_count": 2,
+                "children_count": 0,
+                "extra_guest": 0,
+            }],
+            "payment": 1000.00,
+        }
+        request = self.factory.post(
+            '/api/bookings/online/', request_data, content_type='application/json',
+        )
+    
+        response = CreateOnlineBooking.as_view()(request)
+        self.assertEqual(response.status_code, 201)
+        booking_id = response.data['bookings'][0]['id']
+        billing_id = response.data['billing']['id']
+        return booking_id, billing_id
+
+    # ── POST bookings/{id}/approve tests ───────────────────────
+
+    def test_approve_booking_assigns_room(self):
+        """POST /approve with a room assigns it and sets APPROVED."""
+        booking_id, _ = self._create_online_booking("approve@test.com")
+
+        booking = Booking.objects.get(pk=booking_id)
+        self.assertEqual(booking.status, BookingStatus.PENDING)
+        self.assertIsNone(booking.room)
+
+        request = self.factory.post(
+            f'/api/bookings/{booking_id}/approve/',
+            {'room': self.rooms[0].id},
+            format='json',
+        )
+        response = ApproveBooking.as_view()(request, pk=booking_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], BookingStatus.APPROVED)
+        self.assertEqual(response.data['room'], self.rooms[0].id)
+
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, BookingStatus.APPROVED)
+        self.assertEqual(booking.room_id, self.rooms[0].id)
+        self.assertEqual(booking.room.type, self.room_type)
+
+    def test_approve_missing_room_returns_400(self):
+        """POST /approve without room field returns 400."""
+        booking_id, _ = self._create_online_booking("no-room-field@test.com")
+
+        request = self.factory.post(
+            f'/api/bookings/{booking_id}/approve/',
+            {},
+            format='json',
+        )
+        response = ApproveBooking.as_view()(request, pk=booking_id)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('room is required', response.data['error'])
+
+    def test_approve_wrong_room_type_returns_400(self):
+        """POST /approve with room of different type returns 400."""
+        booking_id, _ = self._create_online_booking("wrong-type@test.com")
+
+        other_type = RoomType.objects.create(
+            name="Other", price=1000, max_adult=2,
+        )
+        other_room = Room.objects.create(
+            number="999", type=other_type, status=RoomStatus.AVAILABLE,
+        )
+
+        request = self.factory.post(
+            f'/api/bookings/{booking_id}/approve/',
+            {'room': other_room.id},
+            format='json',
+        )
+        response = ApproveBooking.as_view()(request, pk=booking_id)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('but booking requires', response.data['error'])
+
+    def test_approve_already_approved_booking_fails(self):
+        """Approving an already APPROVED booking returns 400."""
+        booking_id, _ = self._create_online_booking("double-approve@test.com")
+
+        request = self.factory.post(
+            f'/api/bookings/{booking_id}/approve/',
+            {'room': self.rooms[0].id},
+            format='json',
+        )
+        response = ApproveBooking.as_view()(request, pk=booking_id)
+        self.assertEqual(response.status_code, 200)
+
+        request2 = self.factory.post(
+            f'/api/bookings/{booking_id}/approve/',
+            {'room': self.rooms[1].id},
+            format='json',
+        )
+
+        response2 = ApproveBooking.as_view()(request2, pk=booking_id)
+
+
+        self.assertEqual(response2.status_code, 400)
+        self.assertIn('Cannot approve', response2.data['error'])
+
+    def test_approve_already_booked_room_returns_400(self):
+        """Approving with a room already booked for the date range returns 400."""
+        booking_id, _ = self._create_online_booking("already-booked@test.com")
+
+        Booking.objects.create(
+            customer_bill=Billing.objects.create(
+                customer=Customer.objects.create(
+                    first_name="Blocker", last_name="Test",
+                    contact_number="09999999999", email="blocker@test.com",
+                ),
+                status=BillingStatus.PENDING,
+            ),
+            room=self.rooms[0],
+            room_type=self.room_type,
+            check_in="2027-10-01",
+            check_out="2027-10-03",
+            adult_count=2,
+            status=BookingStatus.APPROVED,
+        )
+
+        request = self.factory.post(
+            f'/api/bookings/{booking_id}/approve/',
+            {'room': self.rooms[0].id},
+            format='json',
+        )
+        response = ApproveBooking.as_view()(request, pk=booking_id)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('already booked', response.data['error'])
+
+    # ── POST bookings/{id}/cancel tests ────────────────────────
+
+    def test_cancel_booking_cascades_billing(self):
+        """POST /cancel cancels booking and cascades to billing."""
+        booking_id, billing_id = self._create_online_booking("cancel@test.com")
+
+        request = self.factory.post(
+            f'/api/bookings/{booking_id}/cancel/',
+            format='json',
+        )
+        response = CancelBooking.as_view()(request, pk=booking_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], BookingStatus.CANCELLED)
+
+        booking = Booking.objects.get(pk=booking_id)
+        self.assertEqual(booking.status, BookingStatus.CANCELLED)
+
+        billing = Billing.objects.get(pk=billing_id)
+        self.assertEqual(billing.status, BillingStatus.CANCELLED)
+
+    def test_cancel_one_booking_does_not_cancel_billing_when_others_active(self):
+        """Cancelling one booking leaves billing active if other bookings remain."""
+        booking_id_1, billing_id = self._create_online_booking("multi-cancel@test.com")
+
+        Booking.objects.create(
+            customer_bill_id=billing_id,
+            room_type=self.room_type,
+            check_in="2027-10-05",
+            check_out="2027-10-07",
+            adult_count=1,
+            status=BookingStatus.PENDING,
+        )
+
+        request = self.factory.post(
+            f'/api/bookings/{booking_id_1}/cancel/',
+            format='json',
+        )
+        response = CancelBooking.as_view()(request, pk=booking_id_1)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], BookingStatus.CANCELLED)
+
+        billing = Billing.objects.get(pk=billing_id)
+        self.assertNotEqual(billing.status, BillingStatus.CANCELLED,
+                           "Billing should not be cancelled while other bookings are active")
+
+    def test_cancel_already_cancelled_booking_fails(self):
+        """Cancelling an already CANCELLED booking returns 400."""
+        booking_id, _ = self._create_online_booking("double-cancel@test.com")
+
+        request = self.factory.post(
+            f'/api/bookings/{booking_id}/cancel/',
+            format='json',
+        )
+        response = CancelBooking.as_view()(request, pk=booking_id)
+        self.assertEqual(response.status_code, 200)
+
+        request2 = self.factory.post(
+            f'/api/bookings/{booking_id}/cancel/',
+            format='json',
+        )
+        response2 = CancelBooking.as_view()(request, pk=booking_id)
+        self.assertEqual(response2.status_code, 400)
+        self.assertIn('Cannot cancel', response2.data['error'])
+
     def tearDown(self):
 
         Booking.objects.all().delete()
@@ -288,4 +505,3 @@ class BookingSystemTestCase(TestCase):
         Activity.objects.all().delete()
         Room.objects.all().delete()
         RoomType.objects.all().delete()
-        

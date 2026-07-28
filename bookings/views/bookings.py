@@ -1,6 +1,4 @@
-import requests
 from django.db import transaction
-import os
 from dotenv import load_dotenv
 
 from drf_spectacular.utils import OpenApiExample, extend_schema
@@ -17,13 +15,16 @@ from bookings.serializers import (
     OnsiteBookingRequestSerializer,
 )
 from bookings.services.availability import get_room_type_available
+from bookings.services.booking import (
+    approve_booking, cancel_booking,
+    create_amenities, create_activities, create_boat_transfer, create_guest_list,
+)
 from bookings.services.lock import (
     acquire_room_type_lock, release_room_type_lock,
 )
-from transactions.models import BillingStatus, GuestStatus, ActivitiesAvailed, AmenitiesAvailed, GuestList
+from transactions.models import BillingStatus
 from transactions.serializers import (
-    ActivitiesAvailedSerializer, AmenitiesAvailedSerializer,
-    BillingSerializerBase, CustomerSerializer, GuestListSerializer,
+    BillingSerializerBase, CustomerSerializer,
 )
 from ..mixins import BillingCreationMixin, BookingCreateMixin
 load_dotenv()
@@ -43,9 +44,9 @@ class CreateDayTourGuest(BillingCreationMixin, APIView):
         with transaction.atomic():
             customer = self._create_customer(data['customer'])
             billing = self._create_billing(customer, billing_status=BillingStatus.PROCESSING)
-            guests = self._create_guest_list(billing, data.get('guest_list', []))
-            amenities_added = self._create_amenities(billing, data.get('selected_amenities', []))
-            activities_added = self._create_activities(billing, data.get('selected_activities', []))
+            guests = create_guest_list(billing=billing, names=data.get('guest_list', []))
+            amenities_added = create_amenities(billing=billing, items=data.get('selected_amenities', []))
+            activities_added = create_activities(billing=billing, items=data.get('selected_activities', []))
 
         return Response({
             'customer': CustomerSerializer(customer).data,
@@ -55,61 +56,6 @@ class CreateDayTourGuest(BillingCreationMixin, APIView):
             'guests': guests,
         }, status=status.HTTP_201_CREATED)
 
-
-    def _create_guest_list(self, billing, guest_list):
-        validated = []
-        for name in guest_list:
-            serializer = GuestListSerializer(data={
-                'customer_bill': billing.id,
-                'guest': name,
-                'status': GuestStatus.CHECKED_IN,
-            })
-            serializer.is_valid(raise_exception=True)
-            validated.append(serializer.validated_data)
-
-        objs = GuestList.objects.bulk_create([
-            GuestList(**v) for v in validated
-        ])
-        return GuestListSerializer(objs, many=True).data
-
-    def _create_amenities(self, billing, amenities):
-        if not amenities:
-            return []
-
-        validated = []
-        for item in amenities:
-            serializer = AmenitiesAvailedSerializer(data={
-                'amenity': item['id'],
-                'customer_bill': billing.id,
-                'head_count': item['head_count'],
-            })
-            serializer.is_valid(raise_exception=True)
-            validated.append(serializer.validated_data)
-
-
-        objs = AmenitiesAvailed.objects.bulk_create([
-            AmenitiesAvailed(**v) for v in validated
-        ])
-        return AmenitiesAvailedSerializer(objs, many=True).data
-        
-    def _create_activities(self, billing, activities):
-        if not activities:
-            return []
-
-        validated = []
-        for item in activities:
-            serializer = ActivitiesAvailedSerializer(data={
-                'activity': item['id'],
-                'customer_bill': billing.id,
-                'hours_availed': item['hours'],
-            })
-            serializer.is_valid(raise_exception=True)
-            validated.append(serializer.validated_data)
-
-        objs = ActivitiesAvailed.objects.bulk_create([
-            ActivitiesAvailed(**v) for v in validated
-        ])
-        return ActivitiesAvailedSerializer(objs, many=True).data
 
 class CreateStayInBooking(BookingCreateMixin, APIView):
     @extend_schema(
@@ -240,7 +186,7 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
                 customer = self._create_customer(data['customer'])
                 billing = self._create_billing(customer)
                 created_bookings = self._create_bookings(billing, data['rooms'])
-                boat_ids, tourist_added = self._create_boat(billing, data.get('boat', []))
+                boat_ids, tourist_added = create_boat_transfer(billing=billing, boat_list=data.get('boat', []))
         except serializers.ValidationError as e:
             self._release_holder_locks(data['rooms'], holder_id)
             return Response(
@@ -265,67 +211,6 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
             response_data['guests'] = tourist_added
 
         return Response(response_data, status=status.HTTP_201_CREATED)
-
-    # ── helpers (boat + payment are online-only) ───────────────
-
-    def _create_boat(self, billing, boat_list):
-        if not boat_list:
-            return [], []
-
-        amenity_objs = []
-        guest_objs = []
-        for availed_boat in boat_list:
-            availed_boat['customer_bill'] = billing.id
-            availed_boat['amenity'] = 1
-            serializer = AmenitiesAvailedSerializer(data=availed_boat)
-            serializer.is_valid(raise_exception=True)
-            amenity_objs.append(AmenitiesAvailed(**serializer.validated_data))
-
-            for tourist in availed_boat['guests']:
-                guest_serializer = GuestListSerializer(data={
-                    'customer_bill': billing.id,
-                    'guest': tourist,
-                    'status': GuestStatus.PENDING,
-                })
-                guest_serializer.is_valid(raise_exception=True)
-                guest_objs.append(GuestList(**guest_serializer.validated_data))
-
-        AmenitiesAvailed.objects.bulk_create(amenity_objs)
-        boat_ids = list(
-            AmenitiesAvailed.objects.filter(customer_bill=billing, amenity=1)
-            .values_list('id', flat=True)
-        )
-
-        GuestList.objects.bulk_create(guest_objs)
-        created_guests = GuestList.objects.filter(customer_bill=billing)
-        tourist_added = GuestListSerializer(created_guests, many=True).data
-
-        return boat_ids, tourist_added
-
-    def _create_payment_link(self, billing, customer, booking_ids, payment_data):
-        payload = {
-            'billing_id': str(billing.id),
-            'payment_for': 'Down Payment',
-            'payment_status': 'Down Payment',
-            'content_type': 'booking',
-            'object_id': ','.join(booking_ids),
-            'amount': payment_data['amount'],
-            'description': f'Booking for customer {customer.id}',
-            'remarks': f'Booking for customer {customer.id}',
-        }
-        try:
-            response = requests.post(
-                os.environ.get('PAYMENT_LINK_URL'),
-                json=payload,
-                timeout=10,
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.RequestException as e:
-            detail = str(e)
-            if hasattr(e, 'response') and e.response is not None:
-                detail = e.response.json() if e.response.headers.get('content-type', '').startswith('application/json') else {'body': e.response.text[:500]}
-            raise Exception(f'Payment link API failed: {detail}') from e
 
 class BookingPagination(PageNumberPagination):
     page_size = 10
@@ -466,6 +351,63 @@ class EditBooking(APIView):
                 ],
             }, status=status.HTTP_409_CONFLICT)
         return None
+
+
+class ApproveBooking(APIView):
+    @extend_schema(
+        tags=['Bookings'],
+        description='Approve a PENDING booking with a specific room.',
+    )
+    def post(self, request, pk):
+        booking = _get_booking(pk)
+        if isinstance(booking, Response):
+            return booking
+
+        room_id = request.data.get('room')
+        if not room_id:
+            return Response(
+                {'error': 'room is required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            booking = approve_booking(booking=booking, room_id=room_id)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        booking.refresh_from_db()
+        return Response(BookingSerializer(booking).data)
+
+
+class CancelBooking(APIView):
+    @extend_schema(
+        tags=['Bookings'],
+        description='Cancel a PENDING or APPROVED booking.',
+    )
+    def post(self, request, pk):
+        booking = _get_booking(pk)
+        if isinstance(booking, Response):
+            return booking
+
+        try:
+            booking = cancel_booking(booking)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        booking.refresh_from_db()
+        return Response(BookingSerializer(booking).data)
+
+
+def _get_booking(pk):
+    try:
+        return Booking.objects.select_related(
+            'customer_bill__customer', 'room_type',
+        ).get(pk=pk)
+    except Booking.DoesNotExist:
+        return Response(
+            {'error': 'Booking not found'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
 
 class LockRoomType(APIView):
