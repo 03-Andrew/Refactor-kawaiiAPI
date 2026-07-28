@@ -33,6 +33,51 @@ from transactions.serializers import ActivitiesSerializer, ActivitiesAvailedSeri
 from .serializers import RoomBookingListSerializer,BookingsListSerializer, AmenitiesAvailedListSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
 from bookings.serializers import BookingSerializer
 # Create your views here.
+
+# ── Shared helpers ──────────────────────────────────────────────
+
+MODEL_BY_CONTENT_TYPE = {
+    'booking': Booking,
+    'amenitiesavailed': AmenitiesAvailed,
+    'activitiesavailed': ActivitiesAvailed,
+    'foodbill': FoodBill,
+}
+
+
+def prefetch_paid_for(payments):
+    """Batch-fetch all GenericForeignKey objects to avoid N+1 in get_paid_for.
+
+    Attaches _cached_paid_for to each Payment instance so
+    PaymentSerializer.get_paid_for() can skip the per-row GFK query.
+    """
+    buckets = {}
+    for p in payments:
+        if p.content_type_id and p.object_id:
+            buckets.setdefault(p.content_type_id, []).append(p.object_id)
+
+    if not buckets:
+        return
+
+    content_types = {
+        ct.id: ct
+        for ct in ContentType.objects.filter(id__in=buckets.keys())
+    }
+
+    cache = {}
+    for ct_id, object_ids in buckets.items():
+        ct = content_types[ct_id]
+        model = MODEL_BY_CONTENT_TYPE.get(ct.model)
+        if model is None:
+            continue
+        objects = model.objects.filter(id__in=object_ids)
+        cache[(ct_id, ct.model)] = {obj.id: obj for obj in objects}
+
+    for p in payments:
+        if p.content_type_id and p.object_id:
+            ct = content_types.get(p.content_type_id)
+            if ct:
+                bucket = cache.get((p.content_type_id, ct.model), {})
+                p._cached_paid_for = bucket.get(p.object_id)
 class BookingPagination(PageNumberPagination):
     page_size = 10  # You can set a default page size
     page_size_query_param = 'page_size'  # Allows dynamic page sizing by passing this in query params
@@ -477,13 +522,6 @@ class GetPayments(generics.ListCreateAPIView):
     # permission_classes = [IsAuthenticated]
     serializer_class = PaymentSerializer
 
-    MODEL_BY_CONTENT_TYPE = {
-        'booking': Booking,
-        'amenitiesavailed': AmenitiesAvailed,
-        'activitiesavailed': ActivitiesAvailed,
-        'foodbill': FoodBill,
-    }
-
     def get_queryset(self):
         queryset = Payment.objects.select_related(
             'mop', 'status', 'customer_bill__customer'
@@ -492,7 +530,6 @@ class GetPayments(generics.ListCreateAPIView):
         customer = self.request.GET.get('customer')
         sort = self.request.GET.get('sort')
 
-        # Filter
         if mop:
             mop_list = mop.split(',')
             queryset = queryset.filter(mop__mode__in=[mode.strip() for mode in mop_list])
@@ -503,7 +540,6 @@ class GetPayments(generics.ListCreateAPIView):
                 Q(customer_bill__customer__last_name__icontains=customer)
             )
 
-        # Sorting
         if sort:
             if sort == 'ascdate':
                 queryset = queryset.order_by('date')
@@ -517,45 +553,12 @@ class GetPayments(generics.ListCreateAPIView):
         page = self.paginate_queryset(queryset)
         payments = list(page) if page is not None else list(queryset)
 
-        self._prefetch_paid_for(payments)
+        prefetch_paid_for(payments)
 
         serializer = self.get_serializer(payments, many=True)
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
-
-    def _prefetch_paid_for(self, payments):
-        """Batch-fetch all GenericForeignKey objects to avoid N+1 in get_paid_for."""
-        buckets = {}
-        for p in payments:
-            if p.content_type_id and p.object_id:
-                buckets.setdefault(p.content_type_id, []).append(p.object_id)
-
-        if not buckets:
-            return
-
-        content_types = {
-            ct.id: ct
-            for ct in ContentType.objects.filter(id__in=buckets.keys())
-        }
-
-        # Fetch all objects per content type in one query each
-        cache = {}
-        for ct_id, object_ids in buckets.items():
-            ct = content_types[ct_id]
-            model = self.MODEL_BY_CONTENT_TYPE.get(ct.model)
-            if model is None:
-                continue
-            objects = model.objects.filter(id__in=object_ids)
-            cache[(ct_id, ct.model)] = {obj.id: obj for obj in objects}
-
-        # Attach cache to each payment
-        for p in payments:
-            if p.content_type_id and p.object_id:
-                ct = content_types.get(p.content_type_id)
-                if ct:
-                    bucket = cache.get((p.content_type_id, ct.model), {})
-                    p._cached_paid_for = bucket.get(p.object_id)
     
 @extend_schema(tags=['WebSocket'], exclude=True)
 class WebSocketTestView(View):
