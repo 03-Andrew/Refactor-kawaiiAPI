@@ -10,6 +10,10 @@ from transactions.serializers import (
     ActivitiesAvailedSerializer, AmenitiesAvailedSerializer,
     GuestListSerializer,
 )
+from django.core.mail import send_mail
+from django.conf import settings
+import logging
+
 
 def approve_booking(*, booking, room_id, **extra_fields):
     """Approve a PENDING booking with the given room.
@@ -209,3 +213,15 @@ def create_payment_link(*, billing, customer, booking_ids, payment_data):
             ct = e.response.headers.get('content-type', '')
             detail = e.response.json() if ct.startswith('application/json') else {'body': e.response.text[:500]}
         raise Exception(f'Payment link API failed: {detail}') from e
+
+def send_email(subject, message, recipient_list):
+    try:
+        send_mail(
+            subject,
+            message,
+            settings.EMAIL_HOST_USER, 
+            recipient_list,
+            fail_silently=False,
+        )
+    except Exception as e:
+        logging.error(f"Error sending email: {str(e)}")

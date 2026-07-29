@@ -96,6 +96,10 @@ CACHES = {
     }
 }
 
+
+CELERY_BROKER_URL = "redis://127.0.0.1:6379/2"
+# CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/2"
+
 WSGI_APPLICATION = 'kawaiiAPI.wsgi.application'
 ASGI_APPLICATION = 'kawaiiAPI.asgi.application'
 
@@ -208,5 +212,6 @@ EMAIL_HOST = os.environ.get("EMAIL_HOST")
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
 EMAIL_PORT = os.environ.get("EMAIL_PORT")
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS") == 'True'
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND")
