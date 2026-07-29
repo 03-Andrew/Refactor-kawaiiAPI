@@ -1,3 +1,5 @@
+import logging
+
 from django.db import transaction
 from dotenv import load_dotenv
 
@@ -27,6 +29,11 @@ from transactions.serializers import (
     BillingSerializerBase, CustomerSerializer,
 )
 from ..mixins import BillingCreationMixin, BookingCreateMixin
+
+logger = logging.getLogger(__name__)
+from django.conf import settings
+
+from ..tasks import send_email
 load_dotenv()
 
 
@@ -122,6 +129,7 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
+            self._release_holder_locks(booking_data, holder_id)
             return Response(
                 {'error': 'Booking failed', 'details': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -187,13 +195,16 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
                 billing = self._create_billing(customer)
                 created_bookings = self._create_bookings(billing, data['rooms'])
                 boat_ids, tourist_added = create_boat_transfer(billing=billing, boat_list=data.get('boat', []))
+
         except serializers.ValidationError as e:
             self._release_holder_locks(data['rooms'], holder_id)
             return Response(
                 {'error': 'Validation failed', 'details': e.detail},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
         except Exception as e:
+            self._release_holder_locks(data['rooms'], holder_id)
             return Response(
                 {'error': 'Online booking failed', 'details': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -209,6 +220,16 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
         if boat_ids:
             response_data['boat'] = boat_ids
             response_data['guests'] = tourist_added
+
+
+        subject = "Online Booking Confirmation"
+        message = f"Booking Successful for {data['customer']['first_name']} {data['customer']['last_name']}"
+        print(settings.DEBUG)
+        if settings.DEBUG:
+            try:
+                send_email.delay(subject, message, [data['customer']['email']])
+            except Exception as exc:
+                logger.warning('Failed to queue email for billing %s: %s', billing.id, exc)
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 

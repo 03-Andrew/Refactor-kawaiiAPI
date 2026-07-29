@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -16,6 +18,8 @@ from transactions.models import BillingStatus
 from transactions.serializers import (
     BillingSerializerBase, CustomerSerializer
 )
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -131,5 +135,9 @@ class BookingCreateMixin(BillingCreationMixin):
                     room['room_type'], str(room['check_in']),
                     str(room['check_out']), holder_id,
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(
+                    'Failed to release lock for room_type=%s dates=%s->%s holder=%s: %s',
+                    room['room_type'], room['check_in'], room['check_out'],
+                    holder_id, exc,
+                )
