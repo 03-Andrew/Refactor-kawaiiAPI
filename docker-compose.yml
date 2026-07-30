@@ -1,24 +1,65 @@
-version: "3.9"
 services:
   redis:
     image: redis:alpine
     container_name: redis-main
+    command: redis-server --protected-mode no
     ports:
-     - "6379:6379"
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 
   app:
-    build: .
-    container_name: kawaiiapi
+    build:
+      context: .
+      dockerfile: DockerFile
+    container_name: kawaiiapi-app
+    restart: always
     volumes:
       - .:/app
-    command: daphne -p 8000 -b 0.0.0.0 kawaiiAPI.asgi:application  # Run Daphne
+    command: daphne -p 8000 -b 0.0.0.0 kawaiiAPI.asgi:application
     ports:
       - "8000:8000"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
     environment:
-      DEBUG: "False"
-      SECRET_KEY: "django-insecure-le41^5*zazcf%@9r2vmkip1%h#f)uba6osnt1_4-v2o9f$(bmb"
-      REDIS_URL: "redis://redis:6379/0"
+      DEBUG: "${DEBUG:-False}"
+      SECRET_KEY: "${SECRET_KEY:-django-insecure-key}"
+      DATABASE_URL: "${DATABASE_URL}"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      REDIS_URL: "redis://redis:6379/1"
+      CELERY_BROKER_URL: "redis://redis:6379/2"
 
-# No volumes for database are needed
+  celery:
+    build:
+      context: .
+      dockerfile: DockerFile
+    container_name: kawaiiapi-celery
+    restart: always
+    volumes:
+      - .:/app
+    command: celery -A kawaiiAPI worker -l info
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DEBUG: "${DEBUG:-False}"
+      SECRET_KEY: "${SECRET_KEY:-django-insecure-key}"
+      DATABASE_URL: "${DATABASE_URL}"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      REDIS_URL: "redis://redis:6379/1"
+      CELERY_BROKER_URL: "redis://redis:6379/2"
+
+
+
+
