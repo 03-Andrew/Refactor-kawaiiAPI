@@ -5,3 +5,8 @@ db.sqlite3
 data/
 .vscode/*
 md_drafts/
+# Terraform local state and temporary directories
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl 
