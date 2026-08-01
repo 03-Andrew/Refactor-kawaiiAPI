@@ -27,6 +27,15 @@ resource "aws_subnet" "private_booking_subnet_1" {
     }   
 }
 
+resource "aws_subnet" "private_booking_subnet_2" {
+    vpc_id = aws_vpc.booking_vpc.id
+    cidr_block = "10.0.3.0/24"
+    availability_zone = var.ZONE2
+    tags = {
+        Name = "private_booking_subnet_2"
+    }   
+}
+
 resource "aws_internet_gateway" "booking_IGW" {
     vpc_id = aws_vpc.booking_vpc.id
     tags = {

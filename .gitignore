@@ -10,3 +10,4 @@ md_drafts/
 *.tfstate
 *.tfstate.backup
 .terraform.lock.hcl 
+*.tfvars

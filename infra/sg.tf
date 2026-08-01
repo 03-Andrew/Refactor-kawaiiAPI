@@ -1,6 +1,6 @@
 resource "aws_security_group" "terraform_sg" {
-    name = "allow_ssh"
-    description = "sg to allow SSH"
+    name = "booking-terraform-sg"
+    description = "sg to allow ssh and http traffic"
     vpc_id = aws_vpc.booking_vpc.id
     tags = {
         Name = "Terraform_proj_sg"
@@ -43,4 +43,12 @@ resource "aws_vpc_security_group_egress_rule" "allow_all_traffic_ipv4" {
     security_group_id = aws_security_group.terraform_sg.id
     cidr_ipv4 = "0.0.0.0/0"
     ip_protocol = "-1"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_daphne" {
+    security_group_id = aws_security_group.terraform_sg.id
+    cidr_ipv4 = "0.0.0.0/0"
+    from_port = 8000
+    ip_protocol = "tcp"
+    to_port = 8000
 }
