@@ -14,15 +14,11 @@ data "aws_ami" "ubuntu" {
 
 resource "aws_instance" "booking-ec2-instance" {
     ami = data.aws_ami.ubuntu.id
-    instance_type = "t3.nano"
+    instance_type = "t3.micro"
     subnet_id = aws_subnet.public_booking_subnet_1.id
     key_name = aws_key_pair.booking_key.key_name
     vpc_security_group_ids = [aws_security_group.terraform_sg.id]
     tags = {
         Name = "booking-ec2-instance"
     }
-}
-
-output "PublicIP" {
-    value = aws_instance.booking-ec2-instance.public_ip
 }
