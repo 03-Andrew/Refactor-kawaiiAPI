@@ -15,7 +15,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: DockerFile
+      dockerfile: Dockerfile
     container_name: kawaiiapi-app
     restart: always
     volumes:
@@ -40,7 +40,7 @@ services:
   celery:
     build:
       context: .
-      dockerfile: DockerFile
+      dockerfile: Dockerfile
     container_name: kawaiiapi-celery
     restart: always
     volumes:
