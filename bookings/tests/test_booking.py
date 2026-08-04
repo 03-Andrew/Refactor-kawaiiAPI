@@ -1,10 +1,10 @@
 """
 Booking Tests
 =============
-BookingCreationTests   – online, stay-in, and day-tour booking creation
-BookingPerformanceTests – N+1 regression and bulk-create speed checks
-ApproveBookingTests    – approve booking scenarios
-CancelBookingTests     – cancel booking scenarios
+BookingCreationTests   - online, stay-in, and day-tour booking creation
+BookingPerformanceTests - N+1 regression and bulk-create speed checks
+ApproveBookingTests     - approve booking scenarios
+CancelBookingTests     - cancel booking scenarios
 """
 import time
 
@@ -66,7 +66,7 @@ class BookingTestBase(TestCase):
         Room.objects.all().delete()
         RoomType.objects.all().delete()
 
-    @patch('requests.post')
+    @patch('bookings.turnstile.requests.post')
     def _create_online_booking(self, email="patch-test@example.com", mock_post=None):
         """Helper: create an online booking and return (booking_id, billing_id)."""
         request_data = {
@@ -103,7 +103,7 @@ class BookingTestBase(TestCase):
 class BookingCreationTests(BookingTestBase):
     """Tests for creating bookings via online, stay-in, and day-tour endpoints."""
 
-    @patch('requests.post')
+    @patch('bookings.turnstile.requests.post')
     def test_create_online_booking(self, mock_post):
         check_in = "2026-09-01"
         check_out = "2026-09-05"
@@ -247,7 +247,7 @@ class BookingPerformanceTests(BookingTestBase):
         self.assertLess(ratio, 4.0,
                         f"4-room booking should be <4x 1-room time (got {ratio:.2f}x)")
 
-    @patch('requests.post')
+    @patch('bookings.turnstile.requests.post')
     def test_online_booking_multi_room_query_count(self, mock_post):
         """N+1 regression: online booking with boats — constant query profile."""
         check_in = "2026-12-10"
