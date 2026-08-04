@@ -87,7 +87,7 @@ class ReportsNPlusOneTest(TestCase):
 
     def _seed_data(self, count=50):
         """Create `count` daytour bookings + payments. Returns year used."""
-        print(f"  Seeding {count} daytours + payments...")
+        # print(f"  Seeding {count} daytours + payments...")
         start = time.perf_counter()
         for i in range(count):
             data = self._create_daytour(i)
@@ -97,7 +97,7 @@ class ReportsNPlusOneTest(TestCase):
             ).first().id
             self._create_payment(billing_id, amenity_id)
         elapsed = time.perf_counter() - start
-        print(f"  Seed complete: {count} records in {elapsed:.2f}s")
+        # print(f"  Seed complete: {count} records in {elapsed:.2f}s")
         self.assertEqual(Payment.objects.count(), count)
 
     # ── Report tests ──────────────────────────────────────────
@@ -114,9 +114,9 @@ class ReportsNPlusOneTest(TestCase):
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/daily-reports/?date={date_str}:")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/daily-reports/?date={date_str}:")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
@@ -134,9 +134,9 @@ class ReportsNPlusOneTest(TestCase):
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/weekly-reports/?year=2026&s=30&e=30:")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/weekly-reports/?year=2026&s=30&e=30:")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
@@ -151,9 +151,9 @@ class ReportsNPlusOneTest(TestCase):
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/monthly-reports/?year=2026&s=7:")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/monthly-reports/?year=2026&s=7:")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
@@ -168,9 +168,9 @@ class ReportsNPlusOneTest(TestCase):
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/yearly-reports/?s=2026:")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/yearly-reports/?s=2026:")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
@@ -185,9 +185,9 @@ class ReportsNPlusOneTest(TestCase):
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/total-per-month/?year=2026:")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/total-per-month/?year=2026:")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("months", response.data)
@@ -215,10 +215,10 @@ class ReportsNPlusOneTest(TestCase):
             self.assertEqual(response.status_code, 200)
             results[label] = (query_count, elapsed * 1000)
 
-        print(f"\n  {'Endpoint':<18} {'Queries':>8} {'Time':>10}")
-        print(f"  {'─'*18} {'─'*8} {'─'*10}")
-        for label, (qc, ms) in results.items():
-            print(f"  {label:<18} {qc:>8} {ms:>8.1f}ms")
+        # print(f"\n  {'Endpoint':<18} {'Queries':>8} {'Time':>10}")
+        # print(f"  {'─'*18} {'─'*8} {'─'*10}")
+        # for label, (qc, ms) in results.items():
+        #     print(f"  {label:<18} {qc:>8} {ms:>8.1f}ms")
 
     # ── Cleanup ───────────────────────────────────────────────
 
