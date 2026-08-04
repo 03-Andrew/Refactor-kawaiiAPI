@@ -103,25 +103,25 @@ class ReportsNPlusOneTest(TestCase):
     # ── Report tests ──────────────────────────────────────────
 
     def test_daily_report(self):
-        """GET /api/daily-reports/?date=YYYY-MM-DD — single day."""
+        """GET /api/reports/daily/?date=YYYY-MM-DD — single day."""
         self._seed_data(50)
 
         date_str = "2026-07-28"
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get(f"/api/daily-reports/?date={date_str}")
+        response = self.client.get(f"/api/reports/daily/?date={date_str}")
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        # print(f"\n  GET /api/daily-reports/?date={date_str}:")
+        # print(f"\n  GET /api/reports/daily/?date={date_str}:")
         # print(f"    Queries: {query_count}")
         # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
     def test_weekly_report(self):
-        """GET /api/weekly-reports/?year=2026&s=30&e=30 — one week.
+        """GET /api/reports/weekly/?year=2026&s=30&e=30 — one week.
 
         This is the heaviest: PaymentSerializer called per day (7x).
         """
@@ -130,62 +130,62 @@ class ReportsNPlusOneTest(TestCase):
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/weekly-reports/?year=2026&s=30&e=30")
+        response = self.client.get("/api/reports/weekly/?year=2026&s=30&e=30")
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        # print(f"\n  GET /api/weekly-reports/?year=2026&s=30&e=30:")
+        # print(f"\n  GET /api/reports/weekly/?year=2026&s=30&e=30:")
         # print(f"    Queries: {query_count}")
         # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
     def test_monthly_report(self):
-        """GET /api/monthly-reports/?year=2026&s=7 — one month."""
+        """GET /api/reports/monthly/?year=2026&s=7 — one month."""
         self._seed_data(50)
 
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/monthly-reports/?year=2026&s=7")
+        response = self.client.get("/api/reports/monthly/?year=2026&s=7")
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        # print(f"\n  GET /api/monthly-reports/?year=2026&s=7:")
+        # print(f"\n  GET /api/reports/monthly/?year=2026&s=7:")
         # print(f"    Queries: {query_count}")
         # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
     def test_yearly_report(self):
-        """GET /api/yearly-reports/?s=2026 — one year, all months."""
+        """GET /api/reports/yearly/?s=2026 — one year, all months."""
         self._seed_data(50)
 
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/yearly-reports/?s=2026")
+        response = self.client.get("/api/reports/yearly/?s=2026")
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        # print(f"\n  GET /api/yearly-reports/?s=2026:")
+        # print(f"\n  GET /api/reports/yearly/?s=2026:")
         # print(f"    Queries: {query_count}")
         # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
     def test_total_per_month(self):
-        """GET /api/total-per-month/?year=2026 — aggregation, no N+1 expected."""
+        """GET /api/reports/monthly-total/?year=2026 — aggregation, no N+1 expected."""
         self._seed_data(50)
 
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/total-per-month/?year=2026")
+        response = self.client.get("/api/reports/monthly-total/?year=2026")
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        # print(f"\n  GET /api/total-per-month/?year=2026:")
+        # print(f"\n  GET /api/reports/monthly-total/?year=2026:")
         # print(f"    Queries: {query_count}")
         # print(f"    Time:    {elapsed*1000:.1f}ms")
 
@@ -198,11 +198,11 @@ class ReportsNPlusOneTest(TestCase):
         self._seed_data(50)
 
         endpoints = {
-            "daily": "/api/daily-reports/?date=2026-07-28",
-            "weekly": "/api/weekly-reports/?year=2026&s=30&e=30",
-            "monthly": "/api/monthly-reports/?year=2026&s=7",
-            "yearly": "/api/yearly-reports/?s=2026",
-            "total-per-month": "/api/total-per-month/?year=2026",
+            "daily": "/api/reports/daily/?date=2026-07-28",
+            "weekly": "/api/reports/weekly/?year=2026&s=30&e=30",
+            "monthly": "/api/reports/monthly/?year=2026&s=7",
+            "yearly": "/api/reports/yearly/?s=2026",
+            "monthly-total": "/api/reports/monthly-total/?year=2026",
         }
 
         results = {}
