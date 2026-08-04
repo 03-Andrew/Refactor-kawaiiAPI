@@ -64,12 +64,12 @@ class AmenitiesAvailedNPlusOneTest(TestCase):
         num_records = 100
 
         # --- Create 100 daytour bookings, each with 1 amenity availed ---
-        print(f"\n  Creating {num_records} daytour bookings (each = 1 AmenitiesAvailed)...")
+        # print(f"\n  Creating {num_records} daytour bookings (each = 1 AmenitiesAvailed)...")
         create_start = time.perf_counter()
         for i in range(num_records):
             self._create_daytour(i)
         create_elapsed = time.perf_counter() - create_start
-        print(f"  Created {num_records} in {create_elapsed:.2f}s")
+        # print(f"  Created {num_records} in {create_elapsed:.2f}s")
 
         # Verify count
         self.assertEqual(AmenitiesAvailed.objects.count(), num_records)
@@ -82,9 +82,9 @@ class AmenitiesAvailedNPlusOneTest(TestCase):
         get_elapsed = time.perf_counter() - get_start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/amenities-availed/ ({num_records} records):")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {get_elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/amenities-availed/ ({num_records} records):")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {get_elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], num_records)
@@ -123,7 +123,7 @@ class AmenitiesAvailedNPlusOneTest(TestCase):
         q_small = create_and_fetch(10, offset=0)
         q_large = create_and_fetch(100, offset=10)
 
-        print(f"\n  Query counts: 10 records={q_small}, 100 records={q_large}")
+        # print(f"\n  Query counts: 10 records={q_small}, 100 records={q_large}")
 
         # self.assertEqual(
         #     q_small, q_large,
@@ -195,12 +195,12 @@ class ActivitiesAvailedNPlusOneTest(TestCase):
         num_records = 100
 
         # --- Create 100 daytour bookings, each with 1 activity availed ---
-        print(f"\n  Creating {num_records} daytour bookings (each = 1 ActivitiesAvailed)...")
+        # print(f"\n  Creating {num_records} daytour bookings (each = 1 ActivitiesAvailed)...")
         create_start = time.perf_counter()
         for i in range(num_records):
             self._create_daytour(i)
         create_elapsed = time.perf_counter() - create_start
-        print(f"  Created {num_records} in {create_elapsed:.2f}s")
+        # print(f"  Created {num_records} in {create_elapsed:.2f}s")
 
         # Verify count
         self.assertEqual(ActivitiesAvailed.objects.count(), num_records)
@@ -213,9 +213,9 @@ class ActivitiesAvailedNPlusOneTest(TestCase):
         get_elapsed = time.perf_counter() - get_start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/activities-availed/ ({num_records} records):")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {get_elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/activities-availed/ ({num_records} records):")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {get_elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], num_records)
@@ -244,7 +244,7 @@ class ActivitiesAvailedNPlusOneTest(TestCase):
         q_small = create_and_fetch(10, offset=0)
         q_large = create_and_fetch(100, offset=10)
 
-        print(f"\n  Query counts: 10 records={q_small}, 100 records={q_large}")
+        # print(f"\n  Query counts: 10 records={q_small}, 100 records={q_large}")
 
         # self.assertEqual(
         #     q_small, q_large,
@@ -330,12 +330,12 @@ class CreatePaymentNPlusOneTest(TestCase):
         num_records = 100
 
         # ── Phase 1: Create daytour bookings ──
-        print(f"\n  Creating {num_records} daytour bookings...")
+        # print(f"\n  Creating {num_records} daytour bookings...")
         daytour_start = time.perf_counter()
         for i in range(num_records):
             self._create_daytour(i)
         daytour_elapsed = time.perf_counter() - daytour_start
-        print(f"  Daytours created in {daytour_elapsed:.2f}s")
+        # print(f"  Daytours created in {daytour_elapsed:.2f}s")
 
         self.assertEqual(AmenitiesAvailed.objects.count(), num_records)
         self.assertEqual(Billing.objects.count(), num_records)
@@ -348,12 +348,12 @@ class CreatePaymentNPlusOneTest(TestCase):
             Billing.objects.values_list("id", flat=True).order_by("id")
         )
 
-        print(f"  Creating {num_records} payments via /api/payment/multiple/...")
+        # print(f"  Creating {num_records} payments via /api/payment/multiple/...")
         post_start = time.perf_counter()
         for i in range(num_records):
             self._create_payment(billing_ids[i], amenity_ids[i])
         post_elapsed = time.perf_counter() - post_start
-        print(f"  Payments POST: {post_elapsed:.2f}s total, {post_elapsed/num_records*1000:.1f}ms avg")
+        # print(f"  Payments POST: {post_elapsed:.2f}s total, {post_elapsed/num_records*1000:.1f}ms avg")
 
         self.assertEqual(Payment.objects.count(), num_records)
 
@@ -365,17 +365,17 @@ class CreatePaymentNPlusOneTest(TestCase):
         get_elapsed = time.perf_counter() - get_start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/all-payments/ ({num_records} records):")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {get_elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/all-payments/ ({num_records} records):")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {get_elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], num_records)
 
-        print(f"\n  Summary:")
-        print(f"    Daytour create:  {daytour_elapsed:.2f}s")
-        print(f"    Payments POST:   {post_elapsed:.2f}s ({post_elapsed/num_records*1000:.1f}ms avg)")
-        print(f"    GET all-payments: {get_elapsed*1000:.1f}ms, {query_count} queries")
+        # print(f"\n  Summary:")
+        # print(f"    Daytour create:  {daytour_elapsed:.2f}s")
+        # print(f"    Payments POST:   {post_elapsed:.2f}s ({post_elapsed/num_records*1000:.1f}ms avg)")
+        # print(f"    GET all-payments: {get_elapsed*1000:.1f}ms, {query_count} queries")
 
     def tearDown(self):
         Payment.objects.all().delete()
