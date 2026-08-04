@@ -24,6 +24,7 @@ from bookings.services.booking import (
 from bookings.services.lock import (
     acquire_room_type_lock, release_room_type_lock,
 )
+from bookings.turnstile import validate_turnstile
 from transactions.models import BillingStatus
 from transactions.serializers import (
     BillingSerializerBase, CustomerSerializer,
@@ -144,6 +145,7 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
         }, status=status.HTTP_201_CREATED)
 
 class CreateOnlineBooking(BookingCreateMixin, APIView):
+    authentication_classes = []
     @extend_schema(
         tags=['Bookings'],
         description='Create an online booking with customer info, room bookings, optional boat transfers, and a down-payment link.',
@@ -183,6 +185,14 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         holder_id = request.data.get('holder_id')
+        turnstile_token = request.data.get('turnstile_token')
+        remoteip = request.META.get('REMOTE_ADDR') or request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0]
+        validation_result = validate_turnstile(turnstile_token, remoteip)
+        if not validation_result.get('success'):
+            return Response(
+                {'error': 'validation failed', 'details': validation_result.get('error-codes', [])},
+                status=status.HTTP_403_FORBIDDEN,
+            )        
 
         try:
             with transaction.atomic():
@@ -224,7 +234,6 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
 
         subject = "Online Booking Confirmation"
         message = f"Booking Successful for {data['customer']['first_name']} {data['customer']['last_name']}"
-        print(settings.DEBUG)
         if settings.DEBUG:
             try:
                 send_email.delay(subject, message, [data['customer']['email']])
@@ -436,7 +445,7 @@ class LockRoomType(APIView):
 
     Called when user selects a room type on the booking form.
     Lock expires after 10 minutes if not consumed by CreateOnlineBooking."""
-
+    authentication_classes = []
     @extend_schema(
         tags=['Bookings'],
         description='Acquire a 10-minute lock on a room-type for a date range.',
@@ -445,6 +454,14 @@ class LockRoomType(APIView):
         room_type_id = request.data.get('room_type')
         check_in = request.data.get('check_in')
         check_out = request.data.get('check_out')
+        turnstile_token = request.data.get('turnstile_token')
+        remoteip = request.META.get('REMOTE_ADDR') or request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0]
+        validation_result = validate_turnstile(turnstile_token, remoteip)
+        if not validation_result.get('success'):
+            return Response(
+                {'error': 'validation failed', 'details': validation_result.get('error-codes', [])},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         errors = {}
         if not room_type_id:
@@ -493,6 +510,7 @@ class LockRoomType(APIView):
         })
 
 class ReleaseRoomType(APIView):
+    authentication_classes = []
     """Explicitly release a room-type lock.
 
     Called when user navigates away from booking form or closes tab."""

@@ -234,3 +234,5 @@ EMAIL_PORT = os.environ.get("EMAIL_PORT")
 EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND")
+
+TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY")

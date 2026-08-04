@@ -87,6 +87,7 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 @extend_schema(tags=['Room Types'])
 class RoomTypesListView(generics.ListCreateAPIView):
+    authentication_classes = []
     serializer_class = RoomTypeSerializer
     queryset = RoomType.objects.all()
     pagination_class = None
