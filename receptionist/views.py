@@ -4,6 +4,7 @@ from django.db.models import Q, F
 from django.core.mail import send_mail
 from django.conf import settings
 
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -23,14 +24,60 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # Models
+from django.contrib.contenttypes.models import ContentType
 from bookings.models import Booking,Room,BookingStatus
-from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing
+from transactions.models import Amenities, AmenitiesAvailed, Activity,ActivitiesAvailed,Payment, Billing, FoodBill
 
 # Serializers
 from transactions.serializers import ActivitiesSerializer, ActivitiesAvailedSerializer, AmenitiesSerializer, AmenitiesAvailedSerializer, BillingSerializerBase
-from .serializers import RoomStatusListSerializer, RoomBookingListSerializer,BookingsListSerializer, AmenitiesAvailedListSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
+from .serializers import RoomBookingListSerializer,BookingsListSerializer, AmenitiesAvailedListSerializer, ActivitiesAvailedListSerializer, PaymentSerializer
 from bookings.serializers import BookingSerializer
 # Create your views here.
+
+# ── Shared helpers ──────────────────────────────────────────────
+
+MODEL_BY_CONTENT_TYPE = {
+    'booking': Booking,
+    'amenitiesavailed': AmenitiesAvailed,
+    'activitiesavailed': ActivitiesAvailed,
+    'foodbill': FoodBill,
+}
+
+
+def prefetch_paid_for(payments):
+    """Batch-fetch all GenericForeignKey objects to avoid N+1 in get_paid_for.
+
+    Attaches _cached_paid_for to each Payment instance so
+    PaymentSerializer.get_paid_for() can skip the per-row GFK query.
+    """
+    buckets = {}
+    for p in payments:
+        if p.content_type_id and p.object_id:
+            buckets.setdefault(p.content_type_id, []).append(p.object_id)
+
+    if not buckets:
+        return
+
+    content_types = {
+        ct.id: ct
+        for ct in ContentType.objects.filter(id__in=buckets.keys())
+    }
+
+    cache = {}
+    for ct_id, object_ids in buckets.items():
+        ct = content_types[ct_id]
+        model = MODEL_BY_CONTENT_TYPE.get(ct.model)
+        if model is None:
+            continue
+        objects = model.objects.filter(id__in=object_ids)
+        cache[(ct_id, ct.model)] = {obj.id: obj for obj in objects}
+
+    for p in payments:
+        if p.content_type_id and p.object_id:
+            ct = content_types.get(p.content_type_id)
+            if ct:
+                bucket = cache.get((p.content_type_id, ct.model), {})
+                p._cached_paid_for = bucket.get(p.object_id)
 class BookingPagination(PageNumberPagination):
     page_size = 10  # You can set a default page size
     page_size_query_param = 'page_size'  # Allows dynamic page sizing by passing this in query params
@@ -131,7 +178,17 @@ def get_roombookingqueryset(request):
     return queryset
 
 def get_amenitiesavailedqueryset(request):
-    queryset = AmenitiesAvailed.objects.all()
+    queryset = AmenitiesAvailed.objects.select_related(
+            'customer_bill__customer',
+            'amenity',
+        ).prefetch_related(
+            'customer_bill__bookings__room_type',
+            'customer_bill__payment',
+            'customer_bill__food_bill',
+            'customer_bill__amenities_availed__amenity',
+            'customer_bill__activities_availed__activity',
+            'customer_bill__additional_payment',
+        )
     customer_name = request.GET.get('customer')
 
     if customer_name is not None:
@@ -140,76 +197,42 @@ def get_amenitiesavailedqueryset(request):
             Q(customer_bill__customer__first_name__icontains=customer_name) | 
             Q(customer_bill__customer__last_name__icontains=customer_name)
         )
-    else:
-        queryset = AmenitiesAvailed.objects.all()
 
     return queryset
 
 def get_activitiesavailedqueryset(request):
-    queryset = ActivitiesAvailed.objects.all()
+    queryset = ActivitiesAvailed.objects.select_related(
+        'customer_bill__customer',
+        'activity',
+    ).prefetch_related(
+        'customer_bill__bookings__room_type',
+        'customer_bill__payment',
+        'customer_bill__food_bill',
+        'customer_bill__amenities_availed__amenity',
+        'customer_bill__activities_availed__activity',
+        'customer_bill__additional_payment',
+    )
     customer_name = request.GET.get('customer')
 
-    # Filter by customer name
-    if customer_name is not None:
+    if customer_name:
         queryset = queryset.filter(
             Q(customer_bill__customer__first_name__icontains=customer_name) | 
             Q(customer_bill__customer__last_name__icontains=customer_name)
         )
 
-    else:
-        queryset = ActivitiesAvailed.objects.all()
 
     return queryset
 
-class RoomListStatus(generics.ListAPIView):
-    queryset = Room.objects.all()
-    serializer_class = RoomStatusListSerializer
 
-class RoomDetailStatus(generics.RetrieveUpdateDestroyAPIView):
-    
-    primary_key = 'pk'
-    queryset = Room.objects.all()
-
-class RoomBookingList(generics.ListAPIView):
-    pagination_class = LimitOffsetPagination
-    serializer_class = RoomBookingListSerializer
-    def get_queryset(self):
-        return get_roombookingqueryset(self.request)
-
-class BookingListPending(generics.ListAPIView):
-    pagination_class = LimitOffsetPagination
-    serializer_class = BookingsListSerializer
-
-    def get_queryset(self):
-        return get_bookingqueryset(self.request).filter(status='1')  # Filters booking (pending only)
-
-
-class BookingListApproved(generics.ListAPIView):
-    pagination_class = LimitOffsetPagination
-    serializer_class = BookingsListSerializer
-
-    def get_queryset(self):
-        return get_bookingqueryset(self.request).filter(status='2')  # Filters booking (approved only)
-
-class BookingDetailPending(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = BookingSerializer
-    primary_key = 'pk'
-    queryset = Booking.objects.select_related(
-        'customer_bill__customer',
-        'room',
-        'room_type',
-    ).filter(status=BookingStatus.PENDING)
-
-    def get_object(self):
-        return generics.get_object_or_404(self.queryset, **{self.primary_key: self.kwargs['pk']})
-
+@extend_schema(tags=['Amenities'])
 class AmenitiesList(generics.ListCreateAPIView):
     queryset = Amenities.objects.all()
     serializer_class = AmenitiesSerializer
 
+@extend_schema(tags=['Amenities'])
 class AmenitiesListAvailed(generics.ListCreateAPIView):
     queryset = AmenitiesAvailed.objects.all()
-
+    
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return AmenitiesAvailedSerializer
@@ -240,15 +263,18 @@ class AmenitiesListAvailed(generics.ListCreateAPIView):
     def get_queryset(self):
         return get_amenitiesavailedqueryset(self.request)
 
+@extend_schema(tags=['Amenities'])
 class AmenitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AmenitiesAvailedSerializer
     primary_key = 'pk'
     queryset = AmenitiesAvailed.objects.all()
 
-class ActivitiesList(generics.ListAPIView):
+@extend_schema(tags=['Activities'])
+class ActivitiesList(generics.ListCreateAPIView):
     queryset = Activity.objects.all()
     serializer_class = ActivitiesSerializer
 
+@extend_schema(tags=['Activities'])
 class ActivitiesListAvailed(generics.ListCreateAPIView):
     queryset = ActivitiesAvailed.objects.all()
 
@@ -282,11 +308,13 @@ class ActivitiesListAvailed(generics.ListCreateAPIView):
     def get_queryset(self):
         return get_activitiesavailedqueryset(self.request)
 
+@extend_schema(tags=['Activities'])
 class ActivitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ActivitiesAvailedSerializer
     primary_key = 'pk'
     queryset = ActivitiesAvailed.objects.all()
 
+@extend_schema(tags=['Amenities & Activities'])
 class AddAmenitiesAndActivitiesAvailed(APIView):
      def get(self, request, format=None):
         return Response({"message": "Use POST to submit amenities and activities."}, status=200)
@@ -328,6 +356,7 @@ class AddAmenitiesAndActivitiesAvailed(APIView):
             'created_activities': created_activities
         }, status=status.HTTP_201_CREATED)
         
+@extend_schema(tags=['Bookings'])
 class UpdatePendingBookings(APIView):
     def patch(self, request, *args, **kwargs):
         updated_rooms = request.data.get('booking', [])
@@ -487,37 +516,51 @@ class UpdatePendingBookings(APIView):
         except Exception as e:
             logging.error(f"Error sending email: {str(e)}")
         
+@extend_schema(tags=['Payments'])
 class GetPayments(generics.ListCreateAPIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    # authentication_classes = [JWTAuthentication]
+    # permission_classes = [IsAuthenticated]
     serializer_class = PaymentSerializer
 
-    def get_queryset(self): 
-        queryset = Payment.objects.all()
+    def get_queryset(self):
+        queryset = Payment.objects.select_related(
+            'mop', 'status', 'customer_bill__customer'
+        )
         mop = self.request.GET.get('mop')
         customer = self.request.GET.get('customer')
-        sort = self.request.GET.get('sort') 
+        sort = self.request.GET.get('sort')
 
-        # Filter
         if mop:
-            mop_list = mop.split(',') 
+            mop_list = mop.split(',')
             queryset = queryset.filter(mop__mode__in=[mode.strip() for mode in mop_list])
 
         if customer:
             queryset = queryset.filter(
-                Q(customer_bill__customer__first_name__icontains=customer) | 
+                Q(customer_bill__customer__first_name__icontains=customer) |
                 Q(customer_bill__customer__last_name__icontains=customer)
             )
 
-        # Sorting
         if sort:
             if sort == 'ascdate':
-                queryset = queryset.order_by('date') 
+                queryset = queryset.order_by('date')
             elif sort == 'descdate':
                 queryset = queryset.order_by('-date')
 
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        payments = list(page) if page is not None else list(queryset)
+
+        prefetch_paid_for(payments)
+
+        serializer = self.get_serializer(payments, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
     
+@extend_schema(tags=['WebSocket'], exclude=True)
 class WebSocketTestView(View):
     def get(self, request, *args, **kwargs):
         # Get the channel layer

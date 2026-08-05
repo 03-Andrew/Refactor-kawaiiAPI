@@ -3,7 +3,7 @@ from datetime import date
 from rest_framework import serializers
 
 from .models import Booking, Room, RoomType
-
+from transactions.models import AmenitiesAvailed
 
 class BookingCustomerSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=100)
@@ -68,7 +68,7 @@ class OnsiteBookingRequestSerializer(serializers.Serializer):
 
 class DayTourAmenitySerializer(serializers.Serializer):
     id = serializers.IntegerField(min_value=1)
-    hours = serializers.IntegerField(min_value=1)
+    head_count = serializers.IntegerField(min_value=1)
 
     class Meta:
         ref_name = "DayTourAmenity"
@@ -83,12 +83,12 @@ class DayTourActivitySerializer(serializers.Serializer):
 
 
 class DayTourRequestSerializer(serializers.Serializer):
-    personalInfo = BookingCustomerSerializer()
-    touristList = serializers.ListField(
+    customer = BookingCustomerSerializer()
+    guest_list = serializers.ListField(
         child=serializers.CharField(), required=False, default=list,
     )
-    selectedAmenities = DayTourAmenitySerializer(many=True, required=False, default=list)
-    selectedActivities = DayTourActivitySerializer(many=True, required=False, default=list)
+    selected_amenities = DayTourAmenitySerializer(many=True, required=False, default=list)
+    selected_activities = DayTourActivitySerializer(many=True, required=False, default=list)
 
     class Meta:
         ref_name = "DayTourRequest"
@@ -126,6 +126,16 @@ class BookingSerializer(serializers.ModelSerializer):
             'number_of_nights', 'total_cost',
         ]
         read_only_fields = ['created_at']
+
+        def get_availed_boat_transfer(self, obj):
+        # Get the AmenitiesAvailed object with 'boat transfer' amenity
+            boat_transfer = AmenitiesAvailed.objects.filter(
+                customer_bill=obj.customer_bill, amenity__amenity='boat transfer'
+            ).first()
+            
+            # If the boat transfer exists, return the time; otherwise return None
+            return boat_transfer.time if boat_transfer else "Not Availed"
+
 
 class RoomTypeSerializer(serializers.ModelSerializer):
     class Meta:

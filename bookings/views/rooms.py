@@ -4,11 +4,12 @@ from datetime import date
 from django.db.models import Count, Exists, OuterRef, Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from bookings.models import Booking, Room, RoomStatus, RoomType, BookingStatus
 from bookings.serializers import RoomSerializer, RoomTypeSerializer
-from bookings.services.lock import get_locked_count
+from bookings.services.lock import bulk_get_locked_counts
 
 ROOM_QUERY_PARAMS = [
     OpenApiParameter('check_in', type=str, description='Filter available rooms (YYYY-MM-DD)'),
@@ -19,6 +20,7 @@ ROOM_QUERY_PARAMS = [
 ]
 
 
+@extend_schema(tags=['Rooms'])
 class RoomListCreateView(generics.ListCreateAPIView):
     serializer_class = RoomSerializer
 
@@ -44,33 +46,28 @@ class RoomListCreateView(generics.ListCreateAPIView):
             except ValueError:
                 return Response({"error": "check_in/check_out must be valid ISO dates."}, status=400)
 
-            if include_booked:
-                queryset = queryset.annotate(
-                    is_booked=Exists(
-                        Booking.objects.filter(
-                            room=OuterRef('pk'),
-                            check_in__lt=check_out_date,
-                            check_out__gt=check_in_date,
-                        )
-                    )
+        if include_booked:
+            if check_in and check_out:
+                booking_filter = Q(
+                    room=OuterRef('pk'),
+                    check_in__lt=check_out_date,
+                    check_out__gt=check_in_date,
                 )
             else:
-                queryset = queryset.exclude(
-                    Q(bookings__check_in__lt=check_out_date)
-                    & Q(bookings__check_out__gt=check_in_date)
-                ).distinct()
-                
-        elif include_booked:
-            today = date.today()
+                today = date.today()
+                booking_filter = Q(
+                    room=OuterRef('pk'),
+                    check_in__lte=today,
+                    check_out__gt=today,
+                ) & ~Q(status=BookingStatus.CANCELLED)
             queryset = queryset.annotate(
-                is_booked=Exists(
-                    Booking.objects.filter(
-                        room=OuterRef('pk'),
-                        check_in__lte=today,
-                        check_out__gt=today,
-                    ).exclude(status=BookingStatus.CANCELLED)
-                )
+                is_booked=Exists(Booking.objects.filter(booking_filter)),
             )
+        elif check_in and check_out:
+            queryset = queryset.exclude(
+                Q(bookings__check_in__lt=check_out_date)
+                & Q(bookings__check_out__gt=check_in_date)
+            ).distinct()
 
         if room_type:
             queryset = queryset.filter(type__name__icontains=room_type)
@@ -83,16 +80,28 @@ class RoomListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+@extend_schema(tags=['Rooms'])
 class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
 
 
+@extend_schema(tags=['Room Types'])
 class RoomTypesListView(generics.ListCreateAPIView):
     serializer_class = RoomTypeSerializer
     queryset = RoomType.objects.all()
     pagination_class = None
 
+    def get_authenticators(self):
+        if self.request and self.request.method == 'GET':
+            return []
+        return super().get_authenticators()
+    def get_permissions(self):
+        if self.request and self.request.method == 'GET':
+            return [AllowAny()]
+        return super().get_permissions()
+
+    
     @extend_schema(parameters=ROOM_QUERY_PARAMS[0:3])
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
@@ -128,15 +137,18 @@ class RoomTypesListView(generics.ListCreateAPIView):
 
         queryset = queryset.annotate(**annotations)
 
+        locked_counts = {}
+        if check_in and check_out:
+            try:
+                requests = [(rt.id, check_in, check_out) for rt in queryset]
+                locked_counts = bulk_get_locked_counts(requests)
+            except Exception:
+                pass
+
         data = []
         for rt in queryset:
             serialized = self.get_serializer(rt).data
-            locked = 0
-            if check_in and check_out:
-                try:
-                    locked = get_locked_count(rt.id, check_in, check_out)
-                except Exception:
-                    pass
+            locked = locked_counts.get((rt.id, check_in, check_out), 0) if check_in and check_out else 0
             serialized['total_rooms'] = rt.total_count
             serialized['booked_rooms'] = rt.booked_count
             serialized['locked_rooms'] = locked
@@ -146,6 +158,7 @@ class RoomTypesListView(generics.ListCreateAPIView):
         return Response(data)
 
 
+@extend_schema(tags=['Room Types'])
 class RoomTypesDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RoomTypeSerializer
     queryset = RoomType.objects.all()

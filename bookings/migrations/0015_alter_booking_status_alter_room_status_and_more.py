@@ -14,12 +14,12 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='booking',
             name='status',
-            field=models.CharField(choices=[('PENDING', 'Pending'), ('APPROVED', 'Approved'), ('REJECTED', 'Rejected'), ('CANCELLED', 'Cancelled')], default='PENDING', verbose_name=bookings.models.BookingStatus),
+            field=models.CharField(choices=[('PENDING', 'Pending'), ('APPROVED', 'Approved'), ('REJECTED', 'Rejected'), ('CANCELLED', 'Cancelled')], default='PENDING', max_length=20),
         ),
         migrations.AlterField(
             model_name='room',
             name='status',
-            field=models.CharField(choices=[('AVAILABLE', 'Available'), ('BOOKED', 'Booked'), ('RESERVED', 'Reserved'), ('MAINTENANCE', 'Maintenance')], default='AVAILABLE', verbose_name=bookings.models.RoomStatus),
+            field=models.CharField(choices=[('AVAILABLE', 'Available'), ('BOOKED', 'Booked'), ('RESERVED', 'Reserved'), ('MAINTENANCE', 'Maintenance')], default='AVAILABLE', max_length=20),
         ),
         migrations.DeleteModel(
             name='BookingStatus',

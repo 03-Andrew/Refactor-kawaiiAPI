@@ -3,33 +3,22 @@ from . import views
 
 urlpatterns = [
     path("api/billings/", views.BillingList.as_view(), name="billings"),
-    path("api/billings/create/", views.BillingCreate.as_view(), name="create-billing"),
-    path("api/billings/edit/<int:pk>/", views.BillingUpdate.as_view(), name="edit-billing"),
-    path("api/billings2/edit/<int:pk>/", views.BillingUpdate2.as_view(), name="edit-billing2"),
-    path("api/billing-details/<int:pk>/", views.BillingDetails.as_view(), name="billing-details"),
+    path("api/billings/<int:pk>/", views.BillingSingleEntity.as_view(), name="single-billing"),
+    path("api/billings/details/<int:pk>/", views.BillingDetails.as_view(), name="billing-details"),
     
-    path("api/active-billings/", views.ActiveBookings.as_view(), name="active-billings"),
-    path("api/customer/", views.CustomerListCreate.as_view(), name="customers"),
-    
-    path("api/payment/", views.PaymentListCreate.as_view(), name="payment"),
+    path("api/customer/", views.CustomerList.as_view(), name="customers"),
+    path("api/customer/<int:pk>", views.CustomerSingleEntity.as_view()),
+
     path("api/payment/multiple/", views.CreatePayment.as_view(), name="create-multiple-payment"),
     
-    path("api/pending-billing-list/", views.ListBillingBooking.as_view()),
-    path("api/room-bookings/", views.ListConfirmedBooking.as_view()),
-    path("api/booking/edit/<int:pk>", views.EditBooking.as_view()),
-
     path("api/guests/", views.GuestListView.as_view(), name="guest-list"),
-    path("api/guests/add/", views.AddGuest.as_view(), name="add-guest-list"),
-    path("api/guests/<int:pk>/", views.GuestListPerBilling.as_view(), name="guest-list-per-billing"),
-    path("api/guests-status/edit/<int:pk>/", views.EditGuestListStatus.as_view(), name="edit-guest-list"),
-    # path("api/guest-list-status/get/", views.GetGuestStatus.as_view(), name='guest-status-list'),
-    path("api/guest-list-status/update/", views.UpdateGuestListStatus.as_view(), name="update-guest-list-status"),
+    path("api/guests/<int:pk>/", views.GuestListSingleEntity.as_view(), name="edit-guest-list"),
     
-    path("api/foodbill/add/", views.AddFoodBill.as_view(), name="add-food-bill"),
-    path("api/foodbill/edit/<int:pk>/", views.ModifyFoodBill.as_view(), name='modify-foodbill'),
+    path("api/foodbill/", views.AddFoodBill.as_view(), name="add-food-bill"),
+    path("api/foodbill/<int:pk>/", views.ModifyFoodBill.as_view(), name='modify-foodbill'),
 
-    path("api/food/add/", views.AddFoodList.as_view(), name="add-food-list"),
-    path("api/food/edit/<int:pk>/", views.ModifyFoodList.as_view(), name='modify-food-list'),
+    path("api/food/", views.AddFoodList.as_view(), name="add-food-list"),
+    path("api/food/<int:pk>/", views.ModifyFoodList.as_view(), name='modify-food-list'),
 
-    path("api/additional-payments/add/", views.CreateAdditionalPayments.as_view(), name="add-additional-payments"),
+    path("api/additional-payments/", views.AdditionalPayments.as_view(), name="add-additional-payments"),
 ]

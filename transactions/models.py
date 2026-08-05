@@ -1,5 +1,4 @@
 from django.db import models
-from django.db.models import  Sum, F
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
@@ -37,25 +36,16 @@ class Billing(models.Model):
         return sum(booking.total_cost for booking in self.bookings.all())
 
     def total_food_bill(self):
-        # Calculate total food bill on the database side
-        return self.food_bill.aggregate(total=Sum('price'))['total'] or 0
+        return sum(f.price for f in self.food_bill.all())
 
     def total_amenities(self):
-        # Calculate total amenities cost using F expressions and aggregation
-        return self.amenities_availed.aggregate(
-            total=Sum(F('head_count') * F('amenity__rate_per_head'))
-        )['total'] or 0
+        return sum(a.head_count * a.amenity.rate_per_head for a in self.amenities_availed.all())
 
     def total_activities(self):
-        # Calculate total activities cost using F expressions and aggregation
-        return self.activities_availed.aggregate(
-            total=Sum(F('hours_availed') * F('activity__hourly_rate'))
-        )['total'] or 0
+        return sum(a.hours_availed * a.activity.hourly_rate for a in self.activities_availed.all())
 
     def total_additional(self):
-        return self.additional_payment.aggregate(
-            total=Sum(F('price'))
-        )['total'] or 0
+        return sum(a.price for a in self.additional_payment.all())
     
     @property
     def total_cost(self):
@@ -171,6 +161,15 @@ class PaymentMethod(models.Model):
     def __str__(self):
         return self.mode
     
+class PaymentForChoices(models.TextChoices):
+    ROOM = 'Room', 'Room'
+    DOWN_PAYMENT = 'Down payment', 'Down payment'
+    ACTIVITIES = 'Activities', 'Activities'
+    AMENITIES = 'Amenities', 'Amenities'
+    FOOD = 'Food', 'Food'
+    ADDITIONAL = 'Additional', 'Additional'
+
+
 class PaymentFor(models.Model):
     name = models.CharField(max_length=100)
 
@@ -182,13 +181,13 @@ class PaymentStatus(models.Model):
 
     def __str__(self):
         return self.status
-    
+
 class Payment(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT, related_name="payment")
     amount = models.DecimalField(max_digits=20, decimal_places=2)
     date = models.DateTimeField()
     mop = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT, related_name="payment")
-    paymentFor = models.ForeignKey(PaymentFor, on_delete=models.PROTECT, null=True, blank=True, related_name="payment")
+    paymentFor = models.CharField(max_length=20, choices=PaymentForChoices.choices, null=True, blank=True)
     status = models.ForeignKey(PaymentStatus, on_delete=models.PROTECT, null=True, blank=True, related_name="payment")
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)

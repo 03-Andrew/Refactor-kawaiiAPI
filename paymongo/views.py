@@ -8,6 +8,7 @@ except ImportError:
     def send_event(channel, event, data):
         pass
 
+from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -20,7 +21,7 @@ import base64
 import threading  
 
 # Models
-from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus,PaymentFor
+from transactions.models import Billing, Payment,PaymentMethod,PaymentStatus
 from transactions.models import Customer, Billing
 from .models import WebhookEvent
 
@@ -28,6 +29,7 @@ from .models import WebhookEvent
 from .serializers import WebhookEventSerializer, LinkSerializer
 
 
+@extend_schema(tags=['Payments'])
 class CreateLink(APIView):
     def post(self, request, *args, **kwargs):
         # Serializer
@@ -92,6 +94,7 @@ class CreateLink(APIView):
         else:
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
        
+@extend_schema(tags=['Payments'])
 class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
         # Validate the signature
@@ -192,11 +195,10 @@ class WebhookNotif(APIView):
             amount_per_payment = amount / num_of_objects   # Calculate the amount for each payment
 
             try:
-                payment_for = PaymentFor.objects.get(name=payment_for_name)
                 payment_status = PaymentStatus.objects.get(status=payment_status_name)
                 payment_method = PaymentMethod.objects.get(mode=payment_type)
                 content_type = ContentType.objects.get(model=content_type_name)
-            except (PaymentFor.DoesNotExist, PaymentStatus.DoesNotExist, PaymentMethod.DoesNotExist, ContentType.DoesNotExist) as e:
+            except (PaymentStatus.DoesNotExist, PaymentMethod.DoesNotExist, ContentType.DoesNotExist) as e:
                 logging.error(f"Error creating Payment record: {e}")
                 return
 
@@ -207,7 +209,7 @@ class WebhookNotif(APIView):
                     amount=amount_per_payment / 100,  # convert cents to pesos
                     date=timezone.now(),
                     mop=payment_method,
-                    paymentFor=payment_for,
+                    paymentFor=payment_for_name,
                     status=payment_status,
                     content_type=content_type,
                     object_id=object_id,
@@ -304,6 +306,7 @@ class WebhookNotif(APIView):
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
+@extend_schema(tags=['Payments'])
 class ConfirmPayment(APIView):
     def get_customer_id(self, fName, lName, number):
         # Build the query dynamically based on the available parameters
