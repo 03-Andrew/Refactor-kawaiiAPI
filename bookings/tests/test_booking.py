@@ -7,11 +7,10 @@ ApproveBookingTests     - approve booking scenarios
 CancelBookingTests     - cancel booking scenarios
 """
 import time
-
-help("Booking Tests: run with `python manage.py test bookings.tests.test_booking`")
 from unittest.mock import patch
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
+from rest_framework_simplejwt.tokens import AccessToken
 
 from bookings.models import Booking, Room, RoomType, BookingStatus, RoomStatus
 from bookings.views.bookings import (
@@ -20,14 +19,19 @@ from bookings.views.bookings import (
 )
 from transactions.models import Billing, Customer, Amenities, AmenitiesAvailed, GuestList, ActivitiesAvailed, Activity, BillingStatus
 
-
+from django.contrib.auth import get_user_model
 # ── Shared base ────────────────────────────────────────────────────────────────
-
+User = get_user_model()
 class BookingTestBase(TestCase):
     """Shared fixtures and helpers used by all booking test classes."""
 
+    def get_jwt_token(self, user):
+        token = AccessToken.for_user(user) 
+        return str(token)
+    
     def setUp(self):
         self.factory = APIRequestFactory()
+        self.token = self.get_jwt_token(User.objects.create_user(username="testuser", password="testpass"))
 
         self.room_type = RoomType.objects.create(
             name="Test Room Type",
@@ -167,7 +171,8 @@ class BookingCreationTests(BookingTestBase):
         }
 
         request = self.factory.post(
-            '/api/bookings/stay-in/', request_data, content_type='application/json',
+            '/api/bookings/stay-in/', request_data, content_type='application/json', 
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = CreateStayInBooking.as_view()(request)
         self.assertIn(response.status_code, [200, 201])
@@ -187,6 +192,7 @@ class BookingCreationTests(BookingTestBase):
 
         request = self.factory.post(
             '/api/bookings/daytour/', request_data, content_type='application/json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
         response = CreateDayTourGuest.as_view()(request)
         self.assertEqual(response.status_code, 201)
@@ -230,7 +236,8 @@ class BookingPerformanceTests(BookingTestBase):
                 ],
             }
             request = self.factory.post(
-                '/api/bookings/onsite/', request_data, content_type='application/json',
+                '/api/bookings/onsite/', request_data, content_type='application/json', 
+                HTTP_AUTHORIZATION=f'Bearer {self.token}',
             )
             start = time.perf_counter()
             response = CreateStayInBooking.as_view()(request)
@@ -326,6 +333,7 @@ class BookingPerformanceTests(BookingTestBase):
         }
         request = self.factory.post(
             '/api/bookings/onsite/', request_data, content_type='application/json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
 
         start = time.perf_counter()
@@ -360,6 +368,7 @@ class ApproveBookingTests(BookingTestBase):
             f'/api/bookings/{booking_id}/approve/',
             {'room': self.rooms[0].id},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = ApproveBooking.as_view()(request, pk=booking_id)
 
@@ -380,6 +389,7 @@ class ApproveBookingTests(BookingTestBase):
             f'/api/bookings/{booking_id}/approve/',
             {},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = ApproveBooking.as_view()(request, pk=booking_id)
 
@@ -399,6 +409,7 @@ class ApproveBookingTests(BookingTestBase):
             f'/api/bookings/{booking_id}/approve/',
             {'room': other_room.id},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = ApproveBooking.as_view()(request, pk=booking_id)
 
@@ -413,6 +424,7 @@ class ApproveBookingTests(BookingTestBase):
             f'/api/bookings/{booking_id}/approve/',
             {'room': self.rooms[0].id},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = ApproveBooking.as_view()(request, pk=booking_id)
         self.assertEqual(response.status_code, 200)
@@ -421,6 +433,7 @@ class ApproveBookingTests(BookingTestBase):
             f'/api/bookings/{booking_id}/approve/',
             {'room': self.rooms[1].id},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response2 = ApproveBooking.as_view()(request2, pk=booking_id)
 
@@ -451,6 +464,7 @@ class ApproveBookingTests(BookingTestBase):
             f'/api/bookings/{booking_id}/approve/',
             {'room': self.rooms[0].id},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = ApproveBooking.as_view()(request, pk=booking_id)
 
@@ -470,6 +484,7 @@ class CancelBookingTests(BookingTestBase):
         request = self.factory.post(
             f'/api/bookings/{booking_id}/cancel/',
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = CancelBooking.as_view()(request, pk=booking_id)
 
@@ -498,6 +513,7 @@ class CancelBookingTests(BookingTestBase):
         request = self.factory.post(
             f'/api/bookings/{booking_id_1}/cancel/',
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = CancelBooking.as_view()(request, pk=booking_id_1)
 
@@ -515,6 +531,7 @@ class CancelBookingTests(BookingTestBase):
         request = self.factory.post(
             f'/api/bookings/{booking_id}/cancel/',
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = CancelBooking.as_view()(request, pk=booking_id)
         self.assertEqual(response.status_code, 200)
@@ -522,7 +539,8 @@ class CancelBookingTests(BookingTestBase):
         request2 = self.factory.post(
             f'/api/bookings/{booking_id}/cancel/',
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
-        response2 = CancelBooking.as_view()(request, pk=booking_id)
+        response2 = CancelBooking.as_view()(request2, pk=booking_id)
         self.assertEqual(response2.status_code, 400)
         self.assertIn('Cannot cancel', response2.data['error'])

@@ -4,6 +4,7 @@ from django.test import TestCase, override_settings
 from django.db import connection, reset_queries
 
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import AccessToken
 
 from bookings.models import Room, RoomType, RoomStatus
 from transactions.models import (
@@ -12,6 +13,9 @@ from transactions.models import (
     PaymentStatus,
 )
 
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 @override_settings(DEBUG=True)
 class ReportsNPlusOneTest(TestCase):
@@ -21,10 +25,14 @@ class ReportsNPlusOneTest(TestCase):
     Daily/Weekly/Monthly/Yearly all serialize Payment querysets multiple
     times — each serialization triggers per-row FK + GFK queries.
     """
-
+    def get_jwt_token(self, user):
+        token = AccessToken.for_user(user) 
+        return str(token)
+    
     def setUp(self):
         self.client = APIClient()
 
+        self.token = self.get_jwt_token(User.objects.create_user(username="testuser", password="testpass"))
         # ── Shared reference data ──
         self.amenity = Amenities.objects.create(
             amenity="Boat Transfer", rate_per_head=500.00,
@@ -59,6 +67,7 @@ class ReportsNPlusOneTest(TestCase):
         }
         response = self.client.post(
             "/api/bookings/daytour/", payload, format="json",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
         self.assertEqual(response.status_code, 201,
                          f"Daytour failed: {response.data}")
@@ -80,6 +89,7 @@ class ReportsNPlusOneTest(TestCase):
         }
         response = self.client.post(
             "/api/payment/multiple/", payload, format="json",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
         self.assertEqual(response.status_code, 201,
                          f"Payment creation failed: {response.data}")
@@ -110,7 +120,10 @@ class ReportsNPlusOneTest(TestCase):
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get(f"/api/reports/daily/?date={date_str}")
+        response = self.client.get(
+            f"/api/reports/daily/?date={date_str}",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
@@ -130,7 +143,10 @@ class ReportsNPlusOneTest(TestCase):
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/reports/weekly/?year=2026&s=30&e=30")
+        response = self.client.get(
+            "/api/reports/weekly/?year=2026&s=30&e=30",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
@@ -147,7 +163,10 @@ class ReportsNPlusOneTest(TestCase):
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/reports/monthly/?year=2026&s=7")
+        response = self.client.get(
+            "/api/reports/monthly/?year=2026&s=7",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
@@ -164,7 +183,10 @@ class ReportsNPlusOneTest(TestCase):
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/reports/yearly/?s=2026")
+        response = self.client.get(
+            "/api/reports/yearly/?s=2026",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
@@ -181,7 +203,10 @@ class ReportsNPlusOneTest(TestCase):
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/reports/monthly-total/?year=2026")
+        response = self.client.get(
+            "/api/reports/monthly-total/?year=2026", 
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
@@ -209,7 +234,10 @@ class ReportsNPlusOneTest(TestCase):
         for label, url in endpoints.items():
             reset_queries()
             start = time.perf_counter()
-            response = self.client.get(url)
+            response = self.client.get(
+                url,
+                HTTP_AUTHORIZATION=f'Bearer {self.token}'
+            )
             elapsed = time.perf_counter() - start
             query_count = len(connection.queries)
             self.assertEqual(response.status_code, 200)
