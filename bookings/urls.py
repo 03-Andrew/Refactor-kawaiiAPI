@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/bookings/<int:pk>/approve/', bookings.ApproveBooking.as_view(), name='approve_booking'),
     path('api/bookings/<int:pk>/cancel/', bookings.CancelBooking.as_view(), name='cancel_booking'),
     path('api/bookings/lock-room-type/', bookings.LockRoomType.as_view(), name='lock_room_type'),
+    path('api/bookings/bulk-lock-room-types/', bookings.BulkLockRoomType.as_view(), name='bulk_lock_room_types'),
     path('api/bookings/release-room-type/', bookings.ReleaseRoomType.as_view(), name='release_room_type'),
     path('api/bookings/daytour/', bookings.CreateDayTourGuest.as_view(), name='create_day_tour'),
 ]
