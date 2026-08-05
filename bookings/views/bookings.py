@@ -8,6 +8,8 @@ from rest_framework import generics, serializers, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+
 
 from bookings.models import Booking
 from bookings.serializers import (
@@ -146,6 +148,7 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
 
 class CreateOnlineBooking(BookingCreateMixin, APIView):
     authentication_classes = []
+    permission_classes = [AllowAny()]
     @extend_schema(
         tags=['Bookings'],
         description='Create an online booking with customer info, room bookings, optional boat transfers, and a down-payment link.',
@@ -446,6 +449,7 @@ class LockRoomType(APIView):
     Called when user selects a room type on the booking form.
     Lock expires after 10 minutes if not consumed by CreateOnlineBooking."""
     authentication_classes = []
+    permission_classes = [AllowAny()]
     @extend_schema(
         tags=['Bookings'],
         description='Acquire a 10-minute lock on a room-type for a date range.',
@@ -511,6 +515,7 @@ class LockRoomType(APIView):
 
 class ReleaseRoomType(APIView):
     authentication_classes = []
+    permission_classes = [AllowAny()]
     """Explicitly release a room-type lock.
 
     Called when user navigates away from booking form or closes tab."""
