@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'reports',
 ]
 
-
+ALLOWED_HOSTS = ['localhost', 'test-booking.dreww.space']
 
 # SSE configuration
 # SSE_RESPONSE_MODE = 'add'  # [optional, default: "chunk"]
