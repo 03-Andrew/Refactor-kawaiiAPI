@@ -4,6 +4,7 @@ from datetime import date
 from django.db.models import Count, Exists, OuterRef, Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from bookings.models import Booking, Room, RoomStatus, RoomType, BookingStatus
@@ -91,6 +92,16 @@ class RoomTypesListView(generics.ListCreateAPIView):
     queryset = RoomType.objects.all()
     pagination_class = None
 
+    def get_authenticators(self):
+        if self.request and self.request.method == 'GET':
+            return []
+        return super().get_authenticators()
+    def get_permissions(self):
+        if self.request and self.request.method == 'GET':
+            return [AllowAny()]
+        return super().get_permissions()
+
+    
     @extend_schema(parameters=ROOM_QUERY_PARAMS[0:3])
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)

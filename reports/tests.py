@@ -4,6 +4,7 @@ from django.test import TestCase, override_settings
 from django.db import connection, reset_queries
 
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import AccessToken
 
 from bookings.models import Room, RoomType, RoomStatus
 from transactions.models import (
@@ -12,6 +13,9 @@ from transactions.models import (
     PaymentStatus,
 )
 
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 @override_settings(DEBUG=True)
 class ReportsNPlusOneTest(TestCase):
@@ -21,10 +25,14 @@ class ReportsNPlusOneTest(TestCase):
     Daily/Weekly/Monthly/Yearly all serialize Payment querysets multiple
     times — each serialization triggers per-row FK + GFK queries.
     """
-
+    def get_jwt_token(self, user):
+        token = AccessToken.for_user(user) 
+        return str(token)
+    
     def setUp(self):
         self.client = APIClient()
 
+        self.token = self.get_jwt_token(User.objects.create_user(username="testuser", password="testpass"))
         # ── Shared reference data ──
         self.amenity = Amenities.objects.create(
             amenity="Boat Transfer", rate_per_head=500.00,
@@ -59,6 +67,7 @@ class ReportsNPlusOneTest(TestCase):
         }
         response = self.client.post(
             "/api/bookings/daytour/", payload, format="json",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
         self.assertEqual(response.status_code, 201,
                          f"Daytour failed: {response.data}")
@@ -80,6 +89,7 @@ class ReportsNPlusOneTest(TestCase):
         }
         response = self.client.post(
             "/api/payment/multiple/", payload, format="json",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
         self.assertEqual(response.status_code, 201,
                          f"Payment creation failed: {response.data}")
@@ -87,7 +97,7 @@ class ReportsNPlusOneTest(TestCase):
 
     def _seed_data(self, count=50):
         """Create `count` daytour bookings + payments. Returns year used."""
-        print(f"  Seeding {count} daytours + payments...")
+        # print(f"  Seeding {count} daytours + payments...")
         start = time.perf_counter()
         for i in range(count):
             data = self._create_daytour(i)
@@ -97,31 +107,34 @@ class ReportsNPlusOneTest(TestCase):
             ).first().id
             self._create_payment(billing_id, amenity_id)
         elapsed = time.perf_counter() - start
-        print(f"  Seed complete: {count} records in {elapsed:.2f}s")
+        # print(f"  Seed complete: {count} records in {elapsed:.2f}s")
         self.assertEqual(Payment.objects.count(), count)
 
     # ── Report tests ──────────────────────────────────────────
 
     def test_daily_report(self):
-        """GET /api/daily-reports/?date=YYYY-MM-DD — single day."""
+        """GET /api/reports/daily/?date=YYYY-MM-DD — single day."""
         self._seed_data(50)
 
         date_str = "2026-07-28"
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get(f"/api/daily-reports/?date={date_str}")
+        response = self.client.get(
+            f"/api/reports/daily/?date={date_str}",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/daily-reports/?date={date_str}:")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/reports/daily/?date={date_str}:")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
     def test_weekly_report(self):
-        """GET /api/weekly-reports/?year=2026&s=30&e=30 — one week.
+        """GET /api/reports/weekly/?year=2026&s=30&e=30 — one week.
 
         This is the heaviest: PaymentSerializer called per day (7x).
         """
@@ -130,64 +143,76 @@ class ReportsNPlusOneTest(TestCase):
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/weekly-reports/?year=2026&s=30&e=30")
+        response = self.client.get(
+            "/api/reports/weekly/?year=2026&s=30&e=30",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/weekly-reports/?year=2026&s=30&e=30:")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/reports/weekly/?year=2026&s=30&e=30:")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
     def test_monthly_report(self):
-        """GET /api/monthly-reports/?year=2026&s=7 — one month."""
+        """GET /api/reports/monthly/?year=2026&s=7 — one month."""
         self._seed_data(50)
 
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/monthly-reports/?year=2026&s=7")
+        response = self.client.get(
+            "/api/reports/monthly/?year=2026&s=7",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/monthly-reports/?year=2026&s=7:")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/reports/monthly/?year=2026&s=7:")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
     def test_yearly_report(self):
-        """GET /api/yearly-reports/?s=2026 — one year, all months."""
+        """GET /api/reports/yearly/?s=2026 — one year, all months."""
         self._seed_data(50)
 
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/yearly-reports/?s=2026")
+        response = self.client.get(
+            "/api/reports/yearly/?s=2026",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/yearly-reports/?s=2026:")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/reports/yearly/?s=2026:")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
 
     def test_total_per_month(self):
-        """GET /api/total-per-month/?year=2026 — aggregation, no N+1 expected."""
+        """GET /api/reports/monthly-total/?year=2026 — aggregation, no N+1 expected."""
         self._seed_data(50)
 
         reset_queries()
 
         start = time.perf_counter()
-        response = self.client.get("/api/total-per-month/?year=2026")
+        response = self.client.get(
+            "/api/reports/monthly-total/?year=2026", 
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         elapsed = time.perf_counter() - start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/total-per-month/?year=2026:")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/reports/monthly-total/?year=2026:")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("months", response.data)
@@ -198,27 +223,30 @@ class ReportsNPlusOneTest(TestCase):
         self._seed_data(50)
 
         endpoints = {
-            "daily": "/api/daily-reports/?date=2026-07-28",
-            "weekly": "/api/weekly-reports/?year=2026&s=30&e=30",
-            "monthly": "/api/monthly-reports/?year=2026&s=7",
-            "yearly": "/api/yearly-reports/?s=2026",
-            "total-per-month": "/api/total-per-month/?year=2026",
+            "daily": "/api/reports/daily/?date=2026-07-28",
+            "weekly": "/api/reports/weekly/?year=2026&s=30&e=30",
+            "monthly": "/api/reports/monthly/?year=2026&s=7",
+            "yearly": "/api/reports/yearly/?s=2026",
+            "monthly-total": "/api/reports/monthly-total/?year=2026",
         }
 
         results = {}
         for label, url in endpoints.items():
             reset_queries()
             start = time.perf_counter()
-            response = self.client.get(url)
+            response = self.client.get(
+                url,
+                HTTP_AUTHORIZATION=f'Bearer {self.token}'
+            )
             elapsed = time.perf_counter() - start
             query_count = len(connection.queries)
             self.assertEqual(response.status_code, 200)
             results[label] = (query_count, elapsed * 1000)
 
-        print(f"\n  {'Endpoint':<18} {'Queries':>8} {'Time':>10}")
-        print(f"  {'─'*18} {'─'*8} {'─'*10}")
-        for label, (qc, ms) in results.items():
-            print(f"  {label:<18} {qc:>8} {ms:>8.1f}ms")
+        # print(f"\n  {'Endpoint':<18} {'Queries':>8} {'Time':>10}")
+        # print(f"  {'─'*18} {'─'*8} {'─'*10}")
+        # for label, (qc, ms) in results.items():
+        #     print(f"  {label:<18} {qc:>8} {ms:>8.1f}ms")
 
     # ── Cleanup ───────────────────────────────────────────────
 

@@ -1,7 +1,16 @@
+"""
+Booking Tests
+=============
+BookingCreationTests   - online, stay-in, and day-tour booking creation
+BookingPerformanceTests - N+1 regression and bulk-create speed checks
+ApproveBookingTests     - approve booking scenarios
+CancelBookingTests     - cancel booking scenarios
+"""
 import time
-
+from unittest.mock import patch
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
+from rest_framework_simplejwt.tokens import AccessToken
 
 from bookings.models import Booking, Room, RoomType, BookingStatus, RoomStatus
 from bookings.views.bookings import (
@@ -10,12 +19,20 @@ from bookings.views.bookings import (
 )
 from transactions.models import Billing, Customer, Amenities, AmenitiesAvailed, GuestList, ActivitiesAvailed, Activity, BillingStatus
 
+from django.contrib.auth import get_user_model
+# ── Shared base ────────────────────────────────────────────────────────────────
+User = get_user_model()
+class BookingTestBase(TestCase):
+    """Shared fixtures and helpers used by all booking test classes."""
 
-class BookingSystemTestCase(TestCase):
+    def get_jwt_token(self, user):
+        token = AccessToken.for_user(user) 
+        return str(token)
+    
     def setUp(self):
         self.factory = APIRequestFactory()
-        
-        # Shared Room Type
+        self.token = self.get_jwt_token(User.objects.create_user(username="testuser", password="testpass"))
+
         self.room_type = RoomType.objects.create(
             name="Test Room Type",
             description="A test room type",
@@ -24,19 +41,13 @@ class BookingSystemTestCase(TestCase):
             max_children=1,
             max_adult=2,
         )
-        
-        # Shared Rooms
-        room_numbers = ["101", "102", "103", "104", "106"]
 
+        room_numbers = ["101", "102", "103", "104", "106"]
         self.rooms = Room.objects.bulk_create([
-            Room(
-                number=number,
-                type=self.room_type,
-                status=RoomStatus.AVAILABLE,
-            )
+            Room(number=number, type=self.room_type, status=RoomStatus.AVAILABLE)
             for number in room_numbers
         ])
-        # Shared Amenities
+
         self.amenities = Amenities.objects.create(
             amenity="Boat Transfer",
             rate_per_head=500.00,
@@ -47,7 +58,57 @@ class BookingSystemTestCase(TestCase):
             hourly_rate=300.00,
         )
 
-    def test_create_online_booking(self):
+    def tearDown(self):
+        Booking.objects.all().delete()
+        AmenitiesAvailed.objects.all().delete()
+        ActivitiesAvailed.objects.all().delete()
+        GuestList.objects.all().delete()
+        Billing.objects.all().delete()
+        Customer.objects.all().delete()
+        Amenities.objects.all().delete()
+        Activity.objects.all().delete()
+        Room.objects.all().delete()
+        RoomType.objects.all().delete()
+
+    @patch('bookings.turnstile.requests.post')
+    def _create_online_booking(self, email="patch-test@example.com", mock_post=None):
+        """Helper: create an online booking and return (booking_id, billing_id)."""
+        request_data = {
+            "customer": {
+                "first_name": "Patch",
+                "last_name": "Test",
+                "contact_number": "09123456789",
+                "email": email,
+            },
+            "rooms": [{
+                "room_type": self.room_type.id,
+                "check_in": "2027-10-01",
+                "check_out": "2027-10-03",
+                "adult_count": 2,
+                "children_count": 0,
+                "extra_guest": 0,
+            }],
+            "payment": 1000.00,
+            "turnstile_token": "dummy-token",
+        }
+        mock_post.return_value.json.return_value = {"success": True}
+        request = self.factory.post(
+            '/api/bookings/online/', request_data, content_type='application/json',
+        )
+        response = CreateOnlineBooking.as_view()(request)
+        self.assertEqual(response.status_code, 201)
+        booking_id = response.data['bookings'][0]['id']
+        billing_id = response.data['billing']['id']
+        return booking_id, billing_id
+
+
+# ── Booking creation ───────────────────────────────────────────────────────────
+
+class BookingCreationTests(BookingTestBase):
+    """Tests for creating bookings via online, stay-in, and day-tour endpoints."""
+
+    @patch('bookings.turnstile.requests.post')
+    def test_create_online_booking(self, mock_post):
         check_in = "2026-09-01"
         check_out = "2026-09-05"
 
@@ -72,13 +133,14 @@ class BookingSystemTestCase(TestCase):
                 "guests": ["John Doe", "Jane Doe"],
             }],
             "payment": 1000.00,
+            "turnstile_token": "dummy-token",
         }
-
+        mock_post.return_value.json.return_value = {"success": True}
         request = self.factory.post(
             '/api/bookings/online/', request_data, content_type='application/json',
         )
         response = CreateOnlineBooking.as_view()(request)
-        
+
         self.assertEqual(response.status_code, 201)
         self.assertIn('customer', response.data)
         self.assertIn('billing', response.data)
@@ -104,16 +166,15 @@ class BookingSystemTestCase(TestCase):
                 "adult_count": 2,
                 "children_count": 0,
                 "extra_guest": 0,
-                "room_number": self.rooms[0].id
+                "room_number": self.rooms[0].id,
             }],
         }
 
         request = self.factory.post(
-            '/api/bookings/stay-in/', request_data, content_type='application/json',
+            '/api/bookings/stay-in/', request_data, content_type='application/json', 
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = CreateStayInBooking.as_view()(request)
-
-        # Update assertions based on your endpoint's expected response
         self.assertIn(response.status_code, [200, 201])
 
     def test_day_tour_booking(self):
@@ -131,10 +192,16 @@ class BookingSystemTestCase(TestCase):
 
         request = self.factory.post(
             '/api/bookings/daytour/', request_data, content_type='application/json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
         response = CreateDayTourGuest.as_view()(request)
-        # Update assertions based on your endpoint's expected response
         self.assertEqual(response.status_code, 201)
+
+
+# ── Performance / N+1 regressions ─────────────────────────────────────────────
+
+class BookingPerformanceTests(BookingTestBase):
+    """Regression tests ensuring booking endpoints avoid N+1 query patterns."""
 
     def test_create_stay_in_booking_multi_room_query_count(self):
         """N+1 regression: 4-room booking time <4x 1-room time (batched queries)."""
@@ -169,7 +236,8 @@ class BookingSystemTestCase(TestCase):
                 ],
             }
             request = self.factory.post(
-                '/api/bookings/onsite/', request_data, content_type='application/json',
+                '/api/bookings/onsite/', request_data, content_type='application/json', 
+                HTTP_AUTHORIZATION=f'Bearer {self.token}',
             )
             start = time.perf_counter()
             response = CreateStayInBooking.as_view()(request)
@@ -182,11 +250,12 @@ class BookingSystemTestCase(TestCase):
         t4 = make_booking(extra_ids[1:5], "perf-b@test.com")
 
         ratio = t4 / t1
-        print(f"\n  Booking speed: 1 room={t1*1000:.1f}ms, 4 rooms={t4*1000:.1f}ms, ratio={ratio:.2f}x")
+        # print(f"\n  Booking speed: 1 room={t1*1000:.1f}ms, 4 rooms={t4*1000:.1f}ms, ratio={ratio:.2f}x")
         self.assertLess(ratio, 4.0,
                         f"4-room booking should be <4x 1-room time (got {ratio:.2f}x)")
 
-    def test_online_booking_multi_room_query_count(self):
+    @patch('bookings.turnstile.requests.post')
+    def test_online_booking_multi_room_query_count(self, mock_post):
         """N+1 regression: online booking with boats — constant query profile."""
         check_in = "2026-12-10"
         check_out = "2026-12-12"
@@ -217,7 +286,9 @@ class BookingSystemTestCase(TestCase):
                     for i in range(boat_count)
                 ],
                 "payment": 1000.00,
+                "turnstile_token": "dummy-token",
             }
+            mock_post.return_value.json.return_value = {"success": True}
             request = self.factory.post(
                 '/api/bookings/online/', request_data, content_type='application/json',
             )
@@ -232,7 +303,7 @@ class BookingSystemTestCase(TestCase):
         t3 = make_booking(3, 2, "online-b@test.com")
 
         ratio = t3 / t1
-        print(f"\n  Online booking: 1r+1b={t1*1000:.1f}ms, 3r+2b={t3*1000:.1f}ms, ratio={ratio:.2f}x")
+        # print(f"\n  Online booking: 1r+1b={t1*1000:.1f}ms, 3r+2b={t3*1000:.1f}ms, ratio={ratio:.2f}x")
         self.assertLess(ratio, 9.0,
                         f"3r+2b booking should not be 9x+ slower (got {ratio:.2f}x)")
 
@@ -262,6 +333,7 @@ class BookingSystemTestCase(TestCase):
         }
         request = self.factory.post(
             '/api/bookings/onsite/', request_data, content_type='application/json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
 
         start = time.perf_counter()
@@ -272,46 +344,17 @@ class BookingSystemTestCase(TestCase):
                          f"Bulk create failed: {response.data}")
         self.assertEqual(len(response.data['bookings']), bookings_to_create)
 
-        # Verify all bookings persisted
         booking_count = Booking.objects.filter(
             customer_bill__customer__email="bulk@test.com"
         ).count()
         self.assertEqual(booking_count, bookings_to_create)
-        print(f"\n  Bulk create {bookings_to_create} bookings: {elapsed*1000:.1f}ms")
+        # print(f"\n  Bulk create {bookings_to_create} bookings: {elapsed*1000:.1f}ms")
 
-    # ── PATCH booking/{id} tests ───────────────────────────────
 
-    def _create_online_booking(self, email="patch-test@example.com"):
-        """Helper: create an online booking and return (response, booking_id, billing_id)."""
+# ── Approve booking ────────────────────────────────────────────────────────────
 
-        request_data = {
-            "customer": {
-                "first_name": "Patch",
-                "last_name": "Test",
-                "contact_number": "09123456789",
-                "email": email,
-            },
-            "rooms": [{
-                "room_type": self.room_type.id,
-                "check_in": "2027-10-01",
-                "check_out": "2027-10-03",
-                "adult_count": 2,
-                "children_count": 0,
-                "extra_guest": 0,
-            }],
-            "payment": 1000.00,
-        }
-        request = self.factory.post(
-            '/api/bookings/online/', request_data, content_type='application/json',
-        )
-    
-        response = CreateOnlineBooking.as_view()(request)
-        self.assertEqual(response.status_code, 201)
-        booking_id = response.data['bookings'][0]['id']
-        billing_id = response.data['billing']['id']
-        return booking_id, billing_id
-
-    # ── POST bookings/{id}/approve tests ───────────────────────
+class ApproveBookingTests(BookingTestBase):
+    """Tests for POST /bookings/{id}/approve."""
 
     def test_approve_booking_assigns_room(self):
         """POST /approve with a room assigns it and sets APPROVED."""
@@ -325,6 +368,7 @@ class BookingSystemTestCase(TestCase):
             f'/api/bookings/{booking_id}/approve/',
             {'room': self.rooms[0].id},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = ApproveBooking.as_view()(request, pk=booking_id)
 
@@ -345,6 +389,7 @@ class BookingSystemTestCase(TestCase):
             f'/api/bookings/{booking_id}/approve/',
             {},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = ApproveBooking.as_view()(request, pk=booking_id)
 
@@ -355,9 +400,7 @@ class BookingSystemTestCase(TestCase):
         """POST /approve with room of different type returns 400."""
         booking_id, _ = self._create_online_booking("wrong-type@test.com")
 
-        other_type = RoomType.objects.create(
-            name="Other", price=1000, max_adult=2,
-        )
+        other_type = RoomType.objects.create(name="Other", price=1000, max_adult=2)
         other_room = Room.objects.create(
             number="999", type=other_type, status=RoomStatus.AVAILABLE,
         )
@@ -366,6 +409,7 @@ class BookingSystemTestCase(TestCase):
             f'/api/bookings/{booking_id}/approve/',
             {'room': other_room.id},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = ApproveBooking.as_view()(request, pk=booking_id)
 
@@ -380,6 +424,7 @@ class BookingSystemTestCase(TestCase):
             f'/api/bookings/{booking_id}/approve/',
             {'room': self.rooms[0].id},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = ApproveBooking.as_view()(request, pk=booking_id)
         self.assertEqual(response.status_code, 200)
@@ -388,10 +433,9 @@ class BookingSystemTestCase(TestCase):
             f'/api/bookings/{booking_id}/approve/',
             {'room': self.rooms[1].id},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
-
         response2 = ApproveBooking.as_view()(request2, pk=booking_id)
-
 
         self.assertEqual(response2.status_code, 400)
         self.assertIn('Cannot approve', response2.data['error'])
@@ -420,13 +464,18 @@ class BookingSystemTestCase(TestCase):
             f'/api/bookings/{booking_id}/approve/',
             {'room': self.rooms[0].id},
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = ApproveBooking.as_view()(request, pk=booking_id)
 
         self.assertEqual(response.status_code, 400)
         self.assertIn('already booked', response.data['error'])
 
-    # ── POST bookings/{id}/cancel tests ────────────────────────
+
+# ── Cancel booking ─────────────────────────────────────────────────────────────
+
+class CancelBookingTests(BookingTestBase):
+    """Tests for POST /bookings/{id}/cancel."""
 
     def test_cancel_booking_cascades_billing(self):
         """POST /cancel cancels booking and cascades to billing."""
@@ -435,6 +484,7 @@ class BookingSystemTestCase(TestCase):
         request = self.factory.post(
             f'/api/bookings/{booking_id}/cancel/',
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = CancelBooking.as_view()(request, pk=booking_id)
 
@@ -463,6 +513,7 @@ class BookingSystemTestCase(TestCase):
         request = self.factory.post(
             f'/api/bookings/{booking_id_1}/cancel/',
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = CancelBooking.as_view()(request, pk=booking_id_1)
 
@@ -471,7 +522,7 @@ class BookingSystemTestCase(TestCase):
 
         billing = Billing.objects.get(pk=billing_id)
         self.assertNotEqual(billing.status, BillingStatus.CANCELLED,
-                           "Billing should not be cancelled while other bookings are active")
+                            "Billing should not be cancelled while other bookings are active")
 
     def test_cancel_already_cancelled_booking_fails(self):
         """Cancelling an already CANCELLED booking returns 400."""
@@ -480,6 +531,7 @@ class BookingSystemTestCase(TestCase):
         request = self.factory.post(
             f'/api/bookings/{booking_id}/cancel/',
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
         response = CancelBooking.as_view()(request, pk=booking_id)
         self.assertEqual(response.status_code, 200)
@@ -487,21 +539,8 @@ class BookingSystemTestCase(TestCase):
         request2 = self.factory.post(
             f'/api/bookings/{booking_id}/cancel/',
             format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.token}',
         )
-        response2 = CancelBooking.as_view()(request, pk=booking_id)
+        response2 = CancelBooking.as_view()(request2, pk=booking_id)
         self.assertEqual(response2.status_code, 400)
         self.assertIn('Cannot cancel', response2.data['error'])
-
-    def tearDown(self):
-
-        Booking.objects.all().delete()
-        AmenitiesAvailed.objects.all().delete()
-        ActivitiesAvailed.objects.all().delete()
-        GuestList.objects.all().delete()
-        Billing.objects.all().delete()
-
-        Customer.objects.all().delete()
-        Amenities.objects.all().delete()
-        Activity.objects.all().delete()
-        Room.objects.all().delete()
-        RoomType.objects.all().delete()

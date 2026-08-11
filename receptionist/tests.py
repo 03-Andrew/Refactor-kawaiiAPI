@@ -1,9 +1,19 @@
+"""
+Receptionist Tests
+==================
+ReceptionistTestBase        - shared fixtures and helpers
+AmenitiesAvailedNPlusOneTest  - N+1 regression for GET /api/amenities-availed/
+ActivitiesAvailedNPlusOneTest - N+1 regression for GET /api/activities-availed/
+CreatePaymentNPlusOneTest     - N+1 regression for GET /api/all-payments/
+"""
 import time
 
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.db import connection, reset_queries
 
 from rest_framework.test import APIClient
+from rest_framework.views import APIView
 
 from bookings.models import Booking, Room, RoomType
 from transactions.models import (
@@ -11,20 +21,44 @@ from transactions.models import (
     Billing, Customer, GuestList, Payment, PaymentMethod,
     PaymentStatus,
 )
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import AccessToken
 
 
-@override_settings(DEBUG=True)
-class AmenitiesAvailedNPlusOneTest(TestCase):
-    """Regression test for N+1 queries on GET /api/amenities-availed/.
+User = get_user_model()
 
-    Before fix: BillingSerializer nested inside AmenitiesAvailedListSerializer
-    causes O(N * 7+) queries — each Billing's total_cost/paid_amount/running_balance
-    properties iterate reverse relations with fresh SQL.
-    """
+# ── Shared base ────────────────────────────────────────────────────────────────
+
+@override_settings(
+    DEBUG=True,
+    REST_FRAMEWORK={
+        'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+        'PAGE_SIZE': 100,
+        'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+        'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+        'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
+        'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework_simplejwt.authentication.JWTAuthentication'],
+        'DEFAULT_THROTTLE_CLASSES': [],
+        'DEFAULT_THROTTLE_RATES': {},
+    },
+)
+class ReceptionistTestBase(TestCase):
+    """Shared fixtures and helpers used by all receptionist test classes."""
+
+    # Subclasses that need a unique username should override this.
+    username = "testuser"
+
+    def get_jwt_token(self, user):
+        token = AccessToken.for_user(user)
+        return str(token)
 
     def setUp(self):
+        cache.clear()
+        APIView.throttle_classes = []
         self.client = APIClient()
-
+        self.token = self.get_jwt_token(
+            User.objects.create_user(username=self.username, password="testpass")
+        )
         self.amenity = Amenities.objects.create(
             amenity="Boat Transfer",
             rate_per_head=500.00,
@@ -33,6 +67,18 @@ class AmenitiesAvailedNPlusOneTest(TestCase):
             activity="Snorkeling",
             hourly_rate=300.00,
         )
+
+    def tearDown(self):
+        AmenitiesAvailed.objects.all().delete()
+        ActivitiesAvailed.objects.all().delete()
+        GuestList.objects.all().delete()
+        Billing.objects.all().delete()
+        Customer.objects.all().delete()
+        Amenities.objects.all().delete()
+        Activity.objects.all().delete()
+        Booking.objects.all().delete()
+        Room.objects.all().delete()
+        RoomType.objects.all().delete()
 
     def _create_daytour(self, email_suffix):
         """Create one daytour booking with 1 amenity and 1 activity."""
@@ -50,10 +96,24 @@ class AmenitiesAvailedNPlusOneTest(TestCase):
 
         response = self.client.post(
             "/api/bookings/daytour/", payload, format="json",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
         self.assertEqual(response.status_code, 201,
                          f"Daytour creation failed for suffix {email_suffix}: {response.data}")
         return response.data
+
+
+# ── Amenities availed N+1 ──────────────────────────────────────────────────────
+
+class AmenitiesAvailedNPlusOneTest(ReceptionistTestBase):
+    """Regression test for N+1 queries on GET /api/amenities-availed/.
+
+    Before fix: BillingSerializer nested inside AmenitiesAvailedListSerializer
+    causes O(N * 7+) queries — each Billing's total_cost/paid_amount/running_balance
+    properties iterate reverse relations with fresh SQL.
+    """
+
+    username = "testuser"
 
     def test_n_plus_one_on_amenities_availed_get(self):
         """CREATE 100 amenities availed, then GET list and measure queries + time.
@@ -64,12 +124,12 @@ class AmenitiesAvailedNPlusOneTest(TestCase):
         num_records = 100
 
         # --- Create 100 daytour bookings, each with 1 amenity availed ---
-        print(f"\n  Creating {num_records} daytour bookings (each = 1 AmenitiesAvailed)...")
+        # print(f"\n  Creating {num_records} daytour bookings (each = 1 AmenitiesAvailed)...")
         create_start = time.perf_counter()
         for i in range(num_records):
             self._create_daytour(i)
         create_elapsed = time.perf_counter() - create_start
-        print(f"  Created {num_records} in {create_elapsed:.2f}s")
+        # print(f"  Created {num_records} in {create_elapsed:.2f}s")
 
         # Verify count
         self.assertEqual(AmenitiesAvailed.objects.count(), num_records)
@@ -78,13 +138,16 @@ class AmenitiesAvailedNPlusOneTest(TestCase):
         reset_queries()
 
         get_start = time.perf_counter()
-        response = self.client.get("/api/amenities-availed/")
+        response = self.client.get(
+            "/api/amenities-availed/",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         get_elapsed = time.perf_counter() - get_start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/amenities-availed/ ({num_records} records):")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {get_elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/amenities-availed/ ({num_records} records):")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {get_elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], num_records)
@@ -116,14 +179,17 @@ class AmenitiesAvailedNPlusOneTest(TestCase):
                 self._create_daytour(i)
 
             reset_queries()
-            response = self.client.get("/api/amenities-availed/")
+            response = self.client.get(
+                "/api/amenities-availed/",
+                HTTP_AUTHORIZATION=f'Bearer {self.token}'
+            )
             self.assertEqual(response.status_code, 200)
             return len(connection.queries)
 
         q_small = create_and_fetch(10, offset=0)
         q_large = create_and_fetch(100, offset=10)
 
-        print(f"\n  Query counts: 10 records={q_small}, 100 records={q_large}")
+        # print(f"\n  Query counts: 10 records={q_small}, 100 records={q_large}")
 
         # self.assertEqual(
         #     q_small, q_large,
@@ -131,21 +197,10 @@ class AmenitiesAvailedNPlusOneTest(TestCase):
         #     f"100 records={q_large}. N+1 regression: each extra row adds queries."
         # )
 
-    def tearDown(self):
-        AmenitiesAvailed.objects.all().delete()
-        ActivitiesAvailed.objects.all().delete()
-        GuestList.objects.all().delete()
-        Billing.objects.all().delete()
-        Customer.objects.all().delete()
-        Amenities.objects.all().delete()
-        Activity.objects.all().delete()
-        Booking.objects.all().delete()
-        Room.objects.all().delete()
-        RoomType.objects.all().delete()
 
+# ── Activities availed N+1 ─────────────────────────────────────────────────────
 
-@override_settings(DEBUG=True)
-class ActivitiesAvailedNPlusOneTest(TestCase):
+class ActivitiesAvailedNPlusOneTest(ReceptionistTestBase):
     """Regression test for N+1 queries on GET /api/activities-availed/.
 
     Before fix: BillingSerializer nested inside ActivitiesAvailedListSerializer
@@ -153,38 +208,7 @@ class ActivitiesAvailedNPlusOneTest(TestCase):
     properties iterate reverse relations with fresh SQL.
     """
 
-    def setUp(self):
-        self.client = APIClient()
-
-        self.amenity = Amenities.objects.create(
-            amenity="Boat Transfer",
-            rate_per_head=500.00,
-        )
-        self.activity = Activity.objects.create(
-            activity="Snorkeling",
-            hourly_rate=300.00,
-        )
-
-    def _create_daytour(self, email_suffix):
-        """Create one daytour booking with 1 amenity and 1 activity."""
-        payload = {
-            "customer": {
-                "first_name": f"Perf{email_suffix}",
-                "last_name": "Test",
-                "contact_number": "09111111111",
-                "email": f"perf{email_suffix}@test.com",
-            },
-            "guest_list": [f"Guest {email_suffix}"],
-            "selected_amenities": [{"id": self.amenity.id, "head_count": 2}],
-            "selected_activities": [{"id": self.activity.id, "hours": 2}],
-        }
-
-        response = self.client.post(
-            "/api/bookings/daytour/", payload, format="json",
-        )
-        self.assertEqual(response.status_code, 201,
-                         f"Daytour creation failed for suffix {email_suffix}: {response.data}")
-        return response.data
+    username = "testuser2"
 
     def test_n_plus_one_on_activities_availed_get(self):
         """CREATE 100 activities availed, then GET list and measure queries + time.
@@ -195,12 +219,12 @@ class ActivitiesAvailedNPlusOneTest(TestCase):
         num_records = 100
 
         # --- Create 100 daytour bookings, each with 1 activity availed ---
-        print(f"\n  Creating {num_records} daytour bookings (each = 1 ActivitiesAvailed)...")
+        # print(f"\n  Creating {num_records} daytour bookings (each = 1 ActivitiesAvailed)...")
         create_start = time.perf_counter()
         for i in range(num_records):
             self._create_daytour(i)
         create_elapsed = time.perf_counter() - create_start
-        print(f"  Created {num_records} in {create_elapsed:.2f}s")
+        # print(f"  Created {num_records} in {create_elapsed:.2f}s")
 
         # Verify count
         self.assertEqual(ActivitiesAvailed.objects.count(), num_records)
@@ -209,13 +233,16 @@ class ActivitiesAvailedNPlusOneTest(TestCase):
         reset_queries()
 
         get_start = time.perf_counter()
-        response = self.client.get("/api/activities-availed/")
+        response = self.client.get(
+            "/api/activities-availed/",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         get_elapsed = time.perf_counter() - get_start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/activities-availed/ ({num_records} records):")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {get_elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/activities-availed/ ({num_records} records):")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {get_elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], num_records)
@@ -237,14 +264,17 @@ class ActivitiesAvailedNPlusOneTest(TestCase):
                 self._create_daytour(i)
 
             reset_queries()
-            response = self.client.get("/api/activities-availed/")
+            response = self.client.get(
+                "/api/activities-availed/",
+                HTTP_AUTHORIZATION=f'Bearer {self.token}'
+            )
             self.assertEqual(response.status_code, 200)
             return len(connection.queries)
 
         q_small = create_and_fetch(10, offset=0)
         q_large = create_and_fetch(100, offset=10)
 
-        print(f"\n  Query counts: 10 records={q_small}, 100 records={q_large}")
+        # print(f"\n  Query counts: 10 records={q_small}, 100 records={q_large}")
 
         # self.assertEqual(
         #     q_small, q_large,
@@ -252,21 +282,10 @@ class ActivitiesAvailedNPlusOneTest(TestCase):
         #     f"100 records={q_large}. N+1 regression: each extra row adds queries."
         # )
 
-    def tearDown(self):
-        AmenitiesAvailed.objects.all().delete()
-        ActivitiesAvailed.objects.all().delete()
-        GuestList.objects.all().delete()
-        Billing.objects.all().delete()
-        Customer.objects.all().delete()
-        Amenities.objects.all().delete()
-        Activity.objects.all().delete()
-        Booking.objects.all().delete()
-        Room.objects.all().delete()
-        RoomType.objects.all().delete()
 
+# ── Payment N+1 ────────────────────────────────────────────────────────────────
 
-@override_settings(DEBUG=True)
-class CreatePaymentNPlusOneTest(TestCase):
+class CreatePaymentNPlusOneTest(ReceptionistTestBase):
     """N+1 regression: POST /api/payment/multiple/ → GET /api/all-payments/.
 
     GET /api/all-payments/ uses PaymentSerializer which traverses
@@ -274,19 +293,21 @@ class CreatePaymentNPlusOneTest(TestCase):
     (paid_for) — all per row without select_related.
     """
 
-    def setUp(self):
-        self.client = APIClient()
+    username = "testuser3"
 
-        self.amenity = Amenities.objects.create(
-            amenity="Boat Transfer", rate_per_head=500.00,
-        )
-        self.activity = Activity.objects.create(
-            activity="Snorkeling", hourly_rate=300.00,
-        )
+    def setUp(self):
+        super().setUp()
         self.mop = PaymentMethod.objects.create(mode="GCash")
         self.payment_status = PaymentStatus.objects.create(status="Completed")
 
+    def tearDown(self):
+        Payment.objects.all().delete()
+        PaymentMethod.objects.all().delete()
+        PaymentStatus.objects.all().delete()
+        super().tearDown()
+
     def _create_daytour(self, email_suffix):
+        """Create one daytour booking with 1 amenity and 1 activity."""
         payload = {
             "customer": {
                 "first_name": f"Pay{email_suffix}",
@@ -300,6 +321,7 @@ class CreatePaymentNPlusOneTest(TestCase):
         }
         response = self.client.post(
             "/api/bookings/daytour/", payload, format="json",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
         self.assertEqual(response.status_code, 201,
                          f"Daytour creation failed: {response.data}")
@@ -320,6 +342,7 @@ class CreatePaymentNPlusOneTest(TestCase):
         }
         response = self.client.post(
             "/api/payment/multiple/", payload, format="json",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
         )
         self.assertEqual(response.status_code, 201,
                          f"Payment creation failed: {response.data}")
@@ -330,12 +353,12 @@ class CreatePaymentNPlusOneTest(TestCase):
         num_records = 100
 
         # ── Phase 1: Create daytour bookings ──
-        print(f"\n  Creating {num_records} daytour bookings...")
+        # print(f"\n  Creating {num_records} daytour bookings...")
         daytour_start = time.perf_counter()
         for i in range(num_records):
             self._create_daytour(i)
         daytour_elapsed = time.perf_counter() - daytour_start
-        print(f"  Daytours created in {daytour_elapsed:.2f}s")
+        # print(f"  Daytours created in {daytour_elapsed:.2f}s")
 
         self.assertEqual(AmenitiesAvailed.objects.count(), num_records)
         self.assertEqual(Billing.objects.count(), num_records)
@@ -348,12 +371,12 @@ class CreatePaymentNPlusOneTest(TestCase):
             Billing.objects.values_list("id", flat=True).order_by("id")
         )
 
-        print(f"  Creating {num_records} payments via /api/payment/multiple/...")
+        # print(f"  Creating {num_records} payments via /api/payment/multiple/...")
         post_start = time.perf_counter()
         for i in range(num_records):
             self._create_payment(billing_ids[i], amenity_ids[i])
         post_elapsed = time.perf_counter() - post_start
-        print(f"  Payments POST: {post_elapsed:.2f}s total, {post_elapsed/num_records*1000:.1f}ms avg")
+        # print(f"  Payments POST: {post_elapsed:.2f}s total, {post_elapsed/num_records*1000:.1f}ms avg")
 
         self.assertEqual(Payment.objects.count(), num_records)
 
@@ -361,33 +384,21 @@ class CreatePaymentNPlusOneTest(TestCase):
         reset_queries()
 
         get_start = time.perf_counter()
-        response = self.client.get("/api/all-payments/")
+        response = self.client.get(
+            "/api/all-payments/",
+            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+        )
         get_elapsed = time.perf_counter() - get_start
 
         query_count = len(connection.queries)
-        print(f"\n  GET /api/all-payments/ ({num_records} records):")
-        print(f"    Queries: {query_count}")
-        print(f"    Time:    {get_elapsed*1000:.1f}ms")
+        # print(f"\n  GET /api/all-payments/ ({num_records} records):")
+        # print(f"    Queries: {query_count}")
+        # print(f"    Time:    {get_elapsed*1000:.1f}ms")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], num_records)
 
-        print(f"\n  Summary:")
-        print(f"    Daytour create:  {daytour_elapsed:.2f}s")
-        print(f"    Payments POST:   {post_elapsed:.2f}s ({post_elapsed/num_records*1000:.1f}ms avg)")
-        print(f"    GET all-payments: {get_elapsed*1000:.1f}ms, {query_count} queries")
-
-    def tearDown(self):
-        Payment.objects.all().delete()
-        PaymentMethod.objects.all().delete()
-        PaymentStatus.objects.all().delete()
-        AmenitiesAvailed.objects.all().delete()
-        ActivitiesAvailed.objects.all().delete()
-        GuestList.objects.all().delete()
-        Billing.objects.all().delete()
-        Customer.objects.all().delete()
-        Amenities.objects.all().delete()
-        Activity.objects.all().delete()
-        Booking.objects.all().delete()
-        Room.objects.all().delete()
-        RoomType.objects.all().delete()
+        # print(f"\n  Summary:")
+        # print(f"    Daytour create:  {daytour_elapsed:.2f}s")
+        # print(f"    Payments POST:   {post_elapsed:.2f}s ({post_elapsed/num_records*1000:.1f}ms avg)")
+        # print(f"    GET all-payments: {get_elapsed*1000:.1f}ms, {query_count} queries")

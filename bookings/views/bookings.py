@@ -8,6 +8,8 @@ from rest_framework import generics, serializers, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+
 
 from bookings.models import Booking
 from bookings.serializers import (
@@ -22,8 +24,9 @@ from bookings.services.booking import (
     create_amenities, create_activities, create_boat_transfer, create_guest_list,
 )
 from bookings.services.lock import (
-    acquire_room_type_lock, release_room_type_lock,
+    acquire_room_type_lock, bulk_acquire, release_room_type_lock,
 )
+from bookings.turnstile import validate_turnstile
 from transactions.models import BillingStatus
 from transactions.serializers import (
     BillingSerializerBase, CustomerSerializer,
@@ -144,6 +147,8 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
         }, status=status.HTTP_201_CREATED)
 
 class CreateOnlineBooking(BookingCreateMixin, APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
     @extend_schema(
         tags=['Bookings'],
         description='Create an online booking with customer info, room bookings, optional boat transfers, and a down-payment link.',
@@ -183,6 +188,14 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         holder_id = request.data.get('holder_id')
+        turnstile_token = request.data.get('turnstile_token')
+        remoteip = request.META.get('REMOTE_ADDR') or request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0]
+        validation_result = validate_turnstile(turnstile_token, remoteip)
+        if not validation_result.get('success'):
+            return Response(
+                {'error': 'validation failed', 'details': validation_result.get('error-codes', [])},
+                status=status.HTTP_403_FORBIDDEN,
+            )        
 
         try:
             with transaction.atomic():
@@ -224,7 +237,6 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
 
         subject = "Online Booking Confirmation"
         message = f"Booking Successful for {data['customer']['first_name']} {data['customer']['last_name']}"
-        print(settings.DEBUG)
         if settings.DEBUG:
             try:
                 send_email.delay(subject, message, [data['customer']['email']])
@@ -295,7 +307,7 @@ class EditBooking(APIView):
         tags=['Bookings'],
         description='Get a single booking by ID.',
     )
-    def get(self, request, pk):
+    def get(self, _request, pk):
         try:
             booking = Booking.objects.select_related(
                 'customer_bill__customer', 'room_type', 'room',
@@ -405,7 +417,7 @@ class CancelBooking(APIView):
         tags=['Bookings'],
         description='Cancel a PENDING or APPROVED booking.',
     )
-    def post(self, request, pk):
+    def post(self, _request, pk):
         booking = _get_booking(pk)
         if isinstance(booking, Response):
             return booking
@@ -436,7 +448,8 @@ class LockRoomType(APIView):
 
     Called when user selects a room type on the booking form.
     Lock expires after 10 minutes if not consumed by CreateOnlineBooking."""
-
+    authentication_classes = []
+    permission_classes = [AllowAny]
     @extend_schema(
         tags=['Bookings'],
         description='Acquire a 10-minute lock on a room-type for a date range.',
@@ -445,6 +458,14 @@ class LockRoomType(APIView):
         room_type_id = request.data.get('room_type')
         check_in = request.data.get('check_in')
         check_out = request.data.get('check_out')
+        turnstile_token = request.data.get('turnstile_token')
+        remoteip = request.META.get('REMOTE_ADDR') or request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0]
+        validation_result = validate_turnstile(turnstile_token, remoteip)
+        if not validation_result.get('success'):
+            return Response(
+                {'error': 'validation failed', 'details': validation_result.get('error-codes', [])},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         errors = {}
         if not room_type_id:
@@ -456,7 +477,7 @@ class LockRoomType(APIView):
         if errors:
             return Response({'error': errors}, status=status.HTTP_400_BAD_REQUEST)
 
-        available, detail = get_room_type_available(room_type_id, check_in, check_out)
+        _available, detail = get_room_type_available(room_type_id, check_in, check_out)
         if detail.get('error'):
             return Response(
                 {'error': detail['error']},
@@ -492,7 +513,92 @@ class LockRoomType(APIView):
             'check_out': check_out,
         })
 
+class BulkLockRoomType(APIView):
+    """Acquire locks on multiple room-type/date-range combos atomically.
+
+    All-or-nothing: if any combo is at capacity, no locks are held.
+    Returns a single holder_id for all locked combos."""
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=['Bookings'],
+        description='Acquire locks on multiple room-type/date-range combos atomically.',
+    )
+    def post(self, request):
+        rooms = request.data.get('rooms', [])
+        turnstile_token = request.data.get('turnstile_token')
+        remoteip = request.META.get('REMOTE_ADDR') or request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0]
+        validation_result = validate_turnstile(turnstile_token, remoteip)
+        if not validation_result.get('success'):
+            return Response(
+                {'error': 'validation failed', 'details': validation_result.get('error-codes', [])},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not rooms or not isinstance(rooms, list):
+            return Response(
+                {'error': {'rooms': 'A non-empty list of room objects is required.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        room_requests = []
+        errors = []
+        for i, room in enumerate(rooms):
+            room_type_id = room.get('room_type')
+            check_in = room.get('check_in')
+            check_out = room.get('check_out')
+            entry_errors = {}
+            if not room_type_id:
+                entry_errors['room_type'] = 'This field is required.'
+            if not check_in:
+                entry_errors['check_in'] = 'This field is required.'
+            if not check_out:
+                entry_errors['check_out'] = 'This field is required.'
+            if entry_errors:
+                errors.append({f'room[{i}]': entry_errors})
+                continue
+
+            _available, detail = get_room_type_available(room_type_id, check_in, check_out)
+            if detail.get('error'):
+                errors.append({f'room[{i}]': detail['error']})
+                continue
+
+            room_requests.append({
+                'room_type_id': room_type_id,
+                'check_in': check_in,
+                'check_out': check_out,
+                'max_available': detail['db_available'],
+            })
+
+        if errors:
+            return Response({'error': errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            all_held, holder_id, failures = bulk_acquire(room_requests, ttl=600)
+        except Exception:
+            return Response(
+                {'error': 'Lock service unavailable'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not all_held:
+            return Response({
+                'held': False,
+                'failures': failures,
+                'message': 'Some room types are fully booked for the requested dates.',
+            })
+
+        return Response({
+            'held': True,
+            'holder_id': holder_id,
+            'expires_in': 600,
+            'rooms': rooms,
+        })
+
 class ReleaseRoomType(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
     """Explicitly release a room-type lock.
 
     Called when user navigates away from booking form or closes tab."""

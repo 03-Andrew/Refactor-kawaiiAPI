@@ -2,7 +2,7 @@ from django.db.models import Sum
 from django.db.models.functions import ExtractMonth
 from django.contrib.contenttypes.models import ContentType
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
@@ -98,7 +98,12 @@ def initialize_data(rooms, amenities, activities):
 
 # ── Report views ────────────────────────────────────────────────
 
-@extend_schema(tags=['Reports'])
+@extend_schema(
+    tags=['Reports'],
+    parameters=[
+        OpenApiParameter(name='year', type=int, description='Year for which to get total earnings per month', required=True),
+    ]
+)
 class GetTotalEarningsPerMonth(APIView):
     def get(self, request):
         year = request.query_params.get('year')
@@ -129,7 +134,12 @@ class GetTotalEarningsPerMonth(APIView):
         return Response(monthly_earnings)
 
 
-@extend_schema(tags=['Reports'])
+@extend_schema(
+    tags=['Reports'],
+    parameters=[
+        OpenApiParameter(name='date', type=str, description='YYYY-MM-DD format', required=False),
+    ]
+)
 class GetDailyReport(APIView):
     def get(self, request):
         rooms = Room.objects.all()
@@ -149,7 +159,14 @@ class GetDailyReport(APIView):
         return Response(data)
 
 
-@extend_schema(tags=['Reports'])
+@extend_schema(
+    tags=['Reports'],
+    parameters=[
+        OpenApiParameter(name='year', type=int, description='Year for which to get weekly earnings', required=True),
+        OpenApiParameter(name='s', type=int, description='Start week number', required=True),
+        OpenApiParameter(name='e', type=int, description='End week number', required=True),
+    ]
+)
 class GetWeeklyReport(APIView):
     def get(self, request):
         rooms = Room.objects.all()
@@ -206,7 +223,14 @@ class GetWeeklyReport(APIView):
         return Response(response_data)
 
 
-@extend_schema(tags=['Reports'])
+@extend_schema(
+    tags=['Reports'],
+    parameters=[
+        OpenApiParameter(name='year', type=int, description='Year for which to get monthly earnings', required=True),
+        OpenApiParameter(name='s', type=int, description='Start month number', required=True),
+        OpenApiParameter(name='e', type=int, description='End month number', required=True),
+    ]
+)
 class GetMonthlyReport(APIView):
     def get(self, request):
         rooms = Room.objects.all()
@@ -273,7 +297,14 @@ class GetMonthlyReport(APIView):
         return Response(response_data)
 
 
-@extend_schema(tags=['Reports'])
+@extend_schema(
+    tags=['Reports'],
+    parameters=[
+        OpenApiParameter(name='year', type=int, description='Year for which to get yearly earnings', required=True),
+        OpenApiParameter(name='s', type=int, description='Start year', required=True),
+        OpenApiParameter(name='e', type=int, description='End year', required=True),
+    ]
+)
 class GetYearlyReport(APIView):
     def get(self, request):
         rooms = Room.objects.all()
