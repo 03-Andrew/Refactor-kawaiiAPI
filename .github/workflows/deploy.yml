@@ -111,6 +111,13 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
+            - name: Test SSH connection
+              run: |
+                echo "${{ secrets.SERVER_SSH_KEY }}" > /tmp/ssh_key
+                chmod 600 /tmp/ssh_key
+                ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -i /tmp/ssh_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo SSH_OK"
+                rm /tmp/ssh_key
+
             - name: Copy compose and nginx config to EC2
               uses: appleboy/scp-action@v0.1.7
               with:
