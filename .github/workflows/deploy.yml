@@ -42,14 +42,14 @@ jobs:
             - name: Run migrations
               env:
                 DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
-                SECRET_KEY: ci-test-secret-key
+                SECRET_KEY: ci-test-secret-key-not-for-production
                 DJANGO_SETTINGS_MODULE: kawaiiAPI.settings.dev
               run: python manage.py migrate
 
             - name: Run tests
               env:
                 DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
-                SECRET_KEY: ci-test-secret-key
+                SECRET_KEY: ci-test-secret-key-not-for-production
                 DJANGO_SETTINGS_MODULE: kawaiiAPI.settings.dev
               run: python manage.py test
 
