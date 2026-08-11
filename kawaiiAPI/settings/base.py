@@ -11,7 +11,6 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.environ.get("SECRET_KEY", "secret_key")
 
 
-ALLOWED_HOSTS=["*"]
 # Application definition
 
 INSTALLED_APPS = [

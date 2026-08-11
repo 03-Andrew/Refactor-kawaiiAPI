@@ -150,6 +150,7 @@ jobs:
                     PAYMENT_LINK_URL=${{ secrets.PAYMENT_LINK_URL }}
                     DATABASE_URL=${{ secrets.DATABASE_URL }}
                     TURNSTILE_SECRET_KEY=${{ secrets.TURNSTILE_SECRET_KEY }}
+                    ALLOWED_HOSTS=['test-booking.dreww.space']
                     ENVEOF
 
                     echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
