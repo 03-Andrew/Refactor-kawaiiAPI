@@ -20,8 +20,6 @@ RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 # Copy the project files
 COPY . .
 
-# Expose port for Daphne
 EXPOSE 8000
 
-# Default command to run Daphne Web Server
-CMD ["daphne", "-p", "8000", "-b", "0.0.0.0", "kawaiiAPI.asgi:application"]
+CMD ["gunicorn", "kawaiiAPI.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
