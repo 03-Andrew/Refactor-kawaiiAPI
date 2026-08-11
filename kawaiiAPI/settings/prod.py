@@ -8,6 +8,7 @@ SECURE_HSTS_PRELOAD = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 ALLOWED_HOSTS = ['test-booking.dreww.space']
+DEBUG = True
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
