@@ -1,8 +1,8 @@
 resource "aws_vpc" "booking_vpc" {
     cidr_block = "10.0.0.0/16"
     instance_tenancy = "default"
-    enable_dns_support = "true"
-    enable_dns_hostnames = "true"
+    enable_dns_support = true
+    enable_dns_hostnames = true
     tags = {
         Name = "booking_vpc"
     }
@@ -11,7 +11,7 @@ resource "aws_vpc" "booking_vpc" {
 resource "aws_subnet" "public_booking_subnet_1" {
     vpc_id = aws_vpc.booking_vpc.id
     cidr_block = "10.0.1.0/24"
-    map_public_ip_on_launch = "true"
+    map_public_ip_on_launch = true
     availability_zone = var.ZONE1
     tags = {
         Name = "public_booking_subnet_1"

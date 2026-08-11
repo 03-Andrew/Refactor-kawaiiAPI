@@ -43,4 +43,5 @@ resource "aws_db_instance" "booking" {
   backup_retention_period = 7
 
   skip_final_snapshot = true
+  storage_encrypted = true
 }

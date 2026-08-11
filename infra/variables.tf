@@ -18,11 +18,3 @@ variable "MYIP" {
 variable "PASSWORD" {
   type = string
 }
-
-variable "USER" {
-  default = "ubuntu"
-}
-
-variable "PUB_KEY" {
-  default = "YOUR_KEY"
-}
