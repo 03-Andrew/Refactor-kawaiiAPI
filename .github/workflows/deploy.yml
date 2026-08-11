@@ -8,7 +8,7 @@ on:
 
 env:
     REGISTRY: ghcr.io
-    IMAGE_NAME: ${{ github.repository }}
+    IMAGE_NAME: 03-andrew/refactor-kawaiiapi
 
 jobs:
     test:
@@ -72,11 +72,6 @@ jobs:
             packages: write
         steps:
             - uses: actions/checkout@v4
-
-            - name: Set lowercase image name
-              run: echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
-              env:
-                IMAGE_NAME: ${{ github.repository }}
 
             - name: Log in to Github Container Registry
               uses: docker/login-action@v3
