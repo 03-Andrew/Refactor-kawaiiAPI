@@ -1,0 +1,139 @@
+name: CI/CD
+
+on:
+    push:
+        branches: [infra]
+    pull_request:
+        branches: [infra]
+
+env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+
+        services:
+            postgres:
+                image: postgres:16-alpine
+                env:
+                    POSTGRES_DB: testdb
+                    POSTGRES_USER: testuser
+                    POSTGRES_PASSWORD: testpassword
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd pg_isready
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install dependencies
+              run: pip install -r requirements.txt
+
+            - name: Run migrations
+              env:
+                DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
+                SECRET_KEY: ci-test-secret-key
+                DJANGO_SETTINGS_MODULE: kawaiiAPI.settings.dev
+              run: python manage.py migrate
+
+            - name: Run tests
+              env:
+                DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
+                SECRET_KEY: ci-test-secret-key
+                DJANGO_SETTINGS_MODULE: kawaiiAPI.settings.dev
+              run: python manage.py test
+
+    build-and-push:
+        runs-on: ubuntu-latest
+        needs: test
+        if: github.event_name == 'push' && github.ref == 'refs/heads/infra'
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Log in to Github Container Registry
+              uses: docker/login-action@v3
+              with:
+                registry: ${{ env.REGISTRY }}
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Extract metadata (tags, labels)
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                tags: |
+                    type=sha
+                    type=raw, value=latest
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build and push
+              uses: docker/build-push-action@v6
+              with:
+                context: .
+                push: true
+                tags: ${{ steps.meta.outputs.tags }}
+                labels: ${{ steps.meta.outputs.labels }}
+                cache-from: type=gha
+                cache-to: type=gha, mode=max
+
+    deploy:
+        needs: build-and-push
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/infra'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Copy compose and nginx config to EC2
+              uses: appleboy/scp-action@v0.1.7
+              with:
+                host: ${{ secrets.SERVER_HOST }}
+                username: ${{ secrets.SERVER_USER }}
+                key: ${{ secrets.SERVER_SSH_KEY }}
+                source: docker-compose.yml,nginx/
+                target: /opt/kawaiiapi/
+
+            - name: Deploy to EC2
+              uses: appleboy/ssh-action@v1.2.0
+              with:
+                host: ${{ secrets.SERVER_HOST }}
+                username: ${{ secrets.SERVER_USER }}
+                key: ${{ secrets.SERVER_SSH_KEY }}
+                script: |
+                    cd /opt/kawaiiapi
+
+                    cat > .env << 'ENVEOF'
+                    SECRET_KEY=${{ secrets.SECRET_KEY }}
+                    PAYMONGO_SECRET_KEY=${{ secrets.PAYMONGO_SECRET_KEY }}
+                    PAYMONGO_WEBHOOK_SECRET=${{ secrets.PAYMONGO_WEBHOOK_SECRET }}
+                    EMAIL_HOST=${{ secrets.EMAIL_HOST }}
+                    EMAIL_HOST_USER=${{ secrets.EMAIL_HOST_USER }}
+                    EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
+                    PAYMENT_LINK_URL=${{ secrets.PAYMENT_LINK_URL }}
+                    DATABASE_URL=${{ secrets.DATABASE_URL }}
+                    TURNSTILE_SECRET_KEY=${{ secrets.TURNSTILE_SECRET_KEY }}
+                    ENVEOF
+
+                    echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+                    docker compose pull
+                    docker compose up -d --remove-orphans
+                    docker compose exec -T app python manage.py migrate --noinput
+
+                    docker image prune -f

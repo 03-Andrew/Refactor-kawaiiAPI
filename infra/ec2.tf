@@ -1,6 +1,6 @@
 resource "aws_key_pair" "booking_key" {
   key_name   = "booking-ec2-key"
-  public_key = pathexpand("~/.ssh/id_ed25519.pub") # Only public key enters state
+  public_key = file(pathexpand("~/.ssh/id_ed25519.pub"))
 }
 
 data "aws_ami" "ubuntu" {
