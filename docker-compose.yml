@@ -19,7 +19,6 @@ services:
     container_name: kawaiiapi-app
     restart: always
     volumes:
-      - .:/app
       - staticfiles:/app/staticfiles
     command: >
       sh -c "python manage.py collectstatic --noinput &&
@@ -38,8 +37,6 @@ services:
       dockerfile: Dockerfile
     container_name: kawaiiapi-celery
     restart: always
-    volumes:
-      - .:/app
     command: celery -A kawaiiAPI worker -l info
     depends_on:
       redis:

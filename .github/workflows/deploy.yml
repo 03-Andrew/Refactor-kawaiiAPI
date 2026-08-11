@@ -140,6 +140,7 @@ jobs:
                     cd /opt/kawaiiapi
 
                     cat > .env << 'ENVEOF'
+                    REDIS_HOST=redis
                     SECRET_KEY=${{ secrets.SECRET_KEY }}
                     PAYMONGO_SECRET_KEY=${{ secrets.PAYMONGO_SECRET_KEY }}
                     PAYMONGO_WEBHOOK_SECRET=${{ secrets.PAYMONGO_WEBHOOK_SECRET }}
