@@ -152,3 +152,6 @@ class RoomSerializer(serializers.ModelSerializer):
         model = Room
         fields = ['id', 'number', 'type', 'type_id', 'status', 'is_booked']
 
+
+class ApproveBookingSerializer(serializers.Serializer):
+    room = serializers.IntegerField(min_value=1)

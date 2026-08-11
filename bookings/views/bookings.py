@@ -17,6 +17,7 @@ from bookings.serializers import (
     DayTourRequestSerializer,
     OnlineBookingRequestSerializer,
     OnsiteBookingRequestSerializer,
+    ApproveBookingSerializer
 )
 from bookings.services.availability import get_room_type_available
 from bookings.services.booking import (
@@ -390,7 +391,8 @@ class ApproveBooking(APIView):
     @extend_schema(
         tags=['Bookings'],
         description='Approve a PENDING booking with a specific room.',
-        parameters=[OpenApiParameter('room', type=int, description='Room id')],
+        request=ApproveBookingSerializer,
+        responses={200: BookingSerializer},
     )
     def post(self, request, pk):
         booking = _get_booking(pk)
