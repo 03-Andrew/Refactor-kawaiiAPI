@@ -3,7 +3,7 @@ import logging
 from django.db import transaction
 from dotenv import load_dotenv
 
-from drf_spectacular.utils import OpenApiExample, extend_schema
+from drf_spectacular.utils import OpenApiExample, extend_schema, OpenApiParameter
 from rest_framework import generics, serializers, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -390,6 +390,7 @@ class ApproveBooking(APIView):
     @extend_schema(
         tags=['Bookings'],
         description='Approve a PENDING booking with a specific room.',
+        parameters=[OpenApiParameter('room', type=int, description='Room id')],
     )
     def post(self, request, pk):
         booking = _get_booking(pk)
