@@ -119,6 +119,8 @@ jobs:
                 key: ${{ secrets.SERVER_SSH_KEY }}
                 source: docker-compose.yml,nginx/
                 target: /opt/kawaiiapi/
+                debug: true
+                overwrite: true
 
             - name: Deploy to EC2
               uses: appleboy/ssh-action@v1.2.0
