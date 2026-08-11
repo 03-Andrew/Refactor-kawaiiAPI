@@ -21,8 +21,8 @@ services:
     volumes:
       - staticfiles:/app/staticfiles
     command: >
-      sh -c "python manage.py collectstatic --noinput &&
-             python manage.py migrate --noinput &&
+      sh -c "DJANGO_SETTINGS_MODULE=kawaiiAPI.settings.prod python manage.py collectstatic --noinput &&
+             DJANGO_SETTINGS_MODULE=kawaiiAPI.settings.prod python manage.py migrate --noinput &&
              gunicorn kawaiiAPI.wsgi:application --bind 0.0.0.0:8000"
     depends_on:
       redis:
