@@ -31,7 +31,8 @@ class BookingTestBase(TestCase):
     
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.token = self.get_jwt_token(User.objects.create_user(username="testuser", password="testpass"))
+        self.token = self.get_jwt_token(User.objects.create_user(username="testuser", password="testpass", role="RECEPTIONIST"))
+        self.fake_token = self.get_jwt_token(User.objects.create_user(username="fakeuser", password="fakepass", role="GUARD"))
 
         self.room_type = RoomType.objects.create(
             name="Test Room Type",
@@ -176,6 +177,35 @@ class BookingCreationTests(BookingTestBase):
         )
         response = CreateStayInBooking.as_view()(request)
         self.assertIn(response.status_code, [200, 201])
+
+    def test_create_stay_in_booking_unauthorized_role(self):
+        check_in = "2026-09-01"
+        check_out = "2026-09-05"
+
+        request_data = {
+            "customer": {
+                "first_name": "Jane",
+                "last_name": "Smith",
+                "contact_number": "09123456789",
+                "email": "testEmail@gmail.com",
+            },
+            "booking": [{
+                "room_type": self.room_type.id,
+                "check_in": check_in,
+                "check_out": check_out,
+                "adult_count": 2,
+                "children_count": 0,
+                "extra_guest": 0,
+                "room_number": self.rooms[1].id,
+            }],
+        }
+
+        request = self.factory.post(
+            '/api/bookings/stay-in/', request_data, content_type='application/json', 
+            HTTP_AUTHORIZATION=f'Bearer {self.fake_token}',
+        )
+        response = CreateStayInBooking.as_view()(request)
+        self.assertIn(response.status_code, [400, 403])
 
     def test_day_tour_booking(self):
         request_data = {
