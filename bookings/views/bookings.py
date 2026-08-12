@@ -9,6 +9,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from kawaiiAPI.permissions import IsReceptionistOrAdmin
 
 
 from bookings.models import Booking
@@ -41,6 +42,8 @@ load_dotenv()
 
 
 class CreateDayTourGuest(BillingCreationMixin, APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     @extend_schema(
         tags=['Bookings'],
         description='Create a day tour booking with customer info, guest list, selected amenities, and selected activities.',
@@ -68,6 +71,8 @@ class CreateDayTourGuest(BillingCreationMixin, APIView):
 
 
 class CreateStayInBooking(BookingCreateMixin, APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     @extend_schema(
         tags=['Bookings'],
         description='Create a walk-in / reception desk booking. Rooms are assigned immediately.',
@@ -254,6 +259,7 @@ class BookingPagination(PageNumberPagination):
 class ListBookings(generics.ListAPIView):
     serializer_class = BookingSerializer
     pagination_class = BookingPagination
+    permission_classes = [IsReceptionistOrAdmin]
 
     @extend_schema(
         tags=['Bookings'],
@@ -303,6 +309,8 @@ class ListBookings(generics.ListAPIView):
 
 
 class EditBooking(APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     @extend_schema(
         tags=['Bookings'],
         description='Get a single booking by ID.',
@@ -387,6 +395,8 @@ class EditBooking(APIView):
 
 
 class ApproveBooking(APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     @extend_schema(
         tags=['Bookings'],
         description='Approve a PENDING booking with a specific room.',
@@ -413,6 +423,8 @@ class ApproveBooking(APIView):
 
 
 class CancelBooking(APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     @extend_schema(
         tags=['Bookings'],
         description='Cancel a PENDING or APPROVED booking.',

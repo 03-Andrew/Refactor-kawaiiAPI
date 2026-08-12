@@ -24,6 +24,8 @@ from receptionist.serializers import PaymentSerializer
 # Shared GFK prefetch
 from receptionist.views import prefetch_paid_for
 
+from kawaiiAPI.permissions import IsAdmin, IsReceptionistOrAdmin
+
 # ── Report helpers ─────────────────────────────────────────────
 
 PAYMENT_SELECT_RELATED = ('mop', 'status', 'customer_bill__customer')
@@ -105,6 +107,7 @@ def initialize_data(rooms, amenities, activities):
     ]
 )
 class GetTotalEarningsPerMonth(APIView):
+    permission_classes = [IsAdmin]
     def get(self, request):
         year = request.query_params.get('year')
 
@@ -141,6 +144,8 @@ class GetTotalEarningsPerMonth(APIView):
     ]
 )
 class GetDailyReport(APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     def get(self, request):
         rooms = Room.objects.all()
         amenities = Amenities.objects.all()
@@ -168,6 +173,7 @@ class GetDailyReport(APIView):
     ]
 )
 class GetWeeklyReport(APIView):
+    permission_classes = [IsReceptionistOrAdmin]
     def get(self, request):
         rooms = Room.objects.all()
         amenities = Amenities.objects.all()
@@ -232,6 +238,7 @@ class GetWeeklyReport(APIView):
     ]
 )
 class GetMonthlyReport(APIView):
+    permission_classes = [IsReceptionistOrAdmin]
     def get(self, request):
         rooms = Room.objects.all()
         amenities = Amenities.objects.all()
@@ -306,6 +313,7 @@ class GetMonthlyReport(APIView):
     ]
 )
 class GetYearlyReport(APIView):
+    permission_classes = [IsAdmin]
     def get(self, request):
         rooms = Room.objects.all()
         amenities = Amenities.objects.all()

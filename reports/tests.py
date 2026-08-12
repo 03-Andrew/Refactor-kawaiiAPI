@@ -32,7 +32,7 @@ class ReportsNPlusOneTest(TestCase):
     def setUp(self):
         self.client = APIClient()
 
-        self.token = self.get_jwt_token(User.objects.create_user(username="testuser", password="testpass"))
+        self.token = self.get_jwt_token(User.objects.create_user(username="testuser", password="testpass", role="ADMIN"))
         # ── Shared reference data ──
         self.amenity = Amenities.objects.create(
             amenity="Boat Transfer", rate_per_head=500.00,

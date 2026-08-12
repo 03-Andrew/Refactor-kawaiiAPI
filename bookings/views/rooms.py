@@ -4,7 +4,8 @@ from datetime import date
 from django.db.models import Count, Exists, OuterRef, Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
+from kawaiiAPI.permissions import IsAdmin, IsReceptionistOrAdmin, ReceptionistViewOnly
 from rest_framework.response import Response
 
 from bookings.models import Booking, Room, RoomStatus, RoomType, BookingStatus
@@ -23,6 +24,7 @@ ROOM_QUERY_PARAMS = [
 @extend_schema(tags=['Rooms'])
 class RoomListCreateView(generics.ListCreateAPIView):
     serializer_class = RoomSerializer
+    permission_classes = [ReceptionistViewOnly]
 
     @extend_schema(parameters=ROOM_QUERY_PARAMS)
     def get(self, request, *args, **kwargs):
@@ -84,6 +86,7 @@ class RoomListCreateView(generics.ListCreateAPIView):
 class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
+    permission_classes = [ReceptionistViewOnly]
 
 
 @extend_schema(tags=['Room Types'])
@@ -96,10 +99,11 @@ class RoomTypesListView(generics.ListCreateAPIView):
         if self.request and self.request.method == 'GET':
             return []
         return super().get_authenticators()
+    
     def get_permissions(self):
         if self.request and self.request.method == 'GET':
             return [AllowAny()]
-        return super().get_permissions()
+        return [IsAdmin()]
 
     
     @extend_schema(parameters=ROOM_QUERY_PARAMS[0:3])
@@ -162,3 +166,12 @@ class RoomTypesListView(generics.ListCreateAPIView):
 class RoomTypesDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RoomTypeSerializer
     queryset = RoomType.objects.all()
+    def get_permissions(self):
+        if self.request and self.request.method == "GET":
+            return [AllowAny()]
+        return [IsReceptionistOrAdmin]
+    
+    def get_authenticators(self):
+        if self.request and self.request.method == "GET":
+            return []
+        return super().get_authenticators()
