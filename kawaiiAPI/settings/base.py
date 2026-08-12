@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 import dj_database_url
 from dotenv import load_dotenv
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -233,6 +234,13 @@ GRAPH_MODELS = {
 }
 
 AUTH_USER_MODEL = "user.CustomUser"
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ROTATE_REFRESH_TOKEN": True,
+    "BLACKLIST_AFTER_ROTATION": True
+}
 
 #PAYMONGO DETAILS
 PAYMONGO_SECRET_KEY  = os.environ.get("PAYMONGO_SECRET_KEY")
