@@ -45,8 +45,17 @@ def login(request):
     refresh_token = str(refresh)
     serializer = UserSerializer(instance=userP)
 
-    # Return the token and user details
-    return Response({"access": access_token, "refresh": refresh_token, "user": serializer.data})
+    response = Response({"access": access_token, "user": serializer.data})
+    response.set_cookie(
+        "refresh_token",
+        refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="Strict",
+        max_age=86400,
+        path="/api/token/refresh/"
+    )
+    return response
 
 @extend_schema(
     tags=['Users'],
@@ -66,11 +75,19 @@ def signup(request):
         email=request.data['email'],
     )
     refresh = RefreshToken.for_user(user)
-    return Response({
-        "access": str(refresh.access_token),
-        "refresh": str(refresh),
-        "user": UserSerializer(instance=user).data,
-    })
+    serializer = UserSerializer(instance=user)
+
+    response = Response({"access": str(refresh.access_token), "user": serializer.data})
+    response.set_cookie(
+        "refresh_token",
+        str(refresh),
+        httponly=True,
+        secure=True,
+        samesite="Strict",
+        max_age=86400,
+        path="/api/token/refresh/"
+    )
+    return response
 
 @extend_schema(
     tags=['Users'],
