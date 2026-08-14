@@ -16,7 +16,7 @@ class WebhookEventSerializer(serializers.ModelSerializer):
         model = WebhookEvent
         fields = '__all__'  # Include all fields from the WebhookEvent model
 
-class PaymentIntent(serializers.Serializer):
+class PaymongoPaymentSerializer(serializers.Serializer):
     amount = serializers.IntegerField()
     description = serializers.CharField(required=False, allow_blank=True)
 
