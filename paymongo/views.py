@@ -7,7 +7,17 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import AllowAny
 import hmac
 import hashlib
+import json
 from rest_framework import status
+from transactions.models import Billing
+from .tasks import process_event
+
+
+def billing_fee_breakdown(billing):
+    room_total = sum(b.total_cost for b in billing.bookings.all())
+    boat = billing.amenities_availed.first()
+    boat_total = boat.total_cost if boat else 0
+    return room_total, boat_total, (boat.head_count if boat else 0)
 
 
 class CreatePaymentQr(APIView):
@@ -21,12 +31,19 @@ class CreatePaymentQr(APIView):
         serializer = PaymongoPaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        payment_intent = self._create_payment_intent(data.get("amount"), data.get("description"))
+        try:
+            billing = Billing.objects.get(id=data.get("billing_id"))
+        except Billing.DoesNotExist:
+            return Response({"error": "Billing not found"}, status=status.HTTP_400_BAD_REQUEST)
+        room_total, boat_total, _ = billing_fee_breakdown(billing)
+        amount = int((room_total + boat_total) * 100)
+        payment_intent = self._create_payment_intent(amount, data.get("description") or str(billing.id))
         generate_qr = self._create_qr()
         functional_qr = self._attach_method_to_payment_intent(
             payment_intent_id=payment_intent["data"]['id'], 
             payment_method_id=generate_qr["data"]["id"]
         )
+        print(functional_qr)
         return Response(functional_qr)
     
     def _create_qr(self):
@@ -108,37 +125,54 @@ class CreateCheckoutSession(APIView):
         data = serializer.validated_data
     
         try:
-            link = self._create_checkout_link(data.get("amount"), data.get("desc"))
+            billing = Billing.objects.get(id=data.get("billing_id"))
+            link = create_checkout_link(billing, data.get("description"))
             return Response(link)
+        except Billing.DoesNotExist:
+            return Response({"error": "Billing not found"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({
-                "error": str(e) 
+                "error": str(e)
             })
-        
-    def _create_checkout_link(self, amount, desc):
-        url = "https://api.paymongo.com/v1/checkout_sessions"
-        payload = { 
-            "data": { 
-                "attributes": {
-                    "line_items": [
-                        {
-                            "amount": amount,
-                            "currency": "PHP",
-                            "description": desc,
-                            "name": "Booking Down payment",
-                            "images": [],
-                            "quantity": 1
-                        }
-                    ],
-                    "payment_method_types": ["card", "gcash", "paymaya"]
-                } } }
-        headers = {
-            "accept": "application/json",
-            "content-type": "application/json",
-        }
 
-        response = requests.post(url, json=payload, headers=headers, auth=(PAYMONGO_SECRET_KEY, ""))
-        return response.json()
+def create_checkout_link(billing, desc):
+    url = "https://api.paymongo.com/v1/checkout_sessions"
+    boat_total = sum(a.total_cost for a in billing.amenities_availed.all())
+    line_items = [
+        {
+            "amount": int(booking.total_cost * 100),
+            "currency": "PHP",
+            "description": "room_fee",
+            "name": f"{booking.room_type.name} Room",
+            "quantity": 1,
+        }
+        for booking in billing.bookings.all()
+    ]
+    if boat_total:
+        boat = billing.amenities_availed.first()
+        line_items.append({
+            "amount": int(boat.amenity.rate_per_head * 100),
+            "currency": "PHP",
+            "description": "boat_fee",
+            "name": "Boat",
+            "quantity": boat.head_count,
+        })
+    payload = {
+        "data": {
+            "attributes": {
+                "line_items": line_items,
+                "payment_method_types": ["card", "gcash", "paymaya", "qrph"],
+                "description": desc or str(billing.id),
+                "send_email_receipt": True,
+                "show_description": True,
+                "show_line_items": True
+            } } }
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+    }
+    response = requests.post(url, json=payload, headers=headers, auth=(PAYMONGO_SECRET_KEY, ""))
+    return response.json()
 
 
 class WebhookNotif(APIView):
@@ -148,7 +182,8 @@ class WebhookNotif(APIView):
     def post(self, request, *args, **kwargs):
         if not self._validate_signature(request):
             return Response({'status': 'error', 'message': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
-    
+
+        process_event.delay(json.loads(request.body))
         return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
 

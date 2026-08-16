@@ -4,7 +4,7 @@ import requests
 
 from bookings.models import Booking, BookingStatus, Room, RoomStatus
 from transactions.models import (
-    ActivitiesAvailed, AmenitiesAvailed, BillingStatus, GuestList, GuestStatus,
+    Amenities, ActivitiesAvailed, AmenitiesAvailed, BillingStatus, GuestList, GuestStatus,
 )
 from transactions.serializers import (
     ActivitiesAvailedSerializer, AmenitiesAvailedSerializer,
@@ -151,40 +151,35 @@ def create_activities(*, billing, items):
 
 # ── Online booking helpers ─────────────────────────────────
 
-def create_boat_transfer(*, billing, boat_list):
+def create_boat_transfer(*, billing, boat):
     """Bulk-create boat transfer amenities and guest entries. Returns (boat_ids, guests_data)."""
-    if not boat_list:
-        return [], []
+    if not boat:
+        return None, []
 
-    amenity_objs = []
     guest_objs = []
-    for availed_boat in boat_list:
-        availed_boat['customer_bill'] = billing.id
-        availed_boat['amenity'] = 1
-        serializer = AmenitiesAvailedSerializer(data=availed_boat)
-        serializer.is_valid(raise_exception=True)
-        amenity_objs.append(AmenitiesAvailed(**serializer.validated_data))
+    availed_boat = {}
+    availed_boat['customer_bill'] = billing.id
+    availed_boat['amenity'] = 1
+    availed_boat['head_count'] = boat['head_count']
+    availed_boat['time'] = boat['time']
+    serializer = AmenitiesAvailedSerializer(data=availed_boat)
+    serializer.is_valid(raise_exception=True)
+    boat_id = AmenitiesAvailed.objects.create(**serializer.validated_data)
 
-        for tourist in availed_boat['guests']:
-            guest_serializer = GuestListSerializer(data={
-                'customer_bill': billing.id,
-                'guest': tourist,
-                'status': GuestStatus.PENDING,
-            })
-            guest_serializer.is_valid(raise_exception=True)
-            guest_objs.append(GuestList(**guest_serializer.validated_data))
-
-    AmenitiesAvailed.objects.bulk_create(amenity_objs)
-    boat_ids = list(
-        AmenitiesAvailed.objects.filter(customer_bill=billing, amenity=1)
-        .values_list('id', flat=True)
-    )
+    for tourist in boat['guests']:
+        guest_serializer = GuestListSerializer(data={
+            'customer_bill': billing.id,
+            'guest': tourist,
+            'status': GuestStatus.PENDING,
+        })
+        guest_serializer.is_valid(raise_exception=True)
+        guest_objs.append(GuestList(**guest_serializer.validated_data))
 
     GuestList.objects.bulk_create(guest_objs)
     created_guests = GuestList.objects.filter(customer_bill=billing)
     tourist_added = GuestListSerializer(created_guests, many=True).data
 
-    return boat_ids, tourist_added
+    return boat_id, tourist_added
 
 
 def create_payment_link(*, billing, customer, booking_ids, payment_data):
