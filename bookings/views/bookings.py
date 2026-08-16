@@ -175,7 +175,6 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
                         'created_at': '2026-08-01T10:00:00+08:00',
                         'number_of_nights': 2, 'total_cost': 5000.00,
                     }],
-                    'boat': [1],
                     'guests': [{'id': 1, 'guest': 'Juan Dela Cruz', 'status': 'Pending'}],
                 },
                 response_only=True,
@@ -212,7 +211,7 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
                 customer = self._create_customer(data['customer'])
                 billing = self._create_billing(customer)
                 created_bookings = self._create_bookings(billing, data['rooms'])
-                boat_ids, tourist_added = create_boat_transfer(billing=billing, boat_list=data.get('boat', []))
+                boat_ids, tourist_added = create_boat_transfer(billing=billing, boat=data.get('boat'))
 
         except serializers.ValidationError as e:
             self._release_holder_locks(data['rooms'], holder_id)
@@ -236,17 +235,7 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
             'bookings': created_bookings,
         }
         if boat_ids:
-            response_data['boat'] = boat_ids
             response_data['guests'] = tourist_added
-
-
-        subject = "Online Booking Confirmation"
-        message = f"Booking Successful for {data['customer']['first_name']} {data['customer']['last_name']}"
-        if settings.DEBUG:
-            try:
-                send_email.delay(subject, message, [data['customer']['email']])
-            except Exception as exc:
-                logger.warning('Failed to queue email for billing %s: %s', billing.id, exc)
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 

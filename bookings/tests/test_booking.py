@@ -50,8 +50,8 @@ class BookingTestBase(TestCase):
         ])
 
         self.amenities = Amenities.objects.create(
-            amenity="Boat Transfer",
-            rate_per_head=500.00,
+            amenity="Boat",
+            rate_per_head=200.00,
         )
 
         self.activities = Activity.objects.create(
@@ -128,20 +128,19 @@ class BookingCreationTests(BookingTestBase):
                 "children_count": 0,
                 "extra_guest": 0,
             }],
-            "boat": [{
+            "boat": {
                 "head_count": 2,
                 "time": "10:00",
                 "guests": ["John Doe", "Jane Doe"],
-            }],
-            "payment": 1000.00,
+            },
             "turnstile_token": "dummy-token",
         }
         mock_post.return_value.json.return_value = {"success": True}
         request = self.factory.post(
             '/api/bookings/online/', request_data, content_type='application/json',
         )
-        response = CreateOnlineBooking.as_view()(request)
 
+        response = CreateOnlineBooking.as_view()(request)
         self.assertEqual(response.status_code, 201)
         self.assertIn('customer', response.data)
         self.assertIn('billing', response.data)
@@ -307,14 +306,11 @@ class BookingPerformanceTests(BookingTestBase):
                     }
                     for _ in range(room_count)
                 ],
-                "boat": [
-                    {
-                        "head_count": 2,
-                        "time": "10:00",
-                        "guests": [f"Guest {i*2}", f"Guest {i*2+1}"],
-                    }
-                    for i in range(boat_count)
-                ],
+                "boat": {
+                    "head_count": 2,
+                    "time": "10:00",
+                    "guests": ["John Doe1", "Jane Doe2"],
+                },
                 "payment": 1000.00,
                 "turnstile_token": "dummy-token",
             }
