@@ -104,7 +104,7 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
         serializer = OnsiteBookingRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        holder_id = request.data.get('holder_id')
+        holder_id = request.data.get('holder_id') or request.data.get('holder_ids')
 
         booking_data = []
         for room in data['booking']:
@@ -192,7 +192,7 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
         serializer = OnlineBookingRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        holder_id = request.data.get('holder_id')
+        holder_id = request.data.get('holder_id') or request.data.get('holder_ids')
         turnstile_token = request.data.get('turnstile_token')
         remoteip = request.META.get('REMOTE_ADDR') or request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0]
         validation_result = validate_turnstile(turnstile_token, remoteip)

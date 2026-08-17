@@ -83,7 +83,21 @@ class BookingCreateMixin(BillingCreationMixin):
             except Exception:
                 locked = 0
 
-            if holder_id and holder_has_lock(rt_id, str(check_in), str(check_out), holder_id):
+            # Normalize holder_ids (can be str, list, or per-room)
+            all_holder_ids = set()
+            if isinstance(holder_id, (list, tuple, set)):
+                all_holder_ids.update(h for h in holder_id if h)
+            elif isinstance(holder_id, str) and holder_id:
+                all_holder_ids.add(holder_id)
+            if isinstance(room_data, dict) and room_data.get('holder_id'):
+                all_holder_ids.add(room_data['holder_id'])
+
+            is_held = any(
+                holder_has_lock(rt_id, str(check_in), str(check_out), hid)
+                for hid in all_holder_ids
+            ) if all_holder_ids else False
+
+            if is_held:
                 available = db_available
             else:
                 available = db_available - locked
@@ -126,18 +140,29 @@ class BookingCreateMixin(BillingCreationMixin):
         return BookingSerializer(created, many=True).data
 
     def _release_holder_locks(self, rooms, holder_id):
-        """Release all Redis locks held by holder_id for the given rooms."""
-        if not holder_id:
-            return
+        """Release all Redis locks held by holder_id(s) for the given rooms."""
+        all_holder_ids = set()
+        if isinstance(holder_id, (list, tuple, set)):
+            all_holder_ids.update(h for h in holder_id if h)
+        elif isinstance(holder_id, str) and holder_id:
+            all_holder_ids.add(holder_id)
         for room in rooms:
-            try:
-                release_room_type_lock(
-                    room['room_type'], str(room['check_in']),
-                    str(room['check_out']), holder_id,
-                )
-            except Exception as exc:
-                logger.warning(
-                    'Failed to release lock for room_type=%s dates=%s->%s holder=%s: %s',
-                    room['room_type'], room['check_in'], room['check_out'],
-                    holder_id, exc,
-                )
+            if isinstance(room, dict) and room.get('holder_id'):
+                all_holder_ids.add(room['holder_id'])
+
+        if not all_holder_ids:
+            return
+
+        for hid in all_holder_ids:
+            for room in rooms:
+                try:
+                    release_room_type_lock(
+                        room['room_type'], str(room['check_in']),
+                        str(room['check_out']), hid,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        'Failed to release lock for room_type=%s dates=%s->%s holder=%s: %s',
+                        room.get('room_type'), room.get('check_in'), room.get('check_out'),
+                        hid, exc,
+                    )
