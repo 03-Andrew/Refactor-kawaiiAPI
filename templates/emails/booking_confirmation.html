@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reservation Confirmation - Island Resort &amp; Sanctuary</title>
+  <style>
+    /* Reset & Email Client Normalization */
+    body, table, td, p, a, li, blockquote { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; margin: 0; padding: 0; }
+    table, td { border-collapse: collapse !important; }
+    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    
+    body {
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      background-color: #faf6f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a2129;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+    }
+
+    /* Editorial Typeface utilities */
+    .serif {
+      font-family: Georgia, "Times New Roman", Times, serif;
+    }
+
+    .tracking-wide {
+      letter-spacing: 0.12em;
+    }
+
+    .tracking-tight {
+      letter-spacing: -0.02em;
+    }
+
+    @media screen and (max-width: 620px) {
+      .email-wrapper { width: 100% !important; }
+      .content-cell { padding: 28px 20px !important; }
+      .header-cell { padding: 32px 20px 24px 20px !important; }
+      .mobile-stack { display: block !important; width: 100% !important; }
+      .mobile-pt-12 { padding-top: 12px !important; }
+      .mobile-text-left { text-align: left !important; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #faf6f0;">
+
+  <!-- Outer background canvas -->
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #faf6f0; padding: 40px 12px 60px 12px;">
+    <tr>
+      <td align="center">
+
+        <!-- Main Email Card Container (Strictly 0px border-radius) -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-wrapper" style="max-width: 600px; width: 100%; background-color: #ffffff; border: 1px solid #e8e1d5; border-radius: 0;">
+          
+          <!-- Top Accent Hairline -->
+          <tr>
+            <td height="3" style="background-color: #1a2129; line-height: 3px; font-size: 3px;">&nbsp;</td>
+          </tr>
+
+          <!-- Editorial Masthead Header -->
+          <tr>
+            <td class="header-cell" align="center" style="padding: 44px 36px 30px 36px; border-bottom: 1px solid #e8e1d5; background-color: #ffffff;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center">
+                    <div class="serif" style="font-size: 24px; font-weight: 400; letter-spacing: 0.2em; color: #1a2129; text-transform: uppercase;">
+                      THE RESORT
+                    </div>
+                    <div style="margin-top: 6px; font-size: 11px; font-weight: 500; letter-spacing: 0.22em; color: #7a8a8c; text-transform: uppercase;">
+                      Island Sanctuary &bull; Beach &amp; Spa
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Sub-header Status Strip -->
+          <tr>
+            <td style="background-color: #fbf8f5; border-bottom: 1px solid #e8e1d5; padding: 14px 36px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="left" class="mobile-stack" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: #8c8273;">
+                    Official Folio &bull; Confirmed
+                  </td>
+                  <td align="right" class="mobile-stack mobile-pt-12 mobile-text-left" style="font-size: 12px; font-weight: 600; color: #1a2129; letter-spacing: 0.04em;">
+                    Reference <span class="serif" style="font-size: 14px; font-weight: 700; color: #3b8ea5;">#{{ billing.id }}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body Content Area -->
+          <tr>
+            <td class="content-cell" style="padding: 36px 36px 28px 36px;">
+              
+              <!-- Lead Greeting & Headline -->
+              <div class="serif" style="font-size: 24px; font-weight: 400; color: #1a2129; line-height: 1.3; letter-spacing: -0.01em; margin-bottom: 12px;">
+                Dear {{ customer.first_name|default:"Guest" }},
+              </div>
+              <p style="font-size: 14.5px; color: #4a5568; line-height: 1.65; margin-bottom: 32px;">
+                Your reservation is officially confirmed and settled. We look forward to hosting you for a serene and restorative island retreat. Below is your detailed reservation summary.
+              </p>
+
+              <!-- Section: Guest Details -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 32px;">
+                <tr>
+                  <td style="border-bottom: 1px solid #1a2129; padding-bottom: 6px;">
+                    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: #1a2129;">
+                      Guest Details
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top: 14px;">
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 13.5px; line-height: 1.6;">
+                      <tr>
+                        <td style="width: 38%; color: #8c8273; padding-bottom: 4px;">Primary Guest</td>
+                        <td style="color: #1a2129; font-weight: 500; padding-bottom: 4px;">{{ customer.full_name }}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #8c8273; padding-bottom: 4px;">Contact Number</td>
+                        <td style="color: #1a2129; font-weight: 500; padding-bottom: 4px;">{{ customer.contact_number }}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #8c8273; padding-bottom: 4px;">Email Address</td>
+                        <td style="color: #1a2129; font-weight: 500; padding-bottom: 4px;">{{ customer.email }}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Section: Accommodations -->
+              {% if bookings %}
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 32px;">
+                <tr>
+                  <td style="border-bottom: 1px solid #1a2129; padding-bottom: 6px;">
+                    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: #1a2129;">
+                      Accommodations
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top: 12px;">
+                    {% for b in bookings %}
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fbf8f5; border: 1px solid #e8e1d5; border-radius: 0; margin-bottom: 12px; padding: 16px 18px;">
+                      <tr>
+                        <td align="left" class="serif" style="font-size: 16px; font-weight: 400; color: #1a2129;">
+                          {{ b.room_type.name|default:"Resort Suite" }}
+                        </td>
+                        <td align="right" class="serif" style="font-size: 15px; font-weight: 400; color: #1a2129;">
+                          PHP {{ b.total_cost|floatformat:2 }}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding-top: 8px; font-size: 13px; color: #6b7280; line-height: 1.5; border-top: 1px solid #f0e8dc; margin-top: 8px;">
+                          <span style="color: #1a2129; font-weight: 500;">Stay Dates:</span> {{ b.check_in }} &mdash; {{ b.check_out }} ({{ b.number_of_nights }} night{{ b.number_of_nights|pluralize }})<br>
+                          <span style="color: #1a2129; font-weight: 500;">Party:</span> {{ b.adult_count }} Adult{{ b.adult_count|pluralize }}{% if b.children_count %}, {{ b.children_count }} Child{{ b.children_count|pluralize:"ren" }}{% endif %}{% if b.extra_guest %}, {{ b.extra_guest }} Extra Guest{{ b.extra_guest|pluralize }}{% endif %}
+                        </td>
+                      </tr>
+                    </table>
+                    {% endfor %}
+                  </td>
+                </tr>
+              </table>
+              {% endif %}
+
+              <!-- Section: Transfers & Amenities -->
+              {% if amenities %}
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 32px;">
+                <tr>
+                  <td style="border-bottom: 1px solid #1a2129; padding-bottom: 6px;">
+                    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: #1a2129;">
+                      Transfers &amp; Services
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top: 12px;">
+                    {% for a in amenities %}
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fbf8f5; border: 1px solid #e8e1d5; border-radius: 0; margin-bottom: 10px; padding: 14px 18px;">
+                      <tr>
+                        <td align="left" style="font-size: 14px; font-weight: 500; color: #1a2129;">
+                          {{ a.amenity.amenity }} <span style="font-size: 12px; color: #8c8273; font-weight: 400;">({{ a.head_count }} passenger{{ a.head_count|pluralize }})</span>
+                        </td>
+                        <td align="right" class="serif" style="font-size: 14px; font-weight: 400; color: #1a2129;">
+                          PHP {{ a.total_cost|floatformat:2 }}
+                        </td>
+                      </tr>
+                    </table>
+                    {% endfor %}
+                  </td>
+                </tr>
+              </table>
+              {% endif %}
+
+              <!-- Financial Summary Ledger -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff; border: 1px solid #e8e1d5; border-radius: 0; padding: 20px 22px; margin-bottom: 32px;">
+                <tr>
+                  <td>
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 13.5px; line-height: 1.6;">
+                      <tr>
+                        <td style="color: #7a8a8c; padding-bottom: 6px;">Total Booking Value</td>
+                        <td align="right" class="serif" style="color: #1a2129; padding-bottom: 6px;">PHP {{ billing.total_cost|floatformat:2 }}</td>
+                      </tr>
+                      {% if amount_paid %}
+                      <tr>
+                        <td style="color: #3b8ea5; font-weight: 500; padding-bottom: 6px;">Amount Paid (Online Settlement)</td>
+                        <td align="right" class="serif" style="color: #3b8ea5; font-weight: 500; padding-bottom: 6px;">PHP {{ amount_paid|floatformat:2 }}</td>
+                      </tr>
+                      {% endif %}
+                      <tr>
+                        <td colspan="2" style="border-top: 1px solid #e8e1d5; padding-top: 10px; margin-top: 4px;"></td>
+                      </tr>
+                      <tr>
+                        <td class="serif" style="font-size: 15px; font-weight: 700; color: #1a2129;">Payment Status</td>
+                        <td align="right" style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2d7085;">
+                          &bull; PAID IN FULL
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Notice Box: Resort Information (Strict 0px corners, subtle background) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fbf8f5; border: 1px solid #e8e1d5; border-radius: 0; padding: 20px 22px; margin-bottom: 28px;">
+                <tr>
+                  <td>
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: #1a2129; margin-bottom: 8px;">
+                      Stay &amp; Arrival Protocol
+                    </div>
+                    <div style="font-size: 13px; color: #4a5568; line-height: 1.65;">
+                      <p style="margin: 0 0 6px 0;"><strong>Check-in:</strong> 2:00 PM &nbsp;|&nbsp; <strong>Check-out:</strong> 12:00 PM</p>
+                      <p style="margin: 0 0 6px 0;">Please present a valid government-issued photo ID upon check-in at the front desk.</p>
+                      <p style="margin: 0;">For guests with boat transfers, please arrive at the departure port at least 15 minutes prior to scheduled departure.</p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Editorial Closing -->
+              <p class="serif" style="font-size: 14px; font-style: italic; color: #7a8a8c; line-height: 1.6; margin: 0;">
+                Warmest regards,<br>
+                <span style="color: #1a2129; font-style: normal; font-weight: 500;">The Concierge Team</span><br>
+                Resort &amp; Island Sanctuary
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Editorial Clean Footer -->
+          <tr>
+            <td align="center" style="background-color: #1a2129; padding: 32px 24px; color: #a0aec0; font-size: 12px; line-height: 1.7; border-top: 1px solid #1a2129;">
+              <div class="serif" style="font-size: 15px; font-weight: 400; color: #ffffff; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 4px;">
+                THE RESORT
+              </div>
+              <div style="font-size: 11px; letter-spacing: 0.08em; color: #cbd5e1; text-transform: uppercase; margin-bottom: 14px;">
+                Island Sanctuary &bull; Luxury Accommodations
+              </div>
+              <div style="color: #64748b; font-size: 11px; max-width: 440px; margin: 0 auto;">
+                This electronic communication serves as your official confirmation receipt. Please keep this document for your personal travel records.
+              </div>
+            </td>
+          </tr>
+
+        </table>
+        <!-- End Main Email Container -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+
