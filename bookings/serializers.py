@@ -52,9 +52,7 @@ class OnlineBookingBoatSerializer(serializers.Serializer):
 class OnlineBookingRequestSerializer(serializers.Serializer):
     customer = BookingCustomerSerializer()
     rooms = BookingRoomSerializer(many=True)
-    boat = OnlineBookingBoatSerializer(many=True, required=False)
-    payment = serializers.DecimalField(max_digits=10, decimal_places=2)
-
+    boat = OnlineBookingBoatSerializer(required=False)
     class Meta:
         ref_name = "OnlineBookingRequest"
 

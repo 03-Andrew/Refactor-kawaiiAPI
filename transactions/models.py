@@ -20,6 +20,7 @@ class Customer(models.Model):
 class BillingStatus(models.TextChoices):
     PROCESSING = 'Processing', 'Processing'
     COMPLETE = 'Complete', 'Complete'
+    BOOKING_PAID = 'Booking Paid', 'Booking Paid'
     PENDING = 'Pending', 'Pending'
     CANCELLED = 'Cancelled', 'Cancelled'
 

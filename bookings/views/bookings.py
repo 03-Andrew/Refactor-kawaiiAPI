@@ -9,7 +9,9 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
-
+from kawaiiAPI.permissions import IsReceptionistOrAdmin
+from django.utils.decorators import method_decorator
+from idempotency_key.decorators import idempotency_key
 
 from bookings.models import Booking
 from bookings.serializers import (
@@ -42,6 +44,8 @@ load_dotenv()
 
 
 class CreateDayTourGuest(BillingCreationMixin, APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     @extend_schema(
         tags=['Bookings'],
         description='Create a day tour booking with customer info, guest list, selected amenities, and selected activities.',
@@ -69,6 +73,8 @@ class CreateDayTourGuest(BillingCreationMixin, APIView):
 
 
 class CreateStayInBooking(BookingCreateMixin, APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     @extend_schema(
         tags=['Bookings'],
         description='Create a walk-in / reception desk booking. Rooms are assigned immediately.',
@@ -99,7 +105,7 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
         serializer = OnsiteBookingRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        holder_id = request.data.get('holder_id')
+        holder_id = request.data.get('holder_id') or request.data.get('holder_ids')
 
         booking_data = []
         for room in data['booking']:
@@ -146,7 +152,7 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
             'billing': BillingSerializerBase(billing).data,
             'bookings': created_bookings,
         }, status=status.HTTP_201_CREATED)
-
+@method_decorator(idempotency_key(optional=False), name='dispatch')
 class CreateOnlineBooking(BookingCreateMixin, APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -171,7 +177,6 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
                         'created_at': '2026-08-01T10:00:00+08:00',
                         'number_of_nights': 2, 'total_cost': 5000.00,
                     }],
-                    'boat': [1],
                     'guests': [{'id': 1, 'guest': 'Juan Dela Cruz', 'status': 'Pending'}],
                 },
                 response_only=True,
@@ -188,7 +193,7 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
         serializer = OnlineBookingRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        holder_id = request.data.get('holder_id')
+        holder_id = request.data.get('holder_id') or request.data.get('holder_ids')
         turnstile_token = request.data.get('turnstile_token')
         remoteip = request.META.get('REMOTE_ADDR') or request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0]
         validation_result = validate_turnstile(turnstile_token, remoteip)
@@ -208,7 +213,7 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
                 customer = self._create_customer(data['customer'])
                 billing = self._create_billing(customer)
                 created_bookings = self._create_bookings(billing, data['rooms'])
-                boat_ids, tourist_added = create_boat_transfer(billing=billing, boat_list=data.get('boat', []))
+                boat_ids, tourist_added = create_boat_transfer(billing=billing, boat=data.get('boat'))
 
         except serializers.ValidationError as e:
             self._release_holder_locks(data['rooms'], holder_id)
@@ -232,17 +237,8 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
             'bookings': created_bookings,
         }
         if boat_ids:
-            response_data['boat'] = boat_ids
             response_data['guests'] = tourist_added
-
-
-        subject = "Online Booking Confirmation"
-        message = f"Booking Successful for {data['customer']['first_name']} {data['customer']['last_name']}"
-        if settings.DEBUG:
-            try:
-                send_email.delay(subject, message, [data['customer']['email']])
-            except Exception as exc:
-                logger.warning('Failed to queue email for billing %s: %s', billing.id, exc)
+            response_data['boat_cost'] = float(boat_ids.total_cost)
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 
@@ -255,6 +251,7 @@ class BookingPagination(PageNumberPagination):
 class ListBookings(generics.ListAPIView):
     serializer_class = BookingSerializer
     pagination_class = BookingPagination
+    permission_classes = [IsReceptionistOrAdmin]
 
     @extend_schema(
         tags=['Bookings'],
@@ -304,6 +301,8 @@ class ListBookings(generics.ListAPIView):
 
 
 class EditBooking(APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     @extend_schema(
         tags=['Bookings'],
         description='Get a single booking by ID.',
@@ -388,6 +387,8 @@ class EditBooking(APIView):
 
 
 class ApproveBooking(APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     @extend_schema(
         tags=['Bookings'],
         description='Approve a PENDING booking with a specific room.',
@@ -416,6 +417,8 @@ class ApproveBooking(APIView):
 
 
 class CancelBooking(APIView):
+    permission_classes = [IsReceptionistOrAdmin]
+
     @extend_schema(
         tags=['Bookings'],
         description='Cancel a PENDING or APPROVED booking.',

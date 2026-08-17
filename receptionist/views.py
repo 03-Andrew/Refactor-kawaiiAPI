@@ -34,6 +34,8 @@ from .serializers import RoomBookingListSerializer,BookingsListSerializer, Ameni
 from bookings.serializers import BookingSerializer
 # Create your views here.
 
+from kawaiiAPI.permissions import IsAdmin, IsReceptionistOrAdmin, ReceptionistViewOnly
+
 # ── Shared helpers ──────────────────────────────────────────────
 
 MODEL_BY_CONTENT_TYPE = {
@@ -228,10 +230,12 @@ def get_activitiesavailedqueryset(request):
 class AmenitiesList(generics.ListCreateAPIView):
     queryset = Amenities.objects.all()
     serializer_class = AmenitiesSerializer
+    permission_classes = [ReceptionistViewOnly]
 
 @extend_schema(tags=['Amenities'])
 class AmenitiesListAvailed(generics.ListCreateAPIView):
     queryset = AmenitiesAvailed.objects.all()
+    permission_classes = [IsReceptionistOrAdmin]
     
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -273,11 +277,12 @@ class AmenitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
 class ActivitiesList(generics.ListCreateAPIView):
     queryset = Activity.objects.all()
     serializer_class = ActivitiesSerializer
+    permission_classes = [ReceptionistViewOnly]
 
 @extend_schema(tags=['Activities'])
 class ActivitiesListAvailed(generics.ListCreateAPIView):
     queryset = ActivitiesAvailed.objects.all()
-
+    permission_classes = [IsReceptionistOrAdmin]
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return ActivitiesAvailedSerializer
@@ -313,13 +318,13 @@ class ActivitiesDetailAvailed(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ActivitiesAvailedSerializer
     primary_key = 'pk'
     queryset = ActivitiesAvailed.objects.all()
+    permission_classes = [IsReceptionistOrAdmin]
 
 @extend_schema(tags=['Amenities & Activities'])
 class AddAmenitiesAndActivitiesAvailed(APIView):
-     def get(self, request, format=None):
-        return Response({"message": "Use POST to submit amenities and activities."}, status=200)
-    
-     def post(self, request, format=None):
+    permission_classes = [IsReceptionistOrAdmin]
+     
+    def post(self, request, format=None):
         amenities_data = request.data.get('amenities', [])
         activities_data = request.data.get('activities', [])
         
@@ -518,8 +523,7 @@ class UpdatePendingBookings(APIView):
         
 @extend_schema(tags=['Payments'])
 class GetPayments(generics.ListCreateAPIView):
-    # authentication_classes = [JWTAuthentication]
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsReceptionistOrAdmin]
     serializer_class = PaymentSerializer
 
     def get_queryset(self):
