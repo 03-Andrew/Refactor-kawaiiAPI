@@ -123,10 +123,12 @@ class CreateCheckoutSession(APIView):
         serializer = PaymongoPaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-    
+        success_url = request.data.get("success_url")
+        cancel_url = request.data.get("cancel_url")
+
         try:
             billing = Billing.objects.get(id=data.get("billing_id"))
-            link = create_checkout_link(billing, data.get("description"))
+            link = create_checkout_link(billing, data.get("description"), success_url, cancel_url)
             return Response(link)
         except Billing.DoesNotExist:
             return Response({"error": "Billing not found"}, status=status.HTTP_400_BAD_REQUEST)
@@ -135,7 +137,7 @@ class CreateCheckoutSession(APIView):
                 "error": str(e)
             })
 
-def create_checkout_link(billing, desc):
+def create_checkout_link(billing, desc, success_url=None, cancel_url=None):
     url = "https://api.paymongo.com/v1/checkout_sessions"
     boat_total = sum(a.total_cost for a in billing.amenities_availed.all())
     line_items = [
@@ -157,16 +159,23 @@ def create_checkout_link(billing, desc):
             "name": "Boat",
             "quantity": boat.head_count,
         })
+    attributes = {
+        "line_items": line_items,
+        "payment_method_types": ["card", "gcash", "paymaya", "qrph"],
+        "description": desc or str(billing.id),
+        "send_email_receipt": True,
+        "show_description": True,
+        "show_line_items": True,
+    }
+    if success_url:
+        attributes["success_url"] = success_url
+    if cancel_url:
+        attributes["cancel_url"] = cancel_url
     payload = {
         "data": {
-            "attributes": {
-                "line_items": line_items,
-                "payment_method_types": ["card", "gcash", "paymaya", "qrph"],
-                "description": desc or str(billing.id),
-                "send_email_receipt": True,
-                "show_description": True,
-                "show_line_items": True
-            } } }
+            "attributes": attributes
+        }
+    }
     headers = {
         "accept": "application/json",
         "content-type": "application/json",

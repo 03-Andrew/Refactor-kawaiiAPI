@@ -3,6 +3,7 @@ import os
 import dj_database_url
 from dotenv import load_dotenv
 from datetime import timedelta
+from corsheaders.defaults import default_headers
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -47,6 +48,10 @@ INSTALLED_APPS = [
 SSE_ENCODE_BASE64 = True     # [optional, default: False]
 
 
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "Idempotency-Key",
+)
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -55,6 +60,7 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'idempotency_key.middleware.ExemptIdempotencyKeyMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -100,9 +106,37 @@ CACHES = {
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
+    },
+    "idempotency": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/3",  # <-- Points directly to Redis DB 3
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
     }
 }
 
+IDEMPOTENCY_KEY = {
+    'ENCODER_CLASS': 'idempotency_key.encoders.BasicKeyEncoder',
+    'CONFLICT_STATUS_CODE': None,
+    'HEADER': 'HTTP_IDEMPOTENCY_KEY',
+
+    # --- Storage on Redis DB 3 ---
+    'STORAGE': {
+        'CLASS': 'idempotency_key.storage.CacheKeyStorage',
+        'CACHE_NAME': 'idempotency',
+    },
+
+    # --- Optional: Distributed Redis Lock ---
+    'LOCK': {
+        'CLASS': 'idempotency_key.locks.redis.MultiProcessRedisLock',  # Or keep ThreadLock for local dev
+        'LOCATION': 'redis://127.0.0.1:6379/3',
+        'NAME': 'IdempotencyLock',
+        'TTL': 300,
+        'ENABLE': True,
+        'TIMEOUT': 0.1,
+    },
+}
 
 
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}/2")
@@ -237,6 +271,7 @@ SIMPLE_JWT = {
 PAYMONGO_SECRET_KEY  = os.environ.get("PAYMONGO_SECRET_KEY")
 PAYMONGO_WEBHOOK_SECRET = os.environ.get("PAYMONGO_WEBHOOK_SECRET")
 PAYMONGO_PUBLIC_KEY = os.environ.get("PAYMONGO_PUBLIC_KEY")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 #GMAIL DETAILS
 EMAIL_HOST = os.environ.get("EMAIL_HOST")
