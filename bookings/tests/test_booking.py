@@ -50,8 +50,8 @@ class BookingTestBase(TestCase):
         ])
 
         self.amenities = Amenities.objects.create(
-            amenity="Boat Transfer",
-            rate_per_head=500.00,
+            amenity="Boat",
+            rate_per_head=200.00,
         )
 
         self.activities = Activity.objects.create(
@@ -128,20 +128,19 @@ class BookingCreationTests(BookingTestBase):
                 "children_count": 0,
                 "extra_guest": 0,
             }],
-            "boat": [{
+            "boat": {
                 "head_count": 2,
                 "time": "10:00",
                 "guests": ["John Doe", "Jane Doe"],
-            }],
-            "payment": 1000.00,
+            },
             "turnstile_token": "dummy-token",
         }
         mock_post.return_value.json.return_value = {"success": True}
         request = self.factory.post(
             '/api/bookings/online/', request_data, content_type='application/json',
         )
-        response = CreateOnlineBooking.as_view()(request)
 
+        response = CreateOnlineBooking.as_view()(request)
         self.assertEqual(response.status_code, 201)
         self.assertIn('customer', response.data)
         self.assertIn('billing', response.data)
@@ -307,14 +306,11 @@ class BookingPerformanceTests(BookingTestBase):
                     }
                     for _ in range(room_count)
                 ],
-                "boat": [
-                    {
-                        "head_count": 2,
-                        "time": "10:00",
-                        "guests": [f"Guest {i*2}", f"Guest {i*2+1}"],
-                    }
-                    for i in range(boat_count)
-                ],
+                "boat": {
+                    "head_count": 2,
+                    "time": "10:00",
+                    "guests": ["John Doe1", "Jane Doe2"],
+                },
                 "payment": 1000.00,
                 "turnstile_token": "dummy-token",
             }
@@ -574,3 +570,136 @@ class CancelBookingTests(BookingTestBase):
         response2 = CancelBooking.as_view()(request2, pk=booking_id)
         self.assertEqual(response2.status_code, 400)
         self.assertIn('Cannot cancel', response2.data['error'])
+
+
+# ── Idempotency key ────────────────────────────────────────────────────────────
+
+from django.conf import settings as django_settings
+from django.test import override_settings
+
+class IdempotencyKeyTests(BookingTestBase):
+    """
+    Tests for idempotency key enforcement on POST /api/bookings/online/.
+
+    Uses self.client (full Django test client) so the middleware stack runs,
+    unlike other tests that dispatch views directly via APIRequestFactory.
+    The idempotency cache is overridden to use LocMemCache so tests don't
+    require a running Redis instance.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # Use in-memory cache for idempotency (no Redis needed) and disable lock
+        patched_caches = {
+            **django_settings.CACHES,
+            "idempotency": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "idempotency-test",
+            },
+        }
+        patched_idem = {
+            **django_settings.IDEMPOTENCY_KEY,
+            "LOCK": {**django_settings.IDEMPOTENCY_KEY.get("LOCK", {}), "ENABLE": False},
+        }
+        self._settings_override = override_settings(
+            CACHES=patched_caches,
+            IDEMPOTENCY_KEY=patched_idem,
+        )
+        self._settings_override.enable()
+        from django.core.cache import caches
+        caches.close_all()
+
+    def tearDown(self):
+        from django.core.cache import caches
+        caches.close_all()
+        self._settings_override.disable()
+        super().tearDown()
+
+
+    def _payload(self, email="idempotency@test.com"):
+        return {
+            "customer": {
+                "first_name": "Idem",
+                "last_name": "Test",
+                "contact_number": "09123456789",
+                "email": email,
+            },
+            "rooms": [{
+                "room_type": self.room_type.id,
+                "check_in": "2028-01-10",
+                "check_out": "2028-01-12",
+                "adult_count": 2,
+                "children_count": 0,
+                "extra_guest": 0,
+            }],
+            "turnstile_token": "dummy-token",
+        }
+
+    @patch('bookings.turnstile.requests.post')
+    def test_missing_idempotency_key_returns_400(self, mock_post):
+        """No Idempotency-Key header → middleware rejects with 400."""
+        mock_post.return_value.json.return_value = {"success": True}
+        response = self.client.post(
+            '/api/bookings/online/',
+            data=self._payload(),
+            content_type='application/json',
+            # intentionally omitting HTTP_IDEMPOTENCY_KEY
+        )
+        self.assertEqual(response.status_code, 400)
+
+    @patch('bookings.turnstile.requests.post')
+    def test_duplicate_key_replays_response_without_new_booking(self, mock_post):
+        """Same Idempotency-Key on a retry → cached 201, no extra DB row."""
+        mock_post.return_value.json.return_value = {"success": True}
+
+        headers = {'HTTP_IDEMPOTENCY_KEY': 'test-idem-key-duplicate'}
+
+        # First request — creates the booking
+        response1 = self.client.post(
+            '/api/bookings/online/',
+            data=self._payload(email="idem-dup@test.com"),
+            content_type='application/json',
+            **headers,
+        )
+        self.assertEqual(response1.status_code, 201)
+        booking_count_after_first = Booking.objects.count()
+
+        # Second request with the same key — should be replayed, no new booking
+        response2 = self.client.post(
+            '/api/bookings/online/',
+            data=self._payload(email="idem-dup@test.com"),
+            content_type='application/json',
+            **headers,
+        )
+        self.assertEqual(response2.status_code, 201)
+        self.assertEqual(
+            Booking.objects.count(), booking_count_after_first,
+            "Duplicate idempotency key must not create a new booking row",
+        )
+
+    @patch('bookings.turnstile.requests.post')
+    def test_different_key_creates_new_booking(self, mock_post):
+        """A distinct Idempotency-Key is treated as a new request and creates a booking."""
+        mock_post.return_value.json.return_value = {"success": True}
+
+        response1 = self.client.post(
+            '/api/bookings/online/',
+            data=self._payload(email="idem-a@test.com"),
+            content_type='application/json',
+            HTTP_IDEMPOTENCY_KEY='unique-key-aaa',
+        )
+        self.assertEqual(response1.status_code, 201)
+        count_after_first = Booking.objects.count()
+
+        response2 = self.client.post(
+            '/api/bookings/online/',
+            data=self._payload(email="idem-b@test.com"),
+            content_type='application/json',
+            HTTP_IDEMPOTENCY_KEY='unique-key-bbb',
+        )
+        self.assertEqual(response2.status_code, 201)
+        self.assertGreater(
+            Booking.objects.count(), count_after_first,
+            "A fresh idempotency key must create a new booking row",
+        )
+
