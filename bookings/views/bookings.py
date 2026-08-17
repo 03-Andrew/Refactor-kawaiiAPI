@@ -10,7 +10,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from kawaiiAPI.permissions import IsReceptionistOrAdmin
-
+from django.utils.decorators import method_decorator
+from idempotency_key.decorators import idempotency_key
 
 from bookings.models import Booking
 from bookings.serializers import (
@@ -150,7 +151,7 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
             'billing': BillingSerializerBase(billing).data,
             'bookings': created_bookings,
         }, status=status.HTTP_201_CREATED)
-
+@method_decorator(idempotency_key(optional=False), name='dispatch')
 class CreateOnlineBooking(BookingCreateMixin, APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -236,6 +237,7 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
         }
         if boat_ids:
             response_data['guests'] = tourist_added
+            response_data['boat_cost'] = float(boat_ids.total_cost)
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 
