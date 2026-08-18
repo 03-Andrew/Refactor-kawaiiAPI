@@ -150,6 +150,8 @@ jobs:
                     PAYMENT_LINK_URL=${{ secrets.PAYMENT_LINK_URL }}
                     DATABASE_URL=${{ secrets.DATABASE_URL }}
                     TURNSTILE_SECRET_KEY=${{ secrets.TURNSTILE_SECRET_KEY }}
+                    CERTBOT_EMAIL=${{ secrets.CERTBOT_EMAIL }}
+                    DOMAIN=test-booking.dreww.space
                     DEBUG=True
                     ALLOWED_HOSTS=test-booking.dreww.space,localhost
                     ENVEOF
@@ -158,6 +160,7 @@ jobs:
 
                     docker compose pull
                     docker compose up -d --remove-orphans
+                    docker compose restart nginx 
                     docker compose exec -T app python manage.py migrate --noinput
 
                     docker image prune -f
