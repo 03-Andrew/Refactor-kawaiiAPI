@@ -130,7 +130,7 @@ IDEMPOTENCY_KEY = {
     # --- Optional: Distributed Redis Lock ---
     'LOCK': {
         'CLASS': 'idempotency_key.locks.redis.MultiProcessRedisLock',  # Or keep ThreadLock for local dev
-        'LOCATION': 'redis://{REDIS_HOST}:{REDIS_PORT}/3',
+        'LOCATION': f"redis://{REDIS_HOST}:{REDIS_PORT}/3",
         'NAME': 'IdempotencyLock',
         'TTL': 300,
         'ENABLE': True,
