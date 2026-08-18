@@ -147,13 +147,13 @@ class ExtraItemsAvailed(models.Model):
     count = models.SmallIntegerField()
 
 
-class AdditonalPayment(models.Model):
+class AdditionalPayment(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.CASCADE, related_name="additional_payment")
     reason = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     
     def __str__(self):
-        return f"Additonal payments for {self.customer_bill.id} - {self.customer_bill.customer.last_name}, {self.customer_bill.customer.first_name}"
+        return f"Additional payments for {self.customer_bill.id} - {self.customer_bill.customer.last_name}, {self.customer_bill.customer.first_name}"
 
 
 class PaymentMethod(models.Model):

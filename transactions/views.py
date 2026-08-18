@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 # Models
-from .models import Billing, Customer, GuestList, FoodBill, GuestStatus, Food, AdditonalPayment, BillingStatus
+from .models import Billing, Customer, GuestList, FoodBill, GuestStatus, Food, AdditionalPayment, BillingStatus
 
 from kawaiiAPI.permissions import IsReceptionistOrAdmin, AdminDeleteOnly
 
@@ -165,7 +165,7 @@ class ModifyFoodList(generics.RetrieveUpdateDestroyAPIView):
 @extend_schema(tags=['Additional'])   
 class AdditionalPayments(generics.ListCreateAPIView):
     serializer_class = AdditionalPaymentSerializer
-    queryset = AdditonalPayment.objects.all()
+    queryset = AdditionalPayment.objects.all()
     permission_classes = [IsReceptionistOrAdmin]
 
 
