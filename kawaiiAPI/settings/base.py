@@ -89,6 +89,7 @@ REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
 REDIS_URL = os.environ.get("REDIS_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}/1")
 
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
@@ -108,7 +109,7 @@ CACHES = {
     },
     "idempotency": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/3",  # <-- Points directly to Redis DB 3
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/3",  # <-- Points directly to Redis DB 3
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
@@ -129,7 +130,7 @@ IDEMPOTENCY_KEY = {
     # --- Optional: Distributed Redis Lock ---
     'LOCK': {
         'CLASS': 'idempotency_key.locks.redis.MultiProcessRedisLock',  # Or keep ThreadLock for local dev
-        'LOCATION': 'redis://127.0.0.1:6379/3',
+        'LOCATION': 'redis://{REDIS_HOST}:{REDIS_PORT}/3',
         'NAME': 'IdempotencyLock',
         'TTL': 300,
         'ENABLE': True,
