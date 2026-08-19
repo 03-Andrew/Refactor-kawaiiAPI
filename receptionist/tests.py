@@ -1,33 +1,74 @@
 """
-Receptionist Tests
-==================
-ReceptionistTestBase        - shared fixtures and helpers
-AmenitiesAvailedNPlusOneTest  - N+1 regression for GET /api/amenities-availed/
-ActivitiesAvailedNPlusOneTest - N+1 regression for GET /api/activities-availed/
-CreatePaymentNPlusOneTest     - N+1 regression for GET /api/all-payments/
-"""
-import time
+Receptionist Performance, Query Count, and Memory Tests
+========================================================
+Tests for:
+- GET /api/amenities-availed/ vs GET /api/v0/amenities-availed/
+- GET /api/activities-availed/ vs GET /api/v0/activities-availed/
+- GET /api/all-payments/ vs GET /api/v0/all-payments/
 
+Validates:
+- Optimized (select_related & prefetch_related) vs v0 (Unoptimized)
+- Query count, response time, and memory footprint
+- Detailed summary table at the end of the test run
+"""
+
+import atexit
+import time
+import tracemalloc
+from datetime import date, timedelta
+from decimal import Decimal
 from django.core.cache import cache
 from django.test import TestCase, override_settings
-from django.db import connection, reset_queries
-
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework.views import APIView
-
-from bookings.models import Booking, Room, RoomType
-from transactions.models import (
-    Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed,
-    Billing, Customer, GuestList, Payment, PaymentMethod,
-    PaymentStatus,
-)
-from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import AccessToken
 
+from bookings.models import Booking, Room, RoomType, BookingStatus, RoomStatus
+from transactions.models import (
+    Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed,
+    Billing, Customer, FoodBill, AdditionalPayment, Payment, PaymentMethod,
+    PaymentStatus, PaymentForChoices, BillingStatus
+)
 
 User = get_user_model()
 
-# ── Shared base ────────────────────────────────────────────────────────────────
+RECEPTIONIST_BENCHMARK_RESULTS = []
+
+
+def print_receptionist_summary_table():
+    if not RECEPTIONIST_BENCHMARK_RESULTS:
+        return
+
+    header = f"{'Endpoint / Scenario':<42} | {'Version':<18} | {'Queries':<9} | {'Time (ms)':<11} | {'Mem Delta':<11} | {'Peak Mem':<11}"
+    separator = "-" * len(header)
+    title = "RECEPTIONIST PERFORMANCE & QUERY BENCHMARK SUMMARY"
+
+    lines = [
+        "",
+        "=" * len(header),
+        f"{title:^{len(header)}}",
+        "=" * len(header),
+        header,
+        separator,
+    ]
+
+    for item in RECEPTIONIST_BENCHMARK_RESULTS:
+        lines.append(
+            f"{item['scenario']:<42} | {item['version']:<18} | {item['queries']:>9} | "
+            f"{item['time_ms']:>9.2f} ms | {item['mem_delta']:>11} | {item['peak_mem']:>11}"
+        )
+
+    lines.append("=" * len(header))
+    lines.append("")
+    print("\n".join(lines))
+
+
+atexit.register(print_receptionist_summary_table)
+
 
 @override_settings(
     DEBUG=True,
@@ -42,363 +83,245 @@ User = get_user_model()
         'DEFAULT_THROTTLE_RATES': {},
     },
 )
-class ReceptionistTestBase(TestCase):
-    """Shared fixtures and helpers used by all receptionist test classes."""
+class ReceptionistPerformanceTestBase(TestCase):
+    """Shared fixtures and helpers with bulk dataset generation."""
 
-    # Subclasses that need a unique username should override this.
-    username = "testuser"
+    TOTAL_RECORDS = 100
 
-    def get_jwt_token(self, user):
-        token = AccessToken.for_user(user)
-        return str(token)
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="receptionist_testuser",
+            password="testpassword123",
+            role="RECEPTIONIST"
+        )
+        cls.token = str(AccessToken.for_user(cls.user))
+        cls.auth_header = f"Bearer {cls.token}"
+
+        cls.room_type = RoomType.objects.create(
+            name="Standard Room",
+            price=Decimal("2000.00"),
+            max_adult=2,
+        )
+        cls.rooms = Room.objects.bulk_create([
+            Room(number=f"R-{i}", type=cls.room_type, status=RoomStatus.AVAILABLE)
+            for i in range(1, 11)
+        ])
+        cls.amenity = Amenities.objects.create(
+            amenity="Boat Transfer",
+            rate_per_head=Decimal("500.00"),
+        )
+        cls.activity = Activity.objects.create(
+            activity="Snorkeling",
+            hourly_rate=Decimal("300.00"),
+        )
+        cls.payment_method = PaymentMethod.objects.create(mode="GCash")
+        cls.payment_status = PaymentStatus.objects.create(status="Completed")
+
+        # Bulk create customers and billings
+        customers = Customer.objects.bulk_create([
+            Customer(
+                first_name=f"Customer{i}",
+                last_name=f"Recep{i}",
+                contact_number="09111111111",
+                email=f"customer_recep_{i}@test.com"
+            )
+            for i in range(cls.TOTAL_RECORDS)
+        ])
+
+        billings = Billing.objects.bulk_create([
+            Billing(customer=customers[i], status=BillingStatus.PROCESSING)
+            for i in range(cls.TOTAL_RECORDS)
+        ])
+        cls.billings = billings
+
+        base_date = date(2026, 6, 1)
+        Booking.objects.bulk_create([
+            Booking(
+                customer_bill=billings[i],
+                room=cls.rooms[i % len(cls.rooms)],
+                room_type=cls.room_type,
+                check_in=base_date + timedelta(days=i * 2),
+                check_out=base_date + timedelta(days=i * 2 + 1),
+                adult_count=2,
+                status=BookingStatus.APPROVED
+            )
+            for i in range(cls.TOTAL_RECORDS)
+        ])
+
+        FoodBill.objects.bulk_create([
+            FoodBill(customer_bill=billings[i], price=Decimal("300.00"), or_number=f"OR-{i}")
+            for i in range(cls.TOTAL_RECORDS)
+        ])
+
+        cls.amenities_availed = AmenitiesAvailed.objects.bulk_create([
+            AmenitiesAvailed(
+                customer_bill=billings[i],
+                amenity=cls.amenity,
+                head_count=2,
+                time="10:00:00"
+            )
+            for i in range(cls.TOTAL_RECORDS)
+        ])
+
+        cls.activities_availed = ActivitiesAvailed.objects.bulk_create([
+            ActivitiesAvailed(
+                customer_bill=billings[i],
+                activity=cls.activity,
+                hours_availed=Decimal("2.00")
+            )
+            for i in range(cls.TOTAL_RECORDS)
+        ])
+
+        AdditionalPayment.objects.bulk_create([
+            AdditionalPayment(
+                customer_bill=billings[i],
+                reason="Towel",
+                price=Decimal("100.00")
+            )
+            for i in range(cls.TOTAL_RECORDS)
+        ])
+
+        now = timezone.now()
+        cls.payments = Payment.objects.bulk_create([
+            Payment(
+                customer_bill=billings[i],
+                amount=Decimal("1000.00"),
+                date=now,
+                mop=cls.payment_method,
+                status=cls.payment_status,
+                paymentFor=PaymentForChoices.AMENITIES,
+                content_type_id=None,
+                object_id=None,
+            )
+            for i in range(cls.TOTAL_RECORDS)
+        ])
 
     def setUp(self):
         cache.clear()
         APIView.throttle_classes = []
         self.client = APIClient()
-        self.token = self.get_jwt_token(
-            User.objects.create_user(username=self.username, password="testpass")
+
+    def run_benchmark(self, url, scenario, version="Optimized"):
+        """Runs a GET endpoint and records metrics."""
+        tracemalloc.start()
+        with CaptureQueriesContext(connection) as query_context:
+            start_time = time.perf_counter()
+            response = self.client.get(
+                url,
+                HTTP_AUTHORIZATION=self.auth_header
+            )
+            elapsed_time = time.perf_counter() - start_time
+        current_mem, peak_mem = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        query_count = len(query_context)
+
+        def format_bytes(b):
+            if b >= 1024 * 1024:
+                return f"{b / (1024 * 1024):.2f} MB"
+            return f"{b / 1024:.2f} KB"
+
+        RECEPTIONIST_BENCHMARK_RESULTS.append({
+            "scenario": scenario,
+            "version": version,
+            "queries": f"{query_count:,}",
+            "time_ms": elapsed_time * 1000,
+            "mem_delta": format_bytes(current_mem),
+            "peak_mem": format_bytes(peak_mem),
+        })
+
+        return response, query_count, elapsed_time, current_mem, peak_mem
+
+
+class AmenitiesAvailedComparisonTest(ReceptionistPerformanceTestBase):
+    """Compare GET /api/amenities-availed/ (Optimized) vs /api/v0/amenities-availed/ (Unoptimized)"""
+
+    def test_amenities_availed_optimized_vs_v0(self):
+        # 1. Before (v0 Unoptimized)
+        res_v0, q_v0, t_v0, _, _ = self.run_benchmark(
+            "/api/v0/amenities-availed/",
+            f"GET /api/amenities-availed/ ({self.TOTAL_RECORDS} items)",
+            "Before (v0)"
         )
-        self.amenity = Amenities.objects.create(
-            amenity="Boat Transfer",
-            rate_per_head=500.00,
-        )
-        self.activity = Activity.objects.create(
-            activity="Snorkeling",
-            hourly_rate=300.00,
-        )
+        self.assertEqual(res_v0.status_code, 200)
+        self.assertEqual(res_v0.data["count"], self.TOTAL_RECORDS)
 
-    def tearDown(self):
-        AmenitiesAvailed.objects.all().delete()
-        ActivitiesAvailed.objects.all().delete()
-        GuestList.objects.all().delete()
-        Billing.objects.all().delete()
-        Customer.objects.all().delete()
-        Amenities.objects.all().delete()
-        Activity.objects.all().delete()
-        Booking.objects.all().delete()
-        Room.objects.all().delete()
-        RoomType.objects.all().delete()
-
-    def _create_daytour(self, email_suffix):
-        """Create one daytour booking with 1 amenity and 1 activity."""
-        payload = {
-            "customer": {
-                "first_name": f"Perf{email_suffix}",
-                "last_name": "Test",
-                "contact_number": "09111111111",
-                "email": f"perf{email_suffix}@test.com",
-            },
-            "guest_list": [f"Guest {email_suffix}"],
-            "selected_amenities": [{"id": self.amenity.id, "head_count": 2}],
-            "selected_activities": [{"id": self.activity.id, "hours": 2}],
-        }
-
-        response = self.client.post(
-            "/api/bookings/daytour/", payload, format="json",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
-        )
-        self.assertEqual(response.status_code, 201,
-                         f"Daytour creation failed for suffix {email_suffix}: {response.data}")
-        return response.data
-
-
-# ── Amenities availed N+1 ──────────────────────────────────────────────────────
-
-class AmenitiesAvailedNPlusOneTest(ReceptionistTestBase):
-    """Regression test for N+1 queries on GET /api/amenities-availed/.
-
-    Before fix: BillingSerializer nested inside AmenitiesAvailedListSerializer
-    causes O(N * 7+) queries — each Billing's total_cost/paid_amount/running_balance
-    properties iterate reverse relations with fresh SQL.
-    """
-
-    username = "testuser"
-
-    def test_n_plus_one_on_amenities_availed_get(self):
-        """CREATE 100 amenities availed, then GET list and measure queries + time.
-
-        With N+1: ~700+ queries and noticeably slow.
-        After fix with select_related/prefetch_related: < 20 queries.
-        """
-        num_records = 100
-
-        # --- Create 100 daytour bookings, each with 1 amenity availed ---
-        # print(f"\n  Creating {num_records} daytour bookings (each = 1 AmenitiesAvailed)...")
-        create_start = time.perf_counter()
-        for i in range(num_records):
-            self._create_daytour(i)
-        create_elapsed = time.perf_counter() - create_start
-        # print(f"  Created {num_records} in {create_elapsed:.2f}s")
-
-        # Verify count
-        self.assertEqual(AmenitiesAvailed.objects.count(), num_records)
-
-        # --- Measure GET /api/amenities-availed/ ---
-        reset_queries()
-
-        get_start = time.perf_counter()
-        response = self.client.get(
+        # 2. After (Optimized)
+        res_opt, q_opt, t_opt, _, _ = self.run_benchmark(
             "/api/amenities-availed/",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+            f"GET /api/amenities-availed/ ({self.TOTAL_RECORDS} items)",
+            "After (Optimized)"
         )
-        get_elapsed = time.perf_counter() - get_start
+        self.assertEqual(res_opt.status_code, 200)
+        self.assertEqual(res_opt.data["count"], self.TOTAL_RECORDS)
+        self.assertLessEqual(q_opt, 20)
+        self.assertLess(t_opt, 0.5)
 
-        query_count = len(connection.queries)
-        # print(f"\n  GET /api/amenities-availed/ ({num_records} records):")
-        # print(f"    Queries: {query_count}")
-        # print(f"    Time:    {get_elapsed*1000:.1f}ms")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["count"], num_records)
-
-        # --- Assertions ---
-        # With N+1 unfixed: expect > 200 queries (1 base + N*7+ per row)
-        # After fix with select_related + prefetch_related: expect < 20 queries
-        # self.assertLess(
-        #     query_count, 50,
-        #     f"Expected < 50 queries after N+1 fix, got {query_count}. "
-        #     f"N+1 regression: each AmenitiesAvailed row triggers 7+ extra queries "
-        #     f"through BillingSerializer nested properties."
-        # )
-
-        # Time assertion: 100 records should return in well under 500ms
+        # Optimized must execute dramatically fewer queries than v0
         self.assertLess(
-            get_elapsed, 0.5,
-            f"GET /api/amenities-availed/ with {num_records} records took "
-            f"{get_elapsed*1000:.1f}ms, expected < 500ms"
+            q_opt, q_v0,
+            f"Optimized ({q_opt} queries) should be far fewer than v0 ({q_v0} queries)"
         )
 
-    def test_amenities_availed_query_count_scales_constant(self):
-        """Query count should be constant regardless of record count.
 
-        Small batch (10) and large batch (100) should produce same query count.
-        """
-        def create_and_fetch(count, offset=0):
-            for i in range(offset, offset + count):
-                self._create_daytour(i)
+class ActivitiesAvailedComparisonTest(ReceptionistPerformanceTestBase):
+    """Compare GET /api/activities-availed/ (Optimized) vs /api/v0/activities-availed/ (Unoptimized)"""
 
-            reset_queries()
-            response = self.client.get(
-                "/api/amenities-availed/",
-                HTTP_AUTHORIZATION=f'Bearer {self.token}'
-            )
-            self.assertEqual(response.status_code, 200)
-            return len(connection.queries)
+    def test_activities_availed_optimized_vs_v0(self):
+        # 1. Before (v0 Unoptimized)
+        res_v0, q_v0, t_v0, _, _ = self.run_benchmark(
+            "/api/v0/activities-availed/",
+            f"GET /api/activities-availed/ ({self.TOTAL_RECORDS} items)",
+            "Before (v0)"
+        )
+        self.assertEqual(res_v0.status_code, 200)
+        self.assertEqual(res_v0.data["count"], self.TOTAL_RECORDS)
 
-        q_small = create_and_fetch(10, offset=0)
-        q_large = create_and_fetch(100, offset=10)
-
-        # print(f"\n  Query counts: 10 records={q_small}, 100 records={q_large}")
-
-        # self.assertEqual(
-        #     q_small, q_large,
-        #     f"Query count should be constant. 10 records={q_small}, "
-        #     f"100 records={q_large}. N+1 regression: each extra row adds queries."
-        # )
-
-
-# ── Activities availed N+1 ─────────────────────────────────────────────────────
-
-class ActivitiesAvailedNPlusOneTest(ReceptionistTestBase):
-    """Regression test for N+1 queries on GET /api/activities-availed/.
-
-    Before fix: BillingSerializer nested inside ActivitiesAvailedListSerializer
-    causes O(N * 7+) queries — each Billing's total_cost/paid_amount/running_balance
-    properties iterate reverse relations with fresh SQL.
-    """
-
-    username = "testuser2"
-
-    def test_n_plus_one_on_activities_availed_get(self):
-        """CREATE 100 activities availed, then GET list and measure queries + time.
-
-        With N+1: ~700+ queries and noticeably slow.
-        After fix with select_related/prefetch_related: < 20 queries.
-        """
-        num_records = 100
-
-        # --- Create 100 daytour bookings, each with 1 activity availed ---
-        # print(f"\n  Creating {num_records} daytour bookings (each = 1 ActivitiesAvailed)...")
-        create_start = time.perf_counter()
-        for i in range(num_records):
-            self._create_daytour(i)
-        create_elapsed = time.perf_counter() - create_start
-        # print(f"  Created {num_records} in {create_elapsed:.2f}s")
-
-        # Verify count
-        self.assertEqual(ActivitiesAvailed.objects.count(), num_records)
-
-        # --- Measure GET /api/activities-availed/ ---
-        reset_queries()
-
-        get_start = time.perf_counter()
-        response = self.client.get(
+        # 2. After (Optimized)
+        res_opt, q_opt, t_opt, _, _ = self.run_benchmark(
             "/api/activities-availed/",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+            f"GET /api/activities-availed/ ({self.TOTAL_RECORDS} items)",
+            "After (Optimized)"
         )
-        get_elapsed = time.perf_counter() - get_start
+        self.assertEqual(res_opt.status_code, 200)
+        self.assertEqual(res_opt.data["count"], self.TOTAL_RECORDS)
+        self.assertLessEqual(q_opt, 20)
+        self.assertLess(t_opt, 0.5)
 
-        query_count = len(connection.queries)
-        # print(f"\n  GET /api/activities-availed/ ({num_records} records):")
-        # print(f"    Queries: {query_count}")
-        # print(f"    Time:    {get_elapsed*1000:.1f}ms")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["count"], num_records)
-
-        # Time assertion: 100 records should return in well under 500ms
+        # Optimized must execute dramatically fewer queries than v0
         self.assertLess(
-            get_elapsed, 0.5,
-            f"GET /api/activities-availed/ with {num_records} records took "
-            f"{get_elapsed*1000:.1f}ms, expected < 500ms"
+            q_opt, q_v0,
+            f"Optimized ({q_opt} queries) should be far fewer than v0 ({q_v0} queries)"
         )
 
-    def test_activities_availed_query_count_scales_constant(self):
-        """Query count should be constant regardless of record count.
 
-        Small batch (10) and large batch (100) should produce same query count.
-        """
-        def create_and_fetch(count, offset=0):
-            for i in range(offset, offset + count):
-                self._create_daytour(i)
+class PaymentsComparisonTest(ReceptionistPerformanceTestBase):
+    """Compare GET /api/all-payments/ (Optimized) vs /api/v0/all-payments/ (Unoptimized)"""
 
-            reset_queries()
-            response = self.client.get(
-                "/api/activities-availed/",
-                HTTP_AUTHORIZATION=f'Bearer {self.token}'
-            )
-            self.assertEqual(response.status_code, 200)
-            return len(connection.queries)
-
-        q_small = create_and_fetch(10, offset=0)
-        q_large = create_and_fetch(100, offset=10)
-
-        # print(f"\n  Query counts: 10 records={q_small}, 100 records={q_large}")
-
-        # self.assertEqual(
-        #     q_small, q_large,
-        #     f"Query count should be constant. 10 records={q_small}, "
-        #     f"100 records={q_large}. N+1 regression: each extra row adds queries."
-        # )
-
-
-# ── Payment N+1 ────────────────────────────────────────────────────────────────
-
-class CreatePaymentNPlusOneTest(ReceptionistTestBase):
-    """N+1 regression: POST /api/payment/multiple/ → GET /api/all-payments/.
-
-    GET /api/all-payments/ uses PaymentSerializer which traverses
-    paymentFor.name, mop.mode, customer_bill.customer, and GenericForeignKey
-    (paid_for) — all per row without select_related.
-    """
-
-    username = "testuser3"
-
-    def setUp(self):
-        super().setUp()
-        self.mop = PaymentMethod.objects.create(mode="GCash")
-        self.payment_status = PaymentStatus.objects.create(status="Completed")
-
-    def tearDown(self):
-        Payment.objects.all().delete()
-        PaymentMethod.objects.all().delete()
-        PaymentStatus.objects.all().delete()
-        super().tearDown()
-
-    def _create_daytour(self, email_suffix):
-        """Create one daytour booking with 1 amenity and 1 activity."""
-        payload = {
-            "customer": {
-                "first_name": f"Pay{email_suffix}",
-                "last_name": "Test",
-                "contact_number": "09111111111",
-                "email": f"pay{email_suffix}@test.com",
-            },
-            "guest_list": [f"Guest {email_suffix}"],
-            "selected_amenities": [{"id": self.amenity.id, "head_count": 2}],
-            "selected_activities": [{"id": self.activity.id, "hours": 2}],
-        }
-        response = self.client.post(
-            "/api/bookings/daytour/", payload, format="json",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+    def test_payments_optimized_vs_v0(self):
+        # 1. Before (v0 Unoptimized)
+        res_v0, q_v0, t_v0, _, _ = self.run_benchmark(
+            "/api/v0/all-payments/",
+            f"GET /api/all-payments/ ({self.TOTAL_RECORDS} items)",
+            "Before (v0)"
         )
-        self.assertEqual(response.status_code, 201,
-                         f"Daytour creation failed: {response.data}")
-        return response.data
+        self.assertEqual(res_v0.status_code, 200)
+        self.assertEqual(res_v0.data["count"], self.TOTAL_RECORDS)
 
-    def _create_payment(self, customer_bill_id, amenity_id):
-        payload = {
-            "customerInfo": {
-                "customer_bill": customer_bill_id,
-                "date": "2026-07-27",
-                "mop": self.mop.id,
-                "status": self.payment_status.id,
-            },
-            "amount": 0,
-            "selectedItems": {
-                "selectedAmenities": [{"id": amenity_id, "price": 1000}],
-            },
-        }
-        response = self.client.post(
-            "/api/payment/multiple/", payload, format="json",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
-        )
-        self.assertEqual(response.status_code, 201,
-                         f"Payment creation failed: {response.data}")
-        return response.data
-
-    def test_create_payment_and_get_all_payments(self):
-        """Create 100 payments via daytour + payment/multiple, then GET all-payments."""
-        num_records = 100
-
-        # ── Phase 1: Create daytour bookings ──
-        # print(f"\n  Creating {num_records} daytour bookings...")
-        daytour_start = time.perf_counter()
-        for i in range(num_records):
-            self._create_daytour(i)
-        daytour_elapsed = time.perf_counter() - daytour_start
-        # print(f"  Daytours created in {daytour_elapsed:.2f}s")
-
-        self.assertEqual(AmenitiesAvailed.objects.count(), num_records)
-        self.assertEqual(Billing.objects.count(), num_records)
-
-        # ── Phase 2: Create payments ──
-        amenity_ids = list(
-            AmenitiesAvailed.objects.values_list("id", flat=True).order_by("id")
-        )
-        billing_ids = list(
-            Billing.objects.values_list("id", flat=True).order_by("id")
-        )
-
-        # print(f"  Creating {num_records} payments via /api/payment/multiple/...")
-        post_start = time.perf_counter()
-        for i in range(num_records):
-            self._create_payment(billing_ids[i], amenity_ids[i])
-        post_elapsed = time.perf_counter() - post_start
-        # print(f"  Payments POST: {post_elapsed:.2f}s total, {post_elapsed/num_records*1000:.1f}ms avg")
-
-        self.assertEqual(Payment.objects.count(), num_records)
-
-        # ── Phase 3: GET /api/all-payments/ ──
-        reset_queries()
-
-        get_start = time.perf_counter()
-        response = self.client.get(
+        # 2. After (Optimized)
+        res_opt, q_opt, t_opt, _, _ = self.run_benchmark(
             "/api/all-payments/",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
+            f"GET /api/all-payments/ ({self.TOTAL_RECORDS} items)",
+            "After (Optimized)"
         )
-        get_elapsed = time.perf_counter() - get_start
+        self.assertEqual(res_opt.status_code, 200)
+        self.assertEqual(res_opt.data["count"], self.TOTAL_RECORDS)
+        self.assertLessEqual(q_opt, 10)
+        self.assertLess(t_opt, 0.5)
 
-        query_count = len(connection.queries)
-        # print(f"\n  GET /api/all-payments/ ({num_records} records):")
-        # print(f"    Queries: {query_count}")
-        # print(f"    Time:    {get_elapsed*1000:.1f}ms")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["count"], num_records)
-
-        # print(f"\n  Summary:")
-        # print(f"    Daytour create:  {daytour_elapsed:.2f}s")
-        # print(f"    Payments POST:   {post_elapsed:.2f}s ({post_elapsed/num_records*1000:.1f}ms avg)")
-        # print(f"    GET all-payments: {get_elapsed*1000:.1f}ms, {query_count} queries")
+        # Optimized must execute fewer queries than v0
+        self.assertLess(
+            q_opt, q_v0,
+            f"Optimized ({q_opt} queries) should be fewer than v0 ({q_v0} queries)"
+        )

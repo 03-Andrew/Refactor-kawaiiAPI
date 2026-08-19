@@ -1,265 +1,299 @@
+"""
+Reports Performance, Query Count, and Memory Tests
+===================================================
+Tests for:
+- GET /api/reports/daily/ vs GET /api/v0/reports/daily/
+- GET /api/reports/weekly/ vs GET /api/v0/reports/weekly/
+- GET /api/reports/monthly/ vs GET /api/v0/reports/monthly/
+- GET /api/reports/yearly/ vs GET /api/v0/reports/yearly/
+- GET /api/reports/monthly-total/ vs GET /api/v0/reports/monthly-total/
+
+Validates:
+- Optimized (select_related, GFK batch-prefetch & range queries) vs v0 (Unoptimized)
+- Query count, response time, and memory footprint via tracemalloc
+- Prints a structured comparison summary table at the end
+"""
+
+import atexit
 import time
-
+import tracemalloc
+from datetime import date, datetime, timedelta
+from decimal import Decimal
 from django.test import TestCase, override_settings
-from django.db import connection, reset_queries
-
+from django.db import connection
+from django.utils import timezone
+from django.test.utils import CaptureQueriesContext
+from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
 
-from bookings.models import Room, RoomType, RoomStatus
+from bookings.models import Room, RoomType, Booking, RoomStatus, BookingStatus
 from transactions.models import (
     Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed,
-    Billing, Customer, GuestList, Payment, PaymentMethod,
-    PaymentStatus,
+    Billing, Customer, Payment, PaymentMethod, PaymentStatus,
+    PaymentForChoices, BillingStatus
 )
-
-from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-@override_settings(DEBUG=True)
-class ReportsNPlusOneTest(TestCase):
-    """N+1 regression: report endpoints use PaymentSerializer without
-    select_related or GenericForeignKey batch-prefetch.
+REPORTS_BENCHMARK_RESULTS = []
 
-    Daily/Weekly/Monthly/Yearly all serialize Payment querysets multiple
-    times — each serialization triggers per-row FK + GFK queries.
-    """
-    def get_jwt_token(self, user):
-        token = AccessToken.for_user(user) 
-        return str(token)
-    
+
+def print_reports_summary_table():
+    if not REPORTS_BENCHMARK_RESULTS:
+        return
+
+    header = f"{'Endpoint / Scenario':<42} | {'Version':<18} | {'Queries':<9} | {'Time (ms)':<11} | {'Mem Delta':<11} | {'Peak Mem':<11}"
+    separator = "-" * len(header)
+    title = "REPORTS PERFORMANCE & QUERY BENCHMARK SUMMARY"
+
+    lines = [
+        "",
+        "=" * len(header),
+        f"{title:^{len(header)}}",
+        "=" * len(header),
+        header,
+        separator,
+    ]
+
+    for item in REPORTS_BENCHMARK_RESULTS:
+        lines.append(
+            f"{item['scenario']:<42} | {item['version']:<18} | {item['queries']:>9} | "
+            f"{item['time_ms']:>9.2f} ms | {item['mem_delta']:>11} | {item['peak_mem']:>11}"
+        )
+
+    lines.append("=" * len(header))
+    lines.append("")
+    print("\n".join(lines))
+
+
+atexit.register(print_reports_summary_table)
+
+
+@override_settings(DEBUG=True)
+class ReportsPerformanceTest(TestCase):
+    """Benchmark tests comparing optimized report views vs v0 unoptimized report views."""
+
+    RECORD_COUNT = 50
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="report_admin", password="adminpassword123", role="ADMIN"
+        )
+        cls.token = str(AccessToken.for_user(cls.user))
+        cls.auth_header = f"Bearer {cls.token}"
+
+        # Reference Models
+        cls.room_type = RoomType.objects.create(
+            name="Deluxe Suite",
+            price=Decimal("2500.00"),
+            max_adult=2,
+            good_for=2,
+        )
+        cls.room = Room.objects.create(
+            number="101", type=cls.room_type, status=RoomStatus.AVAILABLE
+        )
+        cls.amenity = Amenities.objects.create(
+            amenity="Boat Transfer", rate_per_head=Decimal("500.00")
+        )
+        cls.activity = Activity.objects.create(
+            activity="Snorkeling", hourly_rate=Decimal("300.00")
+        )
+        cls.mop = PaymentMethod.objects.create(mode="GCash")
+        cls.payment_status = PaymentStatus.objects.create(status="Completed")
+
+        # Content Types for GenericForeignKey
+        cls.ct_amenity = ContentType.objects.get_for_model(AmenitiesAvailed)
+        cls.ct_activity = ContentType.objects.get_for_model(ActivitiesAvailed)
+        cls.ct_booking = ContentType.objects.get_for_model(Booking)
+
+        # Bulk seed 50 customers and billings
+        customers = Customer.objects.bulk_create([
+            Customer(
+                first_name=f"ReportFirst{i}",
+                last_name=f"ReportLast{i}",
+                contact_number="09111111111",
+                email=f"report{i}@example.com"
+            )
+            for i in range(cls.RECORD_COUNT)
+        ])
+
+        billings = Billing.objects.bulk_create([
+            Billing(customer=customers[i], status=BillingStatus.PROCESSING)
+            for i in range(cls.RECORD_COUNT)
+        ])
+
+        # Amenities availed
+        amenities_availed = AmenitiesAvailed.objects.bulk_create([
+            AmenitiesAvailed(
+                customer_bill=billings[i],
+                amenity=cls.amenity,
+                head_count=2,
+                time="10:00:00"
+            )
+            for i in range(cls.RECORD_COUNT)
+        ])
+
+        # Payments spread across date ranges (2026-07-28 in Week 31, Month 7, Year 2026)
+        base_date = timezone.make_aware(datetime(2026, 7, 28, 12, 0, 0))
+        Payment.objects.bulk_create([
+            Payment(
+                customer_bill=billings[i],
+                amount=Decimal("1000.00"),
+                date=base_date + timedelta(days=(i % 5)),
+                mop=cls.mop,
+                status=cls.payment_status,
+                paymentFor=PaymentForChoices.AMENITIES,
+                content_type=cls.ct_amenity,
+                object_id=amenities_availed[i].id,
+            )
+            for i in range(cls.RECORD_COUNT)
+        ])
+
     def setUp(self):
         self.client = APIClient()
 
-        self.token = self.get_jwt_token(User.objects.create_user(username="testuser", password="testpass", role="ADMIN"))
-        # ── Shared reference data ──
-        self.amenity = Amenities.objects.create(
-            amenity="Boat Transfer", rate_per_head=500.00,
-        )
-        self.activity = Activity.objects.create(
-            activity="Snorkeling", hourly_rate=300.00,
-        )
-        self.room_type = RoomType.objects.create(
-            name="Standard", description="A standard room",
-            price=2500.00, good_for=2, max_children=1, max_adult=2,
-        )
-        self.room = Room.objects.create(
-            number="101", type=self.room_type, status=RoomStatus.AVAILABLE,
-        )
-        self.mop = PaymentMethod.objects.create(mode="GCash")
-        self.payment_status = PaymentStatus.objects.create(status="Completed")
-
-    # ── Helpers ────────────────────────────────────────────────
-
-    def _create_daytour(self, email_suffix):
-        """POST /api/bookings/daytour/ — returns billing data."""
-        payload = {
-            "customer": {
-                "first_name": f"Rpt{email_suffix}",
-                "last_name": "Test",
-                "contact_number": "09111111111",
-                "email": f"rpt{email_suffix}@test.com",
-            },
-            "guest_list": [f"Guest {email_suffix}"],
-            "selected_amenities": [{"id": self.amenity.id, "head_count": 2}],
-            "selected_activities": [{"id": self.activity.id, "hours": 2}],
-        }
-        response = self.client.post(
-            "/api/bookings/daytour/", payload, format="json",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
-        )
-        self.assertEqual(response.status_code, 201,
-                         f"Daytour failed: {response.data}")
-        return response.data
-
-    def _create_payment(self, customer_bill_id, amenity_id, date_str="2026-07-28"):
-        """POST /api/payment/multiple/ — pay for amenity."""
-        payload = {
-            "customerInfo": {
-                "customer_bill": customer_bill_id,
-                "date": date_str,
-                "mop": self.mop.id,
-                "status": self.payment_status.id,
-            },
-            "amount": 0,
-            "selectedItems": {
-                "selectedAmenities": [{"id": amenity_id, "price": 1000}],
-            },
-        }
-        response = self.client.post(
-            "/api/payment/multiple/", payload, format="json",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
-        )
-        self.assertEqual(response.status_code, 201,
-                         f"Payment creation failed: {response.data}")
-        return response.data
-
-    def _seed_data(self, count=50):
-        """Create `count` daytour bookings + payments. Returns year used."""
-        # print(f"  Seeding {count} daytours + payments...")
-        start = time.perf_counter()
-        for i in range(count):
-            data = self._create_daytour(i)
-            billing_id = data["billing"]["id"]
-            amenity_id = AmenitiesAvailed.objects.filter(
-                customer_bill=billing_id,
-            ).first().id
-            self._create_payment(billing_id, amenity_id)
-        elapsed = time.perf_counter() - start
-        # print(f"  Seed complete: {count} records in {elapsed:.2f}s")
-        self.assertEqual(Payment.objects.count(), count)
-
-    # ── Report tests ──────────────────────────────────────────
-
-    def test_daily_report(self):
-        """GET /api/reports/daily/?date=YYYY-MM-DD — single day."""
-        self._seed_data(50)
-
-        date_str = "2026-07-28"
-        reset_queries()
-
-        start = time.perf_counter()
-        response = self.client.get(
-            f"/api/reports/daily/?date={date_str}",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
-        )
-        elapsed = time.perf_counter() - start
-
-        query_count = len(connection.queries)
-        # print(f"\n  GET /api/reports/daily/?date={date_str}:")
-        # print(f"    Queries: {query_count}")
-        # print(f"    Time:    {elapsed*1000:.1f}ms")
-
-        self.assertEqual(response.status_code, 200)
-
-    def test_weekly_report(self):
-        """GET /api/reports/weekly/?year=2026&s=30&e=30 — one week.
-
-        This is the heaviest: PaymentSerializer called per day (7x).
-        """
-        self._seed_data(50)
-
-        reset_queries()
-
-        start = time.perf_counter()
-        response = self.client.get(
-            "/api/reports/weekly/?year=2026&s=30&e=30",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
-        )
-        elapsed = time.perf_counter() - start
-
-        query_count = len(connection.queries)
-        # print(f"\n  GET /api/reports/weekly/?year=2026&s=30&e=30:")
-        # print(f"    Queries: {query_count}")
-        # print(f"    Time:    {elapsed*1000:.1f}ms")
-
-        self.assertEqual(response.status_code, 200)
-
-    def test_monthly_report(self):
-        """GET /api/reports/monthly/?year=2026&s=7 — one month."""
-        self._seed_data(50)
-
-        reset_queries()
-
-        start = time.perf_counter()
-        response = self.client.get(
-            "/api/reports/monthly/?year=2026&s=7",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
-        )
-        elapsed = time.perf_counter() - start
-
-        query_count = len(connection.queries)
-        # print(f"\n  GET /api/reports/monthly/?year=2026&s=7:")
-        # print(f"    Queries: {query_count}")
-        # print(f"    Time:    {elapsed*1000:.1f}ms")
-
-        self.assertEqual(response.status_code, 200)
-
-    def test_yearly_report(self):
-        """GET /api/reports/yearly/?s=2026 — one year, all months."""
-        self._seed_data(50)
-
-        reset_queries()
-
-        start = time.perf_counter()
-        response = self.client.get(
-            "/api/reports/yearly/?s=2026",
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
-        )
-        elapsed = time.perf_counter() - start
-
-        query_count = len(connection.queries)
-        # print(f"\n  GET /api/reports/yearly/?s=2026:")
-        # print(f"    Queries: {query_count}")
-        # print(f"    Time:    {elapsed*1000:.1f}ms")
-
-        self.assertEqual(response.status_code, 200)
-
-    def test_total_per_month(self):
-        """GET /api/reports/monthly-total/?year=2026 — aggregation, no N+1 expected."""
-        self._seed_data(50)
-
-        reset_queries()
-
-        start = time.perf_counter()
-        response = self.client.get(
-            "/api/reports/monthly-total/?year=2026", 
-            HTTP_AUTHORIZATION=f'Bearer {self.token}'
-        )
-        elapsed = time.perf_counter() - start
-
-        query_count = len(connection.queries)
-        # print(f"\n  GET /api/reports/monthly-total/?year=2026:")
-        # print(f"    Queries: {query_count}")
-        # print(f"    Time:    {elapsed*1000:.1f}ms")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("months", response.data)
-        self.assertEqual(len(response.data["months"]), 12)
-
-    def test_all_reports_summary(self):
-        """Run all reports and print summary comparison."""
-        self._seed_data(50)
-
-        endpoints = {
-            "daily": "/api/reports/daily/?date=2026-07-28",
-            "weekly": "/api/reports/weekly/?year=2026&s=30&e=30",
-            "monthly": "/api/reports/monthly/?year=2026&s=7",
-            "yearly": "/api/reports/yearly/?s=2026",
-            "monthly-total": "/api/reports/monthly-total/?year=2026",
-        }
-
-        results = {}
-        for label, url in endpoints.items():
-            reset_queries()
-            start = time.perf_counter()
+    def run_benchmark(self, url, scenario, version="Optimized"):
+        """Runs a GET endpoint and captures queries, time, and memory."""
+        tracemalloc.start()
+        with CaptureQueriesContext(connection) as query_context:
+            start_time = time.perf_counter()
             response = self.client.get(
                 url,
-                HTTP_AUTHORIZATION=f'Bearer {self.token}'
+                HTTP_AUTHORIZATION=self.auth_header
             )
-            elapsed = time.perf_counter() - start
-            query_count = len(connection.queries)
-            self.assertEqual(response.status_code, 200)
-            results[label] = (query_count, elapsed * 1000)
+            elapsed_time = time.perf_counter() - start_time
+        current_mem, peak_mem = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
 
-        # print(f"\n  {'Endpoint':<18} {'Queries':>8} {'Time':>10}")
-        # print(f"  {'─'*18} {'─'*8} {'─'*10}")
-        # for label, (qc, ms) in results.items():
-        #     print(f"  {label:<18} {qc:>8} {ms:>8.1f}ms")
+        query_count = len(query_context)
 
-    # ── Cleanup ───────────────────────────────────────────────
+        def format_bytes(b):
+            if b >= 1024 * 1024:
+                return f"{b / (1024 * 1024):.2f} MB"
+            return f"{b / 1024:.2f} KB"
 
-    def tearDown(self):
-        Payment.objects.all().delete()
-        PaymentMethod.objects.all().delete()
-        PaymentStatus.objects.all().delete()
-        AmenitiesAvailed.objects.all().delete()
-        ActivitiesAvailed.objects.all().delete()
-        GuestList.objects.all().delete()
-        Billing.objects.all().delete()
-        Customer.objects.all().delete()
-        Amenities.objects.all().delete()
-        Activity.objects.all().delete()
-        Room.objects.all().delete()
-        RoomType.objects.all().delete()
+        REPORTS_BENCHMARK_RESULTS.append({
+            "scenario": scenario,
+            "version": version,
+            "queries": f"{query_count:,}",
+            "time_ms": elapsed_time * 1000,
+            "mem_delta": format_bytes(current_mem),
+            "peak_mem": format_bytes(peak_mem),
+        })
+
+        return response, query_count, elapsed_time, current_mem, peak_mem
+
+    def test_daily_report_optimized_vs_v0(self):
+        """Compare GET /api/reports/daily/ vs GET /api/v0/reports/daily/"""
+        # 1. Before (v0 Unoptimized)
+        res_v0, q_v0, t_v0, _, _ = self.run_benchmark(
+            "/api/v0/reports/daily/?date=2026-07-28",
+            "GET /api/reports/daily/",
+            "Before (v0)"
+        )
+        self.assertEqual(res_v0.status_code, 200)
+
+        # 2. After (Optimized)
+        res_opt, q_opt, t_opt, _, _ = self.run_benchmark(
+            "/api/reports/daily/?date=2026-07-28",
+            "GET /api/reports/daily/",
+            "After (Optimized)"
+        )
+        self.assertEqual(res_opt.status_code, 200)
+
+        self.assertLess(
+            q_opt, q_v0,
+            f"Optimized daily report queries ({q_opt}) should be fewer than v0 ({q_v0})"
+        )
+
+    def test_weekly_report_optimized_vs_v0(self):
+        """Compare GET /api/reports/weekly/ vs GET /api/v0/reports/weekly/"""
+        # 1. Before (v0 Unoptimized)
+        res_v0, q_v0, t_v0, _, _ = self.run_benchmark(
+            "/api/v0/reports/weekly/?year=2026&s=30&e=30",
+            "GET /api/reports/weekly/ (1 week)",
+            "Before (v0)"
+        )
+        self.assertEqual(res_v0.status_code, 200)
+
+        # 2. After (Optimized)
+        res_opt, q_opt, t_opt, _, _ = self.run_benchmark(
+            "/api/reports/weekly/?year=2026&s=30&e=30",
+            "GET /api/reports/weekly/ (1 week)",
+            "After (Optimized)"
+        )
+        self.assertEqual(res_opt.status_code, 200)
+
+        self.assertLess(
+            q_opt, q_v0,
+            f"Optimized weekly report queries ({q_opt}) should be fewer than v0 ({q_v0})"
+        )
+
+    def test_monthly_report_optimized_vs_v0(self):
+        """Compare GET /api/reports/monthly/ vs GET /api/v0/reports/monthly/"""
+        # 1. Before (v0 Unoptimized)
+        res_v0, q_v0, t_v0, _, _ = self.run_benchmark(
+            "/api/v0/reports/monthly/?year=2026&s=7&e=7",
+            "GET /api/reports/monthly/ (1 month)",
+            "Before (v0)"
+        )
+        self.assertEqual(res_v0.status_code, 200)
+
+        # 2. After (Optimized)
+        res_opt, q_opt, t_opt, _, _ = self.run_benchmark(
+            "/api/reports/monthly/?year=2026&s=7&e=7",
+            "GET /api/reports/monthly/ (1 month)",
+            "After (Optimized)"
+        )
+        self.assertEqual(res_opt.status_code, 200)
+
+        self.assertLess(
+            q_opt, q_v0,
+            f"Optimized monthly report queries ({q_opt}) should be fewer than v0 ({q_v0})"
+        )
+
+    def test_yearly_report_optimized_vs_v0(self):
+        """Compare GET /api/reports/yearly/ vs GET /api/v0/reports/yearly/"""
+        # 1. Before (v0 Unoptimized)
+        res_v0, q_v0, t_v0, _, _ = self.run_benchmark(
+            "/api/v0/reports/yearly/?s=2026&e=2026",
+            "GET /api/reports/yearly/ (1 year)",
+            "Before (v0)"
+        )
+        self.assertEqual(res_v0.status_code, 200)
+
+        # 2. After (Optimized)
+        res_opt, q_opt, t_opt, _, _ = self.run_benchmark(
+            "/api/reports/yearly/?s=2026&e=2026",
+            "GET /api/reports/yearly/ (1 year)",
+            "After (Optimized)"
+        )
+        self.assertEqual(res_opt.status_code, 200)
+
+        self.assertLess(
+            q_opt, q_v0,
+            f"Optimized yearly report queries ({q_opt}) should be fewer than v0 ({q_v0})"
+        )
+
+    def test_monthly_total_optimized_vs_v0(self):
+        """Compare GET /api/reports/monthly-total/ vs GET /api/v0/reports/monthly-total/"""
+        # 1. Before (v0 Unoptimized)
+        res_v0, q_v0, t_v0, _, _ = self.run_benchmark(
+            "/api/v0/reports/monthly-total/?year=2026",
+            "GET /api/reports/monthly-total/",
+            "Before (v0)"
+        )
+        self.assertEqual(res_v0.status_code, 200)
+
+        # 2. After (Optimized)
+        res_opt, q_opt, t_opt, _, _ = self.run_benchmark(
+            "/api/reports/monthly-total/?year=2026",
+            "GET /api/reports/monthly-total/",
+            "After (Optimized)"
+        )
+        self.assertEqual(res_opt.status_code, 200)
+
+        self.assertEqual(res_opt.data, res_v0.data)

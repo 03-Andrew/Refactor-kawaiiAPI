@@ -1,8 +1,14 @@
 from django.urls import path
 from . import views
+from . import views_v0
 from .views import WebSocketTestView
 
 urlpatterns = [
+    # v0 endpoints (unoptimized, without select_related / prefetch_related)
+    path('api/v0/amenities-availed/', views_v0.AmenitiesListAvailedV0.as_view(), name="v0-amenities-availed"),
+    path('api/v0/activities-availed/', views_v0.ActivitiesListAvailedV0.as_view(), name="v0-activities-availed"),
+    path('api/v0/all-payments/', views_v0.GetPaymentsV0.as_view(), name='v0-get-payments'),
+
     #For viewing all amenities
     path('api/amenities/',views.AmenitiesList.as_view(),name = "amenities"), 
     #For viewing/adding all amenities availed
