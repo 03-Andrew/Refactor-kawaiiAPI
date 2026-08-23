@@ -10,6 +10,11 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: booking-logs
+        awslogs-stream: nginx-logs
 
   app:
     image: ghcr.io/03-andrew/refactor-kawaiiapi:latest
@@ -30,6 +35,12 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: booking-logs
+        awslogs-stream: booking-api-logs
+
 
   celery:
     image: ghcr.io/03-andrew/refactor-kawaiiapi:latest
@@ -44,6 +55,11 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: booking-logs
+        awslogs-stream: celery-logs
 
   nginx:
     image: nginx:alpine
@@ -63,6 +79,11 @@ services:
     entrypoint: ["sh", "/docker-entrypoint.sh"]
     depends_on:
       - app
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: booking-logs
+        awslogs-stream: nginx-logs
 
   certbot:
     image: certbot/certbot
@@ -79,6 +100,12 @@ services:
       while :; do certbot renew; sleep 12h; done"
     depends_on:
       - nginx
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: booking-logs
+        awslogs-stream: certbot-logs
+
 volumes:
   staticfiles:
   certbot_www:

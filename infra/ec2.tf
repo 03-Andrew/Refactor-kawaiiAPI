@@ -22,6 +22,7 @@ resource "aws_instance" "booking-ec2-instance" {
     tags = {
         Name = "booking-ec2-instance"
     }
+    iam_instance_profile =  aws_iam_instance_profile.ec2-profile.name
 }
 
 resource "aws_eip" "booking-eip" {
