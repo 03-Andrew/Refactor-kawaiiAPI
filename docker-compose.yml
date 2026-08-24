@@ -15,7 +15,7 @@ services:
       options:
         awslogs-region: ap-southeast-1
         awslogs-group: booking-logs
-        awslogs-stream: nginx-logs
+        awslogs-stream: redis-logs
 
   app:
     image: ghcr.io/03-andrew/refactor-kawaiiapi:latest
