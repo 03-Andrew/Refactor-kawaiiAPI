@@ -163,7 +163,7 @@ jobs:
 
                     docker compose pull
                     docker compose up -d --remove-orphans
+                    sleep 30
                     docker compose restart nginx 
                     docker compose exec -T app python manage.py migrate --noinput
-
                     docker image prune -f

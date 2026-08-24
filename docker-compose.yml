@@ -13,6 +13,7 @@ services:
     logging:
       driver: awslogs
       options:
+        awslogs-region: ap-southeast-1
         awslogs-group: booking-logs
         awslogs-stream: nginx-logs
 
@@ -38,6 +39,7 @@ services:
     logging:
       driver: awslogs
       options:
+        awslogs-region: ap-southeast-1
         awslogs-group: booking-logs
         awslogs-stream: booking-api-logs
 
@@ -58,6 +60,7 @@ services:
     logging:
       driver: awslogs
       options:
+        awslogs-region: ap-southeast-1
         awslogs-group: booking-logs
         awslogs-stream: celery-logs
 
@@ -82,6 +85,7 @@ services:
     logging:
       driver: awslogs
       options:
+        awslogs-region: ap-southeast-1
         awslogs-group: booking-logs
         awslogs-stream: nginx-logs
 
@@ -103,6 +107,7 @@ services:
     logging:
       driver: awslogs
       options:
+        awslogs-region: ap-southeast-1
         awslogs-group: booking-logs
         awslogs-stream: certbot-logs
 

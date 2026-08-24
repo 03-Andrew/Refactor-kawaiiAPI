@@ -1,6 +1,6 @@
 variable "log_names" {
     type = list(string)
-    default = [ "booking-api-logs", "celery-logs", "redis-logs", "nginx-logs" ]
+    default = [ "booking-api-logs", "celery-logs", "redis-logs", "nginx-logs", "certbot-logs" ]
 }
 
 resource "aws_cloudwatch_log_group" "booking-logs" {
