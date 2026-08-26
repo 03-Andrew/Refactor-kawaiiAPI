@@ -150,3 +150,16 @@ class RoomSerializer(serializers.ModelSerializer):
         model = Room
         fields = ['id', 'number', 'type', 'type_id', 'status', 'is_booked']
 
+class RoomTypeSelectionSerializerBase(serializers.Serializer):
+    room_type_id = serializers.IntegerField()
+    check_in = serializers.DateField(help_text="Check-in date (YYYY-MM-DD)")
+    check_out = serializers.DateField(help_text="Check-out date (YYYY-MM-DD)")
+
+class BulkLockRoomTypeSerializer(serializers.Serializer):
+    turnstile_token = serializers.CharField(required=False, allow_blank=True ,default=None)
+    holder_id =  serializers.CharField(required=False, allow_blank=True, default=None)
+    rooms = RoomTypeSelectionSerializerBase(many=True)
+
+class SingleLockRoomTypeSerializer(RoomTypeSelectionSerializerBase):
+    turnstile_token = serializers.CharField(required=False, allow_blank=True ,default=None)
+    holder_id =  serializers.CharField(required=False, allow_blank=True, default=None)
