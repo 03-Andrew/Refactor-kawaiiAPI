@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from bookings.models import Booking, Room, RoomStatus, RoomType, BookingStatus
 from bookings.serializers import RoomSerializer, RoomTypeSerializer
 from bookings.services.lock import bulk_get_locked_counts
+from bookings.services.availability import get_room_types_availability
 
 ROOM_QUERY_PARAMS = [
     OpenApiParameter('check_in', type=str, description='Filter available rooms (YYYY-MM-DD)'),
@@ -111,54 +112,25 @@ class RoomTypesListView(generics.ListCreateAPIView):
         return super().get(request, *args, **kwargs)
 
     def list(self, request, *args, **kwargs):
-        queryset = RoomType.objects.all()
         check_in = request.query_params.get('check_in')
         check_out = request.query_params.get('check_out')
         room_type = request.query_params.get('type')
 
-        if room_type:
-            queryset = queryset.filter(name__icontains=room_type)
+        room_types_availability = get_room_types_availability(
+            check_in=check_in, check_out=check_out, room_type=room_type
+        )
+        data = []                                                                                                                            
+        for item in room_types_availability:                                                                                                          
+            serialized = self.get_serializer(item['room_type']).data                                                                         
+            serialized.update({                                                                                                              
+                'total_rooms': item['total_rooms'],                                                                                          
+                'booked_rooms': item['booked_rooms'],                                                                                        
+                'locked_rooms': item['locked_rooms'],                                                                                        
+                'available_rooms': item['available_rooms'],                                                                                  
+                'maintenance_rooms': item['maintenance_rooms'],                                                                              
+            })                                                                                                                               
+            data.append(serialized)  
 
-        annotations = {
-            'total_count': Count('room', distinct=True),
-            'maintenance_count': Count('room', distinct=True, filter=Q(room__status=RoomStatus.MAINTENANCE)),
-        }
-        if check_in and check_out:
-            try:
-                check_in_date = date.fromisoformat(check_in)
-                check_out_date = date.fromisoformat(check_out)
-            except ValueError:
-                return Response([])
-            annotations['booked_count'] = Count(
-                'bookings',
-                filter=Q(bookings__check_in__lt=check_out_date)
-                & Q(bookings__check_out__gt=check_in_date)
-                & Q(bookings__status__in=[BookingStatus.APPROVED, BookingStatus.PENDING]),
-                distinct=True,
-            )
-        else:
-            annotations['booked_count'] = Count('bookings', distinct=True)
-
-        queryset = queryset.annotate(**annotations)
-
-        locked_counts = {}
-        if check_in and check_out:
-            try:
-                requests = [(rt.id, check_in, check_out) for rt in queryset]
-                locked_counts = bulk_get_locked_counts(requests)
-            except Exception:
-                pass
-
-        data = []
-        for rt in queryset:
-            serialized = self.get_serializer(rt).data
-            locked = locked_counts.get((rt.id, check_in, check_out), 0) if check_in and check_out else 0
-            serialized['total_rooms'] = rt.total_count
-            serialized['booked_rooms'] = rt.booked_count
-            serialized['locked_rooms'] = locked
-            serialized['available_rooms'] = rt.total_count - rt.booked_count - rt.maintenance_count - locked
-            serialized['maintenance_rooms'] = rt.maintenance_count
-            data.append(serialized)
         return Response(data)
 
 

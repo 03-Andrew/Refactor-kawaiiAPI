@@ -9,6 +9,8 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from django.shortcuts import get_object_or_404
+
 from kawaiiAPI.permissions import IsReceptionistOrAdmin
 from django.utils.decorators import method_decorator
 from idempotency_key.decorators import idempotency_key
@@ -19,30 +21,45 @@ from bookings.serializers import (
     DayTourRequestSerializer,
     OnlineBookingRequestSerializer,
     OnsiteBookingRequestSerializer,
+    BulkLockRoomTypeSerializer,
+    SingleLockRoomTypeSerializer
 )
-from bookings.services.availability import get_room_type_available
+
+from bookings.exceptions import RoomTypeNotFoundError, RoomUnavailableError, RedisUnavailable
+from bookings.services.availability import (
+    get_room_type_available, lock_room_type, bulk_lock_room_type
+)
 from bookings.services.booking import (
     approve_booking, cancel_booking,
-    create_amenities, create_activities, create_boat_transfer, create_guest_list,
+    create_online_booking, create_day_tour_guests,
+    create_onsite_booking, update_booking
 )
 from bookings.services.lock import (
-    acquire_room_type_lock, bulk_acquire, release_room_type_lock,
+    acquire_room_type_lock, bulk_acquire, release_room_type_lock, release_holder_locks
 )
 from bookings.turnstile import validate_turnstile
 from transactions.models import BillingStatus
 from transactions.serializers import (
-    BillingSerializerBase, CustomerSerializer,
+    BillingSerializerBase, CustomerSerializer, GuestListSerializer,
+    AmenitiesAvailedSerializer, ActivitiesAvailedSerializer
 )
-from ..mixins import BillingCreationMixin, BookingCreateMixin
 
 logger = logging.getLogger(__name__)
 from django.conf import settings
 
-from ..tasks import send_email
+from transactions.services import create_guest_list
+from transactions.models import GuestStatus
+
 load_dotenv()
 
 
-class CreateDayTourGuest(BillingCreationMixin, APIView):
+class BookingPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'limit'
+    max_page_size = 100
+
+
+class CreateDayTourGuest(APIView):
     permission_classes = [IsReceptionistOrAdmin]
 
     @extend_schema(
@@ -56,22 +73,22 @@ class CreateDayTourGuest(BillingCreationMixin, APIView):
         data = serializer.validated_data
 
         with transaction.atomic():
-            customer = self._create_customer(data['customer'])
-            billing = self._create_billing(customer, billing_status=BillingStatus.PROCESSING)
-            guests = create_guest_list(billing=billing, names=data.get('guest_list', []))
-            amenities_added = create_amenities(billing=billing, items=data.get('selected_amenities', []))
-            activities_added = create_activities(billing=billing, items=data.get('selected_activities', []))
-
+            day_tour_guests = create_day_tour_guests(
+                customer=data['customer'],
+                guests=data.get('guest_list', []),
+                amenities=data.get('selected_amenities', []),
+                activities=data.get('selected_activities', [])
+            )
         return Response({
-            'customer': CustomerSerializer(customer).data,
-            'billing': BillingSerializerBase(billing).data,
-            'amenities': amenities_added,
-            'activities': activities_added,
-            'guests': guests,
+            'customer': CustomerSerializer(day_tour_guests['customer']).data,
+            'billing': BillingSerializerBase(day_tour_guests['billing']).data,
+            'amenities': AmenitiesAvailedSerializer(day_tour_guests['amenities_availed'], many=True).data,
+            'activities': ActivitiesAvailedSerializer(day_tour_guests['activities_availed'], many=True).data,
+            'guests': GuestListSerializer(day_tour_guests['guests'], many=True).data,
         }, status=status.HTTP_201_CREATED)
 
 
-class CreateStayInBooking(BookingCreateMixin, APIView):
+class CreateStayInBooking(APIView):
     permission_classes = [IsReceptionistOrAdmin]
 
     @extend_schema(
@@ -106,53 +123,48 @@ class CreateStayInBooking(BookingCreateMixin, APIView):
         data = serializer.validated_data
         holder_id = request.data.get('holder_id') or request.data.get('holder_ids')
 
-        booking_data = []
-        for room in data['booking']:
-            booking_data.append({
-                'check_in': room['check_in'],
-                'check_out': room['check_out'],
-                'room_type': room['room_type'],
-                'room': room['room_number'],
-                'adult_count': room['adult_count'],
-                'children_count': room.get('children_count', 0),
-                'extra_guest': room.get('extra_guest', 0),
-            })
-
         try:
-            with transaction.atomic():
-                self._lock_room_types(booking_data)
-                availability_error = self._check_availability(booking_data, holder_id)
-                if availability_error:
-                    return availability_error
+            booking = create_onsite_booking(
+                customer=data['customer'],
+                rooms=data['booking'],
+                holder_id=holder_id
+            )
 
-                customer = self._create_customer(data['customer'])
-                billing = self._create_billing(
-                    customer, billing_status=BillingStatus.PROCESSING,
-                )
-                created_bookings = self._create_bookings(billing, booking_data, assign_room=True)
-
+        except RoomUnavailableError as e:
+            release_holder_locks(data['booking'], holder_id)
+            return Response(
+                {'error': 'No availability', 'details': e.details},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except RoomTypeNotFoundError as e:
+            release_holder_locks(data['booking'], holder_id)
+            return Response(
+                {'error': 'Not found', 'details': str(e)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except serializers.ValidationError as e:
-            self._release_holder_locks(booking_data, holder_id)
+            release_holder_locks(data['booking'], holder_id)
             return Response(
                 {'error': 'Validation failed', 'details': e.detail},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
-            self._release_holder_locks(booking_data, holder_id)
+            release_holder_locks(data['booking'], holder_id)
             return Response(
                 {'error': 'Booking failed', 'details': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        self._release_holder_locks(booking_data, holder_id)
+        release_holder_locks(data['booking'], holder_id)
 
         return Response({
-            'customer': CustomerSerializer(customer).data,
-            'billing': BillingSerializerBase(billing).data,
-            'bookings': created_bookings,
+            'customer': CustomerSerializer(booking['customer']).data,
+            'billing': BillingSerializerBase(booking['billing']).data,
+            'bookings': BookingSerializer(booking['booking'], many=True).data,
         }, status=status.HTTP_201_CREATED)
+
 @method_decorator(idempotency_key(optional=False), name='dispatch')
-class CreateOnlineBooking(BookingCreateMixin, APIView):
+class CreateOnlineBooking(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
     @extend_schema(
@@ -180,17 +192,12 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
                 },
                 response_only=True,
             ),
-            409: OpenApiExample(
-                'No availability',
-                value={'error': 'No availability',
-                       'details': ["'Standard Room' is fully booked for 2026-08-01 to 2026-08-03"]},
-                response_only=True,
-            ),
         },
     )
     def post(self, request):
         serializer = OnlineBookingRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
         data = serializer.validated_data
         holder_id = request.data.get('holder_id') or request.data.get('holder_ids')
         turnstile_token = request.data.get('turnstile_token')
@@ -203,48 +210,53 @@ class CreateOnlineBooking(BookingCreateMixin, APIView):
             )        
 
         try:
-            with transaction.atomic():
-                self._lock_room_types(data['rooms'])
-                availability_error = self._check_availability(data['rooms'], holder_id)
-                if availability_error:
-                    return availability_error
+            online_booking = create_online_booking(
+                customer=data.get('customer'),
+                rooms=data.get('rooms'),
+                boat_details=data.get('boat'),
+                holder_id=holder_id
+            )
 
-                customer = self._create_customer(data['customer'])
-                billing = self._create_billing(customer)
-                created_bookings = self._create_bookings(billing, data['rooms'])
-                boat_ids, tourist_added = create_boat_transfer(billing=billing, boat=data.get('boat'))
-
+        except RoomUnavailableError as e:
+            release_holder_locks(data['rooms'], holder_id)
+            return Response(
+                {'error': 'No availability', 'details': e.details},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except RoomTypeNotFoundError as e:
+            release_holder_locks(data['rooms'], holder_id)
+            return Response(
+                {'error': 'Not found', 'details': str(e)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except serializers.ValidationError as e:
-            self._release_holder_locks(data['rooms'], holder_id)
+            release_holder_locks(data['rooms'], holder_id)
             return Response(
                 {'error': 'Validation failed', 'details': e.detail},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
+            
         except Exception as e:
-            self._release_holder_locks(data['rooms'], holder_id)
+            release_holder_locks(data['rooms'], holder_id)
             return Response(
-                {'error': 'Online booking failed', 'details': str(e)},
+                {'error': 'Online booking failedddd', 'details': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        
 
-        self._release_holder_locks(data['rooms'], holder_id)
+        release_holder_locks(data['rooms'], holder_id)
 
         response_data = {
-            'customer': CustomerSerializer(customer).data,
-            'billing': BillingSerializerBase(billing).data,
-            'bookings': created_bookings,
+            'customer': CustomerSerializer(online_booking['customer']).data,
+            'billing': BillingSerializerBase(online_booking['billing']).data,
+            'bookings': BookingSerializer(online_booking['booking'], many=True).data,
         }
-        if boat_ids:
-            response_data['guests'] = tourist_added
-            response_data['boat_cost'] = float(boat_ids.total_cost)
+
+        if online_booking['boat']:
+            response_data['guests'] = GuestListSerializer(online_booking['guests'], many=True).data
+            response_data['boat_cost'] = float(online_booking['boat'].total_cost)
 
         return Response(response_data, status=status.HTTP_201_CREATED)
-
-class BookingPagination(PageNumberPagination):
-    page_size = 10
-    page_size_query_param = 'limit'
-    max_page_size = 100
 
 
 class ListBookings(generics.ListAPIView):
@@ -299,23 +311,21 @@ class ListBookings(generics.ListAPIView):
         return qs.order_by('-created_at')
 
 
-class EditBooking(APIView):
+class BookingDetail(APIView):
     permission_classes = [IsReceptionistOrAdmin]
+
+    def _get_booking(self, pk):
+        return  get_object_or_404(
+            Booking.objects.select_related('customer_bill__customer', 'room_type', 'room'),
+            pk=pk
+        )
 
     @extend_schema(
         tags=['Bookings'],
         description='Get a single booking by ID.',
     )
     def get(self, _request, pk):
-        try:
-            booking = Booking.objects.select_related(
-                'customer_bill__customer', 'room_type', 'room',
-            ).get(pk=pk)
-        except Booking.DoesNotExist:
-            return Response(
-                {'error': 'Booking not found'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        booking = self._get_booking(pk)
         return Response(BookingSerializer(booking).data)
 
     @extend_schema(
@@ -324,65 +334,23 @@ class EditBooking(APIView):
         request=BookingSerializer,
     )
     def patch(self, request, pk):
-        try:
-            booking = Booking.objects.select_related(
-                'customer_bill__customer', 'room_type',
-            ).get(pk=pk)
-        except Booking.DoesNotExist:
-            return Response(
-                {'error': 'Booking not found'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
+        booking = self._get_booking(pk)
         serializer = BookingSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
 
-        new_room_type = data.get('room_type', booking.room_type)
-        new_check_in = data.get('check_in', booking.check_in)
-        new_check_out = data.get('check_out', booking.check_out)
-
-        dates_changed = (
-            'check_in' in data
-            or 'check_out' in data
-            or 'room_type' in data
-        )
-
-        if dates_changed:
-            rt_id = new_room_type.id if hasattr(new_room_type, 'id') else new_room_type
-            availability_error = self._check_edit_availability(
-                rt_id, new_check_in, new_check_out, booking.id,
-            )
-            if availability_error:
-                return availability_error
-
-        for field, value in data.items():
-            setattr(booking, field, value)
-        booking.save()
-
-        booking.refresh_from_db()
+        try:
+            booking = update_booking(booking=booking, data=serializer.validated_data)
+        except RoomTypeNotFoundError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except RoomUnavailableError as exc:
+            return Response({'error': 'No availability', 'details': exc.details}, status=status.HTTP_409_CONFLICT)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        
         return Response(
             BookingSerializer(booking).data,
             status=status.HTTP_200_OK,
         )
-
-    def _check_edit_availability(self, room_type_id, check_in, check_out, exclude_id):
-        available, detail = get_room_type_available(
-            room_type_id, check_in, check_out, exclude_booking_id=exclude_id,
-        )
-        if detail.get('error'):
-            return Response(
-                {'error': detail['error']},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        if not available:
-            return Response({
-                'error': 'No availability',
-                'details': [
-                    f"'{detail['name']}' is fully booked for {check_in} to {check_out}"
-                ],
-            }, status=status.HTTP_409_CONFLICT)
-        return None
 
 
 class ApproveBooking(APIView):
@@ -393,9 +361,10 @@ class ApproveBooking(APIView):
         description='Approve a PENDING booking with a specific room.',
     )
     def post(self, request, pk):
-        booking = _get_booking(pk)
-        if isinstance(booking, Response):
-            return booking
+        booking = get_object_or_404(
+            Booking.objects.select_related('customer_bill__customer', 'room_type'),
+            pk=pk
+        )
 
         room_id = request.data.get('room')
         if not room_id:
@@ -421,9 +390,10 @@ class CancelBooking(APIView):
         description='Cancel a PENDING or APPROVED booking.',
     )
     def post(self, _request, pk):
-        booking = _get_booking(pk)
-        if isinstance(booking, Response):
-            return booking
+        booking = get_object_or_404(
+            Booking.objects.select_related('customer_bill__customer', 'room_type'),
+            pk=pk
+        )
 
         try:
             booking = cancel_booking(booking)
@@ -432,18 +402,6 @@ class CancelBooking(APIView):
 
         booking.refresh_from_db()
         return Response(BookingSerializer(booking).data)
-
-
-def _get_booking(pk):
-    try:
-        return Booking.objects.select_related(
-            'customer_bill__customer', 'room_type',
-        ).get(pk=pk)
-    except Booking.DoesNotExist:
-        return Response(
-            {'error': 'Booking not found'},
-            status=status.HTTP_404_NOT_FOUND,
-        )
 
 
 class LockRoomType(APIView):
@@ -458,10 +416,12 @@ class LockRoomType(APIView):
         description='Acquire a 10-minute lock on a room-type for a date range.',
     )
     def post(self, request):
-        room_type_id = request.data.get('room_type')
-        check_in = request.data.get('check_in')
-        check_out = request.data.get('check_out')
-        turnstile_token = request.data.get('turnstile_token')
+        serializer = SingleLockRoomTypeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        data = serializer.validated_data
+
+        turnstile_token = data.get('turnstile_token')
         remoteip = request.META.get('REMOTE_ADDR') or request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0]
         validation_result = validate_turnstile(turnstile_token, remoteip)
         if not validation_result.get('success'):
@@ -470,53 +430,36 @@ class LockRoomType(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        errors = {}
-        if not room_type_id:
-            errors['room_type'] = 'This field is required.'
-        if not check_in:
-            errors['check_in'] = 'This field is required.'
-        if not check_out:
-            errors['check_out'] = 'This field is required.'
-        if errors:
-            return Response({'error': errors}, status=status.HTTP_400_BAD_REQUEST)
+        try: 
+            lock = lock_room_type(
+                room_type_id=data['room_type_id'],
+                check_in=data['check_in'],
+                check_out=data['check_out'],
+                holder_id=request.data.get('holder_id'),
 
-        _available, detail = get_room_type_available(room_type_id, check_in, check_out)
-        if detail.get('error'):
-            return Response(
-                {'error': detail['error']},
-                status=status.HTTP_404_NOT_FOUND,
             )
+        except RoomTypeNotFoundError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except RedisUnavailable:
+            return Response({'error': "Lock Service Unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        db_available = detail['db_available']
-
-        try:
-            held, holder_id = acquire_room_type_lock(
-                room_type_id, check_in, check_out,
-                max_available=db_available, ttl=600,
-            )
-        except Exception:
-            return Response(
-                {'error': 'Lock service unavailable'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        if not held:
+        if not lock.held:
             return Response({
                 'held': False,
-                'available': db_available,
-                'message': f"'{detail['name']}' is fully booked for {check_in} to {check_out}",
+                'available': lock.available,
+                'message': lock.message
             })
-
         return Response({
             'held': True,
-            'holder_id': holder_id,
-            'expires_in': 600,
-            'room_type': detail['name'],
-            'check_in': check_in,
-            'check_out': check_out,
+            'holder_id': lock.holder_id,
+            'expires_in': lock.expires_in,
+            'room_type': lock.room_type_name,
+            'check_in': data['check_in'],
+            'check_out': data['check_out'],
         })
-
+    
 class BulkLockRoomType(APIView):
+
     """Acquire locks on multiple room-type/date-range combos atomically.
 
     All-or-nothing: if any combo is at capacity, no locks are held.
@@ -527,10 +470,14 @@ class BulkLockRoomType(APIView):
     @extend_schema(
         tags=['Bookings'],
         description='Acquire locks on multiple room-type/date-range combos atomically.',
+        request=BulkLockRoomTypeSerializer
     )
     def post(self, request):
-        rooms = request.data.get('rooms', [])
-        turnstile_token = request.data.get('turnstile_token')
+        serializer = BulkLockRoomTypeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        turnstile_token = data.get('turnstile_token')
         remoteip = request.META.get('REMOTE_ADDR') or request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0]
         validation_result = validate_turnstile(turnstile_token, remoteip)
         if not validation_result.get('success'):
@@ -538,66 +485,54 @@ class BulkLockRoomType(APIView):
                 {'error': 'validation failed', 'details': validation_result.get('error-codes', [])},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        if not rooms or not isinstance(rooms, list):
-            return Response(
-                {'error': {'rooms': 'A non-empty list of room objects is required.'}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        room_requests = []
-        errors = []
-        for i, room in enumerate(rooms):
-            room_type_id = room.get('room_type')
-            check_in = room.get('check_in')
-            check_out = room.get('check_out')
-            entry_errors = {}
-            if not room_type_id:
-                entry_errors['room_type'] = 'This field is required.'
-            if not check_in:
-                entry_errors['check_in'] = 'This field is required.'
-            if not check_out:
-                entry_errors['check_out'] = 'This field is required.'
-            if entry_errors:
-                errors.append({f'room[{i}]': entry_errors})
-                continue
-
-            _available, detail = get_room_type_available(room_type_id, check_in, check_out)
-            if detail.get('error'):
-                errors.append({f'room[{i}]': detail['error']})
-                continue
-
-            room_requests.append({
-                'room_type_id': room_type_id,
-                'check_in': check_in,
-                'check_out': check_out,
-                'max_available': detail['db_available'],
-            })
-
-        if errors:
-            return Response({'error': errors}, status=status.HTTP_400_BAD_REQUEST)
+        rooms = data['rooms']
 
         try:
-            all_held, holder_id, failures = bulk_acquire(room_requests, ttl=600)
-        except Exception:
-            return Response(
-                {'error': 'Lock service unavailable'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
+            bulk_lock = bulk_lock_room_type(rooms)
+        except RedisUnavailable:
+            return Response({'error': "Lock Service Unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        if not all_held:
+        if bulk_lock.get('error'):
+            return Response({'error': bulk_lock.get('errors')}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        if not bulk_lock.get('all_heald'):
             return Response({
                 'held': False,
-                'failures': failures,
+                'failures': bulk_lock.get('failures'),
                 'message': 'Some room types are fully booked for the requested dates.',
             })
 
         return Response({
             'held': True,
-            'holder_id': holder_id,
+            'holder_id': bulk_lock.get('holder_id'),
             'expires_in': 600,
             'rooms': rooms,
         })
+
+class BulkReleaseRoomType(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=['Bookings'],
+        description='Release room type locks in bulk',
+        request=BulkLockRoomTypeSerializer  
+    )
+    def post(self, request):
+        serializers = BulkLockRoomTypeSerializer(data=request.data)
+        serializers.is_valid(raise_exception=True)
+        data = serializers.validated_data
+
+        rooms = data.get('rooms', [])
+        holder_id = data.get('holder_id')
+
+        if rooms and holder_id:
+            print("YEAH")
+            release_holder_locks(rooms=rooms, holder_id=holder_id)
+
+        return Response({'released': True}, status=status.HTTP_200_OK)
+
 
 class ReleaseRoomType(APIView):
     authentication_classes = []
@@ -611,20 +546,14 @@ class ReleaseRoomType(APIView):
         description='Release a previously acquired room-type lock.',
     )
     def post(self, request):
-        room_type_id = request.data.get('room_type')
-        check_in = request.data.get('check_in')
-        check_out = request.data.get('check_out')
-        holder_id = request.data.get('holder_id')
-
-        if not all([room_type_id, check_in, check_out, holder_id]):
-            return Response(
-                {'error': 'room_type, check_in, check_out, and holder_id are required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        serializer = SingleLockRoomTypeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
         try:
             released = release_room_type_lock(
-                room_type_id, check_in, check_out, holder_id,
+                room_type_id=data['room_type_id'], check_in=data['check_in'],
+                check_out=data['check_out'], holder_id=data['holder_id']
             )
         except Exception:
             released = False

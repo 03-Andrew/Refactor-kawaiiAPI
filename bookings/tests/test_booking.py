@@ -50,7 +50,7 @@ class BookingTestBase(TestCase):
         ])
 
         self.amenities = Amenities.objects.create(
-            amenity="Boat",
+            amenity="Boat Transfer",
             rate_per_head=200.00,
         )
 

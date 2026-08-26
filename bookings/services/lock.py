@@ -2,7 +2,10 @@ import uuid
 from datetime import date, timedelta
 
 from django_redis import get_redis_connection
+from bookings.exceptions import RedisUnavailable, RoomTypeNotFoundError
+import logging
 
+logger = logging.getLogger(__name__)
 
 def _date_range(check_in, check_out):
     """Generate list of ISO date strings from check_in (inclusive) to check_out (exclusive)."""
@@ -31,30 +34,32 @@ local num_dates = tonumber(ARGV[1])
 local holder_id = ARGV[2]
 local max_available = tonumber(ARGV[3])
 local ttl = tonumber(ARGV[4])
+local quantity = tonumber(ARGV[5]) or 1
 
 -- KEYS layout: first num_dates are count keys, next num_dates are holders keys
 
--- Re-entry: holder already owns these dates, refresh TTL
-if redis.call('SISMEMBER', KEYS[num_dates + 1], holder_id) == 1 then
+-- Check if Holder locks exists and holds the exact key
+local existing_qty = redis.call('HGET', KEYS[num_dates + 1], holder_id)
+if existing_qty and tonumber(existing_qty) == quantity then
     for i = 1, num_dates * 2 do
         redis.call('EXPIRE', KEYS[i], ttl)
     end
     return 1
 end
 
--- Check capacity: if any date in range is at max, fail
+-- Check Capacity (current locked + requested quantity <= max_available)
 for i = 1, num_dates do
     local current = redis.call('GET', KEYS[i])
     current = current and tonumber(current) or 0
-    if current >= max_available then
+    if (current + quantity) > max_available then
         return 0
     end
 end
 
--- Acquire all dates
+-- Acquire locks with quantity
 for i = 1, num_dates do
-    redis.call('INCR', KEYS[i])
-    redis.call('SADD', KEYS[num_dates + i], holder_id)
+    redis.call('INCRBY', KEYS[i], quantity)
+    redis.call('HSET', KEYS[num_dates + i], holder_id, quantity)
     redis.call('EXPIRE', KEYS[i], ttl)
     redis.call('EXPIRE', KEYS[num_dates + i], ttl)
 end
@@ -66,21 +71,28 @@ RELEASE_LUA = """
 local num_dates = tonumber(ARGV[1])
 local holder_id = ARGV[2]
 
--- KEYS layout: first num_dates are count keys, next num_dates are holders keys
-
-if redis.call('SISMEMBER', KEYS[num_dates + 1], holder_id) == 0 then
+local qty = redis.call('HGET', KEYS[num_dates + 1], holder_id)
+if not qty then
     return 0
 end
 
+qty = tonumber(qty)
+
 -- Release all dates
 for i = 1, num_dates do
-    redis.call('SREM', KEYS[num_dates + i], holder_id)
-    local current = redis.call('GET', KEYS[i])
-    current = current and tonumber(current) or 1
-    if current <= 1 then
+    redis.call('HDEL', KEYS[num_dates + i], holder_id)
+    local remaining_holders = redis.call('HLEN', KEYS[num_dates + i])
+    
+    if remaining_holders == 0 then
         redis.call('DEL', KEYS[i], KEYS[num_dates + i])
+    local current = redis.call('GET', KEYS[i])
     else
-        redis.call('DECR', KEYS[i])
+        current = current and tonumber(current) or 0
+        if current <= qty then
+            redis.call('DEL', KEYS[i])
+        else
+            redis.call('DECRBY', KEYS[i], qty)
+        end
     end
 end
 return 1
@@ -108,7 +120,7 @@ local num_dates = tonumber(ARGV[1])
 local holder_id = ARGV[2]
 -- KEYS layout: first num_dates are count keys, next num_dates are holders keys
 for i = 1, num_dates do
-    if redis.call('SISMEMBER', KEYS[num_dates + i], holder_id) == 1 then
+    if redis.call('HEXISTS', KEYS[num_dates + i], holder_id) == 1 then
         return 1
     end
 end
@@ -120,7 +132,7 @@ def _get_redis():
     return get_redis_connection("default")
 
 
-def acquire_room_type_lock(room_type_id, check_in, check_out, max_available,
+def acquire_room_type_lock(room_type_id, check_in, check_out, max_available, quantity,
                       holder_id=None, ttl=600):
     """
     Try to acquire a room-type lock for a given date range.
@@ -137,7 +149,7 @@ def acquire_room_type_lock(room_type_id, check_in, check_out, max_available,
     all_keys = count_keys + holders_keys
     r = _get_redis()
     result = r.eval(ACQUIRE_LUA, len(all_keys), *all_keys,
-                    num_dates, holder_id, max_available, ttl)
+                    num_dates, holder_id, max_available, ttl, quantity)
     return bool(result), holder_id
 
 
@@ -205,7 +217,8 @@ def bulk_acquire(room_requests, ttl=600):
     for req in room_requests:
         held, _ = acquire_room_type_lock(
             req['room_type_id'], req['check_in'], req['check_out'],
-            req['max_available'], holder_id=holder_id, ttl=ttl,
+            req['max_available'], holder_id=holder_id, ttl=ttl, 
+            quantity=req.get('quantity',1)
         )
         if held:
             acquired.append(req)
@@ -218,9 +231,33 @@ def bulk_acquire(room_requests, ttl=600):
     return True, holder_id, []
 
 
-def bulk_release(room_requests, holder_id):
-    """Release locks for all room-type/date-range combinations."""
-    for req in room_requests:
-        release_room_type_lock(
-            req['room_type_id'], req['check_in'], req['check_out'], holder_id,
-        )
+def release_holder_locks(rooms, holder_id):
+    """Release all Redis locks held by holder_id(s) for the given rooms."""
+    if not holder_id or not rooms:
+        return True
+    
+    seen = set()
+    for room in rooms:
+        rt_id = room.get('room_type_id') or room.get('room_type')
+        check_in = str(room.get('check_in'))
+        check_out = str(room.get('check_out'))
+
+        if not rt_id or not check_in or not check_out:
+            continue
+
+        key = (rt_id, check_in, check_out)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        try:
+            release_room_type_lock(
+                room_type_id=room['room_type_id'],
+                check_in=room['check_in'],
+                check_out=room['check_out'],
+                holder_id=holder_id
+            )
+        except Exception as exc:
+            logger.warning(f"Failed to release lock room_type={rt_id}, dates={check_in, check_out}, holder={holder_id}")
+
+    return True
