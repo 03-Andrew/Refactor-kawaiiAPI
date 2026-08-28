@@ -186,6 +186,8 @@ def find_available_room(room_type, check_in, check_out):
         status=RoomStatus.AVAILABLE,
     ).exclude(id__in=booked_rooms).first()
 
+def get_room_type_basic_info():
+    return  RoomType.objects.prefetch_related("inclusions").all()
 
 def get_room_types_availability(*, check_in=None, check_out=None, room_type=None):
     queryset = RoomType.objects.all()

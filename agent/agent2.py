@@ -3,13 +3,14 @@ import os
 import sys
 from langchain_google_genai import ChatGoogleGenerativeAI
 from typing import Annotated, Literal
-from typing_extensions import TypedDict
+from typing_extensions import TypedDict, List
 from langgraph.graph import StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolNode
 from dotenv import load_dotenv
+from pydantic import BaseModel
 import django
 
 load_dotenv()
@@ -21,11 +22,13 @@ if str(BASE_DIR) not in sys.path:
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kawaiiAPI.settings.dev')
 # 3. Initialize Django runtime & ORM                                                                      
 django.setup()   
-from bookings.services.availability import get_room_types_availability
+
+
+from bookings.services.availability import get_room_types_availability, get_room_type_basic_info
 
 
 llm  = ChatGoogleGenerativeAI(
-    model="gemini-3.7-flash",
+    model="gemini-3.1-flash-lite",
     temperature=1.0,  # Gemini 3.0+ defaults to 1.0
     max_tokens=None,
     timeout=None,
@@ -35,15 +38,36 @@ llm  = ChatGoogleGenerativeAI(
 class State(TypedDict):
     messages: Annotated[list, add_messages]
 
+class RoomTypeDetails(BaseModel):
+    id: int
+    name: str
+    price: float
+    description: str | None = None
+    good_for: int | None = None
+    inclusions: list[str] = []
+
 graph = StateGraph(State)
 
-@tool
-def get_room_types(*, check_in="2026-10-10", check_out="2026-10-12", room_type=None):
-    """Retrieve available room types and their availability counts between check_in and check_out dates (YYYY-MM-DD)."""
+@tool(description="Retrieve available room types and their availability counts between check_in and check_out dates (YYYY-MM-DD).")
+def get_room_type_availability(*, check_in=None, check_out=None, room_type=None):
     rooms = get_room_types_availability(check_in=check_in, check_out=check_out, room_type=room_type)
     return rooms
-    
-tools = [get_room_types]
+
+@tool(description="Retrieve room types and their details")
+def get_room_types() -> list[dict]:
+    return [
+        RoomTypeDetails(
+            id=rt.id,
+            name=rt.name,
+            price=rt.price,
+            description=rt.description,
+            good_for=rt.good_for,
+            inclusions=[inc.inclusion for inc in rt.inclusions.all()]
+        ).model_dump()
+        for rt in get_room_type_basic_info()
+    ]
+
+tools = [get_room_types, get_room_type_availability]
 
 llm_with_tools = llm.bind_tools(tools)
 
@@ -73,6 +97,12 @@ graph.set_entry_point("prompt_node")
 
 APP = graph.compile()
 
-new_state = APP.invoke({"messages": ["Show me room types"]})
+if __name__ == "__main__":
+    while True:
+        user_message = input("Message: ")
+        if user_message == "exit":
+            break
 
-print(new_state["messages"][-1].content[-1]['text'])
+        new_state = APP.invoke({"messages": [user_message]})
+        print(new_state["messages"][-1].content[-1]['text'])
+
