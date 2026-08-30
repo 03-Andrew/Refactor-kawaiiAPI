@@ -136,7 +136,7 @@ def get_room_type_available(room_type_id, check_in, check_out,
     """
     all_capacities = get_room_type_capacities([room_type_id])
     if room_type_id not in all_capacities:
-        return False, {'error': f'Room type {room_type_id} not found'}
+        raise RoomTypeNotFoundError(f"Room type {room_type_id} not found")
 
     room_capacity = all_capacities[room_type_id]
     booked = Booking.objects.filter(
@@ -284,9 +284,10 @@ def bulk_lock_room_type(rooms):
     errors = []
 
     for (room_type_id, check_in, check_out), qty in grouped.items():
-        _available, detail = get_room_type_available(room_type_id, check_in, check_out)
-        if detail.get('error'):
-            errors.append({f'room[{room_type_id}]': detail['error']})
+        try:
+            _available, detail = get_room_type_available(room_type_id, check_in, check_out)
+        except RoomTypeNotFoundError as exc:
+            errors.append(str(exc))
             continue
 
         room_requests.append({
@@ -298,10 +299,7 @@ def bulk_lock_room_type(rooms):
         })
 
     if errors:
-        return {
-            'error': True,
-            'errors': errors
-        }
+        raise RoomTypeNotFoundError("; ".join(errors))
 
     try:
         all_held, holder_id, failures = bulk_acquire(room_requests, ttl=600)
@@ -309,8 +307,7 @@ def bulk_lock_room_type(rooms):
         raise RedisUnavailable("Redis Unavailable")
 
     return {
-        'error': False,
-        'all_heald': all_held,
+        'all_held': all_held,
         'holder_id': holder_id,
         'failures': failures
     }
