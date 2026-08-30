@@ -489,14 +489,13 @@ class BulkLockRoomType(APIView):
 
         try:
             bulk_lock = bulk_lock_room_type(rooms)
+        except RoomTypeNotFoundError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_404_NOT_FOUND)
         except RedisUnavailable:
             return Response({'error': "Lock Service Unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        if bulk_lock.get('error'):
-            return Response({'error': bulk_lock.get('errors')}, status=status.HTTP_400_BAD_REQUEST)
 
-
-        if not bulk_lock.get('all_heald'):
+        if not bulk_lock.get('all_held'):
             return Response({
                 'held': False,
                 'failures': bulk_lock.get('failures'),
