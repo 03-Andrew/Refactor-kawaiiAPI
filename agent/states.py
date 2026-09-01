@@ -46,31 +46,43 @@ class BookingState(TypedDict):
     boat_transfer_time: str | None = None
 
 
-class DateAndGuestCountInput(BaseModel):
+class BaseStageInput(BaseModel):
+    action: Literal["continue", "change_room", "modify_dates_or_guests", "cancel"] = "continue"
+    new_check_in: str | None = Field(default=None, description="Updated check-in date in YYYY-MM-DD format")
+    new_check_out: str | None = Field(default=None, description="Updated check-out date in YYYY-MM-DD format")
+    new_adult_count: int | None = Field(default=None, description="Updated number of adults")
+    new_children_count: int | None = Field(default=None, description="Updated number of children")
+    new_room_type: str | None = Field(default=None, description="Room name or room type the user wants to switch to")
+
+
+class DateAndGuestCountInput(BaseStageInput):
     check_in: str | None = None
     check_out: str | None = None
     adult_count: int | None = None
     children_count: int | None = None
 
-class SelectedRoomsInput(BaseModel):
+
+class SelectedRoomsInput(BaseStageInput):
     room_type_ids: list[int] = []
     wants_to_hold: bool = False
 
 
-class GuestInfo(BaseModel):
+class GuestInfo(BaseStageInput):
     first_name: str | None = Field(default=None, description="Guest first name")
     last_name: str | None = Field(default=None, description="Guest last name")
-    phone_number: str | None = Field(default=None, description="Guest phone / mobile number (e.g. 09xxxxxxxxx, +639xxxxxxxxx)")
-    email: str | None = Field(default=None, description="Guest email address (e.g. email@email.com)")
+    phone_number: str | None = Field(default=None, description="Guest phone / mobile number")
+    email: str | None = Field(default=None, description="Guest email address")
 
-class AvailBoat(BaseModel):
-    avail_boat_transfer: bool
+
+class AvailBoat(BaseStageInput):
+    avail_boat_transfer: bool = False
     boat_transfer_time: str | None = None
+
 
 class BoatTime(BaseModel):
     head_count: int | None = None
     boat_transfer_time: str | None = None
-    # guests: list[str] = []
+
 
 class RoomTypeDetails(BaseModel):
     id: int | None = None
@@ -80,5 +92,6 @@ class RoomTypeDetails(BaseModel):
     good_for: int | None = None
     inclusions: list[str] = []
 
-class ConfirmBooking(BaseModel):
-    confirmed: bool
+
+class ConfirmBooking(BaseStageInput):
+    confirmed: bool = False

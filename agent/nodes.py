@@ -30,11 +30,16 @@ django.setup()
 
 
 from bookings.services.availability import get_room_types_availability, get_room_type_basic_info, bulk_lock_room_type
+from bookings.services.lock import release_holder_locks
 from bookings.services.booking import create_online_booking
 from bookings.exceptions import RedisUnavailable, RoomTypeNotFoundError
 from bookings.models import RoomType
+from paymongo.views import create_checkout_link
 
-from agent.states import BookingState, DateAndGuestCountInput, SelectedRoomsInput, GuestInfo, AvailBoat, ConfirmBooking, RoomTypeDetails
+from agent.states import (
+    BookingState, BaseStageInput, DateAndGuestCountInput, SelectedRoomsInput, 
+    GuestInfo, AvailBoat, ConfirmBooking, RoomTypeDetails
+)
 from datetime import datetime
 
 def convert_to_24h(time_str: str) -> str:
@@ -52,7 +57,146 @@ llm  = ChatGoogleGenerativeAI(
 )
 
 
-def get_room_type_availability(*, check_in=None, check_out=None, adult_count=None, childdren_count=None, room_type=None):
+def release_locks(state: BookingState):
+    """Release holder locks"""
+    holder_id = state.get("holder_id")
+    check_in = state.get("check_in")
+    check_out = state.get("check_out")
+    rooms_to_release = [{"check_in": check_in, "check_out": check_out, "room_type_id": room_id} for room_id in state.get("room_type_ids", [])] 
+
+    try:
+        release_holder_locks(rooms_to_release, holder_id)
+    except Exception as e:
+        print(f"Error occurred while releasing locks: {e}")
+
+def handle_common_back_action(state: BookingState, result: BaseStageInput):
+    if result.action == "change_room":
+        if state.get("holder_id"):
+            release_locks(state)
+
+        available_rooms = get_room_type_availability(
+            check_in=state.get("check_in"),
+            check_out=state.get("check_out"),
+            adult_count=state.get("adult_count"),
+            children_count=state.get("children_count")
+        )
+        
+        valid_rooms = [r for r in available_rooms if r.get("available_rooms", 0) > 0]
+        if valid_rooms:
+            room_options = "\n".join([
+                f"• **{r['name']}** (ID: `{r['id']}`) - ₱{float(r['price']):,.2f}/night, good for {r['good_for']} guests ({r['available_rooms']} left)"
+                for r in valid_rooms
+            ])
+        else:
+            room_options = "⚠️ No rooms are currently available for these dates."
+
+        # Check if user already mentioned a specific room (e.g. 'family room')
+        new_room_name = getattr(result, "new_room_type", None)
+        matched_room = None
+        if new_room_name:
+            new_room_clean = new_room_name.strip().lower()
+            for r in valid_rooms:
+                if new_room_clean in r["name"].lower():
+                    matched_room = r
+                    break
+
+        if matched_room:
+            msg = (
+                f"You've chosen to change your room selection to **{matched_room['name']}**. Here are the available room types for your selected dates:\n\n{room_options}. Please specify the room you'd like to reserve. If you want to add more rooms, you can specify them as well."
+            )
+            return {
+                "holder_id": None,
+                "room_type_ids": [matched_room["id"]],
+                "stage": "select_and_hold_rooms",
+                "messages": [
+                    AIMessage(content=msg)
+                ]
+            }
+        
+        else:
+            msg = (
+                f"I've released your previously held room.\n\nHere are the available room types for your selected dates: {room_options} Please specify the room you'd like to reserve. If you want to add more rooms, you can specify them as well."
+            )
+            return {
+                "holder_id": None,
+                "room_type_ids": [],
+                "stage": "select_and_hold_rooms",
+                "messages": [
+                    AIMessage(content=msg)
+                ]
+            }
+
+    elif result.action == "modify_dates_or_guests":
+        if state.get("holder_id"):
+            release_locks(state)
+
+        changes = []
+
+        if result.new_check_in is not None:
+            state["check_in"] = result.new_check_in
+            changes.append(f"check-in date to {result.new_check_in}")
+        if result.new_check_out is not None:
+            state["check_out"] = result.new_check_out
+            changes.append(f"check-out date to {result.new_check_out}")
+        if result.new_adult_count is not None:
+            state["adult_count"] = result.new_adult_count
+            changes.append(f"adult count to {result.new_adult_count}")
+        if result.new_children_count is not None:
+            state["children_count"] = result.new_children_count
+            changes.append(f"children count to {result.new_children_count}")
+
+        available_rooms = get_room_type_availability(
+            check_in=state.get("check_in"),
+            check_out=state.get("check_out"),
+            adult_count=state.get("adult_count"),
+            children_count=state.get("children_count")
+        )
+
+        room_list_str = "\n".join([                                                                                                                                                  
+            f"• **{r['name']}** (ID: `{r['id']}`) - ₱{float(r['price']):,.2f}/night, good for {r['good_for']} guests ({r['available_rooms']} available)"                             
+            for r in available_rooms                                                                                                                                                 
+        ]) 
+        changes_str = f"Updated {', '.join(changes)}." if changes else "Dates updated."                                                                                              
+        guests_str = f"{state.get('adult_count', 0)} adults, {state.get('children_count', 0)} children"   
+
+        msg = (
+            f"You've chosen to modify your booking details.\n"
+            f"• **Status:** {changes_str}\n"
+            f"• **Stay:** {state.get('check_in')} to {state.get('check_out')}\n"
+            f"• **Guests:** {guests_str}\n\n"
+            f"**Available Room Types:**\n"
+            f"{room_list_str}\n\n"
+            f"Which room would you like to select? (Reply with room name or ID)"
+        )
+        return {
+            "holder_id": None,
+            "room_type_ids": [],
+            "check_in": state.get("check_in"),
+            "check_out": state.get("check_out"),
+            "adult_count": state.get("adult_count"),
+            "children_count": state.get("children_count"),
+            "stage": "search_available_rooms",
+            "messages": [AIMessage(content=msg)]
+        }
+
+    elif result.action == "cancel":
+        if state.get("holder_id"):
+            release_locks(state)
+
+        return {
+            "holder_id": None,
+            "room_type_ids": [],
+            "status": "cancelled",
+            "stage": "cancelled",
+            "messages": [
+                AIMessage(content="Your booking process has been canceled. If you'd like to start over, please provide your check-in and check-out dates along with the number of guests.")
+            ]
+        }
+
+    else:
+        return None
+    
+def get_room_type_availability(*, check_in=None, check_out=None, adult_count=None, children_count=None, room_type=None):
     """Retrieve available room types and their availability counts between check_in and check_out dates (YYYY-MM-DD)."""
     return [
         {
@@ -109,7 +253,7 @@ def search_available_rooms(state: BookingState):
         check_in=check_in,
         check_out=check_out,
         adult_count=adult_count,
-        childdren_count=children_count
+        children_count=children_count
     )
 
     if not rooms:
@@ -155,7 +299,7 @@ def select_and_hold_rooms(state: BookingState):
         check_in=state['check_in'],
         check_out=state['check_out'],
         adult_count=state['adult_count'],
-        childdren_count=state['children_count']
+        children_count=state['children_count']
     )
     last_message = state['messages'][-1]
     user_input = getattr(last_message, "content", str(last_message))
@@ -167,15 +311,20 @@ def select_and_hold_rooms(state: BookingState):
         {
             "role": "system",
             "content": f"""Analyze the user's input based on available rooms: {rooms}.
-            1. Extract any room type IDs the user wants to select or add. If they want multiple rooms of the same type, repeat the ID.
-            2. Determine if the user wants to hold/lock/proceed with their selection (e.g. they say 'hold', 'lock', 'proceed', 'yes', 'done', 'continue', 'that's all', 'next'). Set wants_to_hold=True in that case."""
+            Extract any room type IDs the user wants to select or add. If they want multiple rooms of the same type, repeat the ID.
+            Determine if the user wants to hold/lock/proceed with their selection (e.g. they say 'hold', 'lock', 'proceed', 'yes', 'done', 'continue', 'that's all', 'next'). Set wants_to_hold=True in that case.
+            If the user wants to add more rooms, set wants_to_hold=False.
+            Determine if the user wants to change their selection, modify dates/guest count, or cancel. If so, set action to 'change_room', 'modify_dates_or_guests', or 'cancel' respectively. Otherwise, set action to 'continue'."""
         },
         {
             "role": "user",
             "content": user_input
         }
     ])
-
+    print(result.action)
+    if result.action != "continue":
+        return handle_common_back_action(state, result)
+    
     new_ids = result.room_type_ids or []
     wants_to_hold = result.wants_to_hold
 
@@ -288,13 +437,21 @@ def collect_customer_info(state: BookingState):
             - email: Email address (e.g. andrew@gmail.com)
             - phone_number: Contact / mobile phone number (e.g. 09771203453)
             
-            If a field is not mentioned in the input, leave it as null/None."""
+            If a field is not mentioned in the input, leave it as null/None.
+            
+            If a user says they want to change their contact info, extract the new details and ignore the old ones. If a field is not mentioned in that case, leave it as null/None.
+            Determine if the user wants to change their contact info, modify dates/guest count, or cancel. If so, 
+            set action to 'change_room', 'modify_dates_or_guests', or 'cancel' respectively. Otherwise, set action to 'continue'."""
         },
         {
             "role": "user",
             "content": user_input
         }
     ])
+
+    print(result.action)
+    if result.action != "continue":
+        return handle_common_back_action(state, result)
 
     first_name = result.first_name or state.get('first_name')
     last_name = result.last_name or state.get('last_name')
@@ -340,10 +497,16 @@ def collect_boat_transfer(state: BookingState):
             "content": """Determine whether the user wants to avail boat transfer.
             If yes, set avail_boat_transfer=True and extract the boat transfer time.
             If no, set avail_boat_transfer=False and boat_transfer_time=None. 
-            Dont assume time input, if not provided leave blank, if time not in selected timeslots place leave blank and ask the user to input correct time"""
+            Dont assume time input, if not provided leave blank, if time not in selected timeslots place leave blank and ask the user to input correct time
+            Determine if the user wants to change their selection, modify dates/guest count, or cancel. 
+            If so, set action to 'change_room', 'modify_dates_or_guests', or 'cancel' respectively. Otherwise, set action to 'continue'."""
         },
         *state['messages']
     ])
+
+    if result.action != "continue":
+        print(result.action)
+        return handle_common_back_action(state, result)
 
     avail_boat = result.avail_boat_transfer                                                                                                                                             
     boat_time = convert_to_24h(result.boat_transfer_time) if avail_boat else None 
@@ -477,13 +640,19 @@ def confirm_booking(state: BookingState):
             "content": """Determine whether the user confirms and wants to proceed with the booking.
             Return:
             - confirmed=True if they agree/confirm/say yes
-            - confirmed=False if they decline/cancel/say no"""
+            - confirmed=False if they decline/cancel/say no
+            Determine if the user wants to change their selection, modify dates/guest count, or cancel.
+            If so, set action to 'change_room', 'modify_dates_or_guests', or 'cancel' respectively. Otherwise, set action to 'continue'."""
         },
         {
             "role": "user",
             "content": user_input
         }
     ])
+
+    print(result.action)
+    if result.action != "continue":
+        return handle_common_back_action(state, result)
     
     return {
         "confirmed": result.confirmed
@@ -568,7 +737,8 @@ def book(state: BookingState):
 
         first_name = customer_data.get("first_name") or "Guest"
         last_name = customer_data.get("last_name") or ""
-
+        check_out_url = create_checkout_link(billing, "agent booking for " + first_name + " " + last_name)
+        release_locks(state)
         return {
             "status": "booked",
             "messages": [
@@ -580,7 +750,7 @@ def book(state: BookingState):
                         f"• **Booking ID(s):** {booking_ids}\n"
                         f"• **Hold Reference:** `{holder_id}`\n\n"
                         "Please proceed to the secure checkout page to complete your payment:\n"
-                        f"🔗 [Proceed to Payment Checkout](https://kawaii-resort.example.com/checkout?bill_id={billing_id})\n\n"
+                        f"🔗 [Proceed to Payment Checkout]({check_out_url})\n\n"
                         "We look forward to hosting you!"
                     )
                 )
@@ -588,6 +758,7 @@ def book(state: BookingState):
         }
     except Exception as e:
         print(f"Error creating online booking: {e}")
+        release_locks(state)
         return {
             "status": "error",
             "error_type": str(e),
@@ -600,6 +771,7 @@ def book(state: BookingState):
 
 def cancel_booking(state: BookingState):
     print("RUNNING cancel_booking")
+    release_locks(state)
     return {
         "status": "cancelled",
         "messages": [
