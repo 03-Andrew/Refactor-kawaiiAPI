@@ -2,7 +2,7 @@ from datetime import date
 
 from rest_framework import serializers
 
-from .models import Booking, Room, RoomType
+from .models import Booking, Room, RoomType, Inclusions
 from transactions.models import AmenitiesAvailed
 
 class BookingCustomerSerializer(serializers.Serializer):
@@ -134,11 +134,17 @@ class BookingSerializer(serializers.ModelSerializer):
             # If the boat transfer exists, return the time; otherwise return None
             return boat_transfer.time if boat_transfer else "Not Availed"
 
+class InclusionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Inclusions
+        fields = ['inclusion']
 
 class RoomTypeSerializer(serializers.ModelSerializer):
+    inclusions = InclusionSerializer(many=True, required=False)
+
     class Meta:
         model = RoomType
-        fields = ['id', 'name', 'price', 'description', 'good_for', 'max_children', 'max_adult']
+        fields = ['id', 'name', 'price', 'description', 'good_for', 'max_children', 'max_adult', 'inclusions']
 
 class RoomSerializer(serializers.ModelSerializer):
     type = RoomTypeSerializer(read_only=True)

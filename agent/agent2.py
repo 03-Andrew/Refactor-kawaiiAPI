@@ -23,21 +23,22 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.append(str(BASE_DIR))
-# 2. Point to your Django settings module      
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kawaiiAPI.settings.dev')
-# 3. Initialize Django runtime & ORM                                                                      
-django.setup()   
+from django.apps import apps
+if not apps.ready:
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kawaiiAPI.settings.dev')
+    django.setup()   
 
 from agent.states import BookingState
 from agent.nodes import (
     select_and_hold_rooms, search_available_rooms, collect_boat_transfer, 
-    collect_customer_info, display_booking_summary, cancel_booking, 
+    collect_customer_info, display_booking_summary, cancel_booking, greet_user,
     confirm_booking, book, route_booking_confirmation, route_stage
 )
 
 
 graph = StateGraph(BookingState)
 
+graph.add_node('greet', greet_user)
 graph.add_node('search_available_rooms', search_available_rooms)
 graph.add_node('select_and_hold_rooms', select_and_hold_rooms)
 graph.add_node('collect_customer_info', collect_customer_info)
@@ -50,6 +51,7 @@ graph.add_conditional_edges(
     START,
     route_stage,
     {
+        'greet': 'greet',
         'search_available_rooms': 'search_available_rooms',
         'select_and_hold_rooms': 'select_and_hold_rooms',
         'collect_customer_info': 'collect_customer_info',
@@ -105,9 +107,11 @@ def run_chatbot():
         if state.get("messages") and len(state["messages"]) > 0:
             last_message = state["messages"][-1]
             content = getattr(last_message, "content", "")
-            if isinstance(last_message, dict):
-                content = last_message.get("content", "")
-            print(f"Assistant: {json.dumps(content, indent=4)}\n")
+            if isinstance(content, list):
+                print("last_message is a list")
+                content = content[0].get("text", "")
+
+            print(f"Assistant: {content}")
 
 if __name__ == "__main__":
     run_chatbot()

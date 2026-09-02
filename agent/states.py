@@ -21,7 +21,7 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, AnyM
 class BookingState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
 
-    stage: Literal["search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking"] = "search_available_rooms"
+    stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking"] = "greet"
     check_in: date | None = None
     check_out: date | None = None
     adult_count: int | None = None
@@ -45,6 +45,9 @@ class BookingState(TypedDict):
     head_count: int | None = None   
     boat_transfer_time: str | None = None
 
+    room_types_to_display: list[int] = []
+
+
 
 class BaseStageInput(BaseModel):
     action: Literal["continue", "change_room", "modify_dates_or_guests", "cancel"] = "continue"
@@ -54,6 +57,22 @@ class BaseStageInput(BaseModel):
     new_children_count: int | None = Field(default=None, description="Updated number of children")
     new_room_type: str | None = Field(default=None, description="Room name or room type the user wants to switch to")
 
+class RoomTypeDetails(BaseModel):
+    id: int | None = None
+    name: str | None = None
+    price: float | None = None
+    description: str | None = None
+    good_for: int | None = None
+    inclusions: list[str] = []
+
+class RoomCacheSchema(BaseModel):
+    data: list[RoomTypeDetails] | None = None
+    last_updated: datetime | None = None
+
+class InitalGreetingState(BaseStageInput):
+    stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking"] = "greet"
+    message: str | None = Field(default=None, description="Message to the user after greeting, structure it with new lines, and bold important information using markdown syntax")
+    room_types_to_display: list[int] = Field(default=[], description="List of available room type IDs")
 
 class DateAndGuestCountInput(BaseStageInput):
     check_in: str | None = None
@@ -84,13 +103,6 @@ class BoatTime(BaseModel):
     boat_transfer_time: str | None = None
 
 
-class RoomTypeDetails(BaseModel):
-    id: int | None = None
-    name: str | None = None
-    price: float | None = None
-    description: str | None = None
-    good_for: int | None = None
-    inclusions: list[str] = []
 
 
 class ConfirmBooking(BaseStageInput):
