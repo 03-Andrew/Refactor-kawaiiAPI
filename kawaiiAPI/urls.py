@@ -37,6 +37,7 @@ urlpatterns = [
     path('', include('user.urls')),
     path('', include('paymongo.urls')),
     path('', include('reports.urls')),
+    path('', include('agent.urls')),
 
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
