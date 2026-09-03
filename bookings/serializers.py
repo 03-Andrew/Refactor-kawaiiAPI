@@ -155,11 +155,13 @@ class RoomTypeAvailabilitySerializer(serializers.ModelSerializer):
     suggested_number_of_rooms_to_book = serializers.IntegerField(read_only=True)
     should_add_extra_guest = serializers.BooleanField(read_only=True)
     pair_with_other_rooms = serializers.BooleanField(read_only=True)
+    can_accommodate_group = serializers.BooleanField(read_only=True)
     class Meta:
         model = RoomType
         fields = ['id', 'name', 'price', 'description', 'good_for', "total_rooms", "max_extra_guest",
                   "booked_rooms", "locked_rooms",  "available_rooms",  "maintenance_rooms",
-                  'suggested_number_of_rooms_to_book','should_add_extra_guest', 'pair_with_other_rooms']
+                  'suggested_number_of_rooms_to_book','should_add_extra_guest', 'pair_with_other_rooms',
+                  'can_accommodate_group']
 
 class RoomSerializer(serializers.ModelSerializer):
     type = RoomTypeSerializer(read_only=True)

@@ -146,10 +146,10 @@ class RoomTypesListView(generics.ListCreateAPIView):
                 'suggested_number_of_rooms_to_book':  item['suggested_number_of_rooms_to_book'],
                 'should_add_extra_guest': item['should_add_extra_guest'],
                 'pair_with_other_rooms': item['pair_with_other_rooms'],
+                'can_accommodate_group': item['can_accommodate_group']
 
             })                                                                                                                               
             data.append(serialized)  
-
         return Response(data)
 
 

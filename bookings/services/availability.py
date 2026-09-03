@@ -232,6 +232,11 @@ def get_room_types_availability(*, guest_count=1, check_in=None, check_out=None,
         except Exception:
             pass
 
+    total_resort_capacity = sum(
+        max(0, rt.total_count - rt.booked_count - rt.maintenance_count - locked_counts.get((rt.id, check_in, check_out), 0))                                                  
+            * (rt.good_for + (rt.max_extra_guest or 0))                                                                                                                           
+            for rt in queryset                            
+    )
     results = []
 
     for rt in queryset:
@@ -250,8 +255,10 @@ def get_room_types_availability(*, guest_count=1, check_in=None, check_out=None,
         if guest_count > total_base_cap:                                                                                                                                  
             should_add_extra_guest = True   
 
-        if 0 < available < suggested_count_to_book:
-            pair_with_other_rooms = True
+        can_book = available >= suggested_count_to_book
+
+       
+        pair_with_other_rooms = ( 0 < available < suggested_count_to_book and total_resort_capacity >= guest_count )
 
         results.append({
             'room_type': rt,
@@ -262,7 +269,8 @@ def get_room_types_availability(*, guest_count=1, check_in=None, check_out=None,
             'maintenance_rooms': rt.maintenance_count,
             'suggested_number_of_rooms_to_book': suggested_count_to_book,
             'should_add_extra_guest': should_add_extra_guest,
-            'pair_with_other_rooms': pair_with_other_rooms
+            'pair_with_other_rooms': pair_with_other_rooms,
+            'can_accommodate_group': can_book
         })
 
     return results
