@@ -232,6 +232,7 @@ def handle_common_back_action(state: BookingState, result: BaseStageInput):
     
 def get_room_type_availability(*, check_in=None, check_out=None, adult_count=None, children_count=None, room_type=None):
     """Retrieve available room types and their availability counts between check_in and check_out dates (YYYY-MM-DD)."""
+    guest_count = adult_count+children_count
     return [
         {
             "id": rt['room_type'].id,
@@ -240,7 +241,7 @@ def get_room_type_availability(*, check_in=None, check_out=None, adult_count=Non
             "good_for": rt['room_type'].good_for,
             "available_rooms": rt['available_rooms']
         }
-        for rt in get_room_types_availability(check_in=check_in, check_out=check_out, room_type=room_type)
+        for rt in get_room_types_availability(check_in=check_in, check_out=check_out, room_type=room_type, guest_count=guest_count)
     ] 
 
 def greet_user(state: BookingState):
