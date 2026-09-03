@@ -120,7 +120,7 @@ def handle_common_back_action(state: BookingState, result: BaseStageInput):
         valid_rooms = [r for r in available_rooms if r.get("available_rooms", 0) > 0]
         if valid_rooms:
             room_options = "\n".join([
-                f"• **{r['name']}** (ID: `{r['id']}`) - ₱{float(r['price']):,.2f}/night, good for {r['good_for']} guests ({r['available_rooms']} left)"
+                f"**{r['name']}** (ID: `{r['id']}`) - ₱{float(r['price']):,.2f}/night, good for {r['good_for']} guests ({r['available_rooms']} left)"
                 for r in valid_rooms
             ])
         else:
@@ -333,7 +333,13 @@ def search_available_rooms(state: BookingState):
             "role": "system",
             "content": f"""Display the room information to the cusomer using these data {rooms}. If count is less than capacity 
                            (good for), recommend multiple rooms for that single type only if available count allows
-                           Ask which room type they would like to reserve."""
+                           Ask which room type they would like to reserve.
+
+                           Formatting instructions:
+                            - Keep formatting tight and compact.
+                            - Do not use blank lines between list items or sections.
+                            - Use single newlines only.
+                        """
         },
         {
             "role": "user",
@@ -686,7 +692,7 @@ def display_booking_summary(state: BookingState):
         "Would you like to confirm and finalize this booking? Please reply **yes** to proceed or **no** to cancel.",
     ]
 
-    message = "\n".join(summary_lines)
+    message = "".join(summary_lines)
 
     return message
     
@@ -807,13 +813,13 @@ def book(state: BookingState):
             "messages": [
                 AIMessage(
                     content=(
-                        f"🎉 **Booking Confirmed!**\n"
-                        f"Thank you, {first_name} {last_name}!\n"
-                        f"- **Billing Reference ID:** `#{billing_id}`\n"
-                        f"- **Booking ID(s):** {booking_ids}\n"
-                        f"- **Hold Reference:** `{holder_id}`\n\n"
+                        f"🎉 **Booking Confirmed!**"
+                        f"Thank you, {first_name} {last_name}!"
+                        f"- **Billing Reference ID:** `#{billing_id}`"
+                        f"- **Booking ID(s):** {booking_ids}"
+                        f"- **Hold Reference:** `{holder_id}`\n"
                         f"Please proceed to the secure checkout page to complete your payment: "
-                        f"[Proceed to Payment Checkout]({check_out_url})\n\n"
+                        f"[Proceed to Payment Checkout]({check_out_url})"
                         "We look forward to hosting you!"
                     )
                 )
