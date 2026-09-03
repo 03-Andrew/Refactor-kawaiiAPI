@@ -3,19 +3,20 @@ from datetime import date
 
 from django.db.models import Count, Exists, OuterRef, Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from kawaiiAPI.permissions import IsAdmin, IsReceptionistOrAdmin, ReceptionistViewOnly
 from rest_framework.response import Response
 
 from bookings.models import Booking, Room, RoomStatus, RoomType, BookingStatus
-from bookings.serializers import RoomSerializer, RoomTypeSerializer
+from bookings.serializers import RoomSerializer, RoomTypeSerializer, RoomTypeAvailabilitySerializer
 from bookings.services.lock import bulk_get_locked_counts
 from bookings.services.availability import get_room_types_availability
 
 ROOM_QUERY_PARAMS = [
     OpenApiParameter('check_in', type=str, description='Filter available rooms (YYYY-MM-DD)'),
     OpenApiParameter('check_out', type=str, description='Filter available rooms (YYYY-MM-DD)'),
+    OpenApiParameter('guest_count', type=int, description='Number of guests'),
     OpenApiParameter('type', type=str, description='Filter by room type'),
     OpenApiParameter('sort', type=str, enum=['asc', 'desc'], description='Sort by room ID'),
     OpenApiParameter('include_booked', type=bool, description='Show all rooms with is_booked flag'),
@@ -106,8 +107,13 @@ class RoomTypesListView(generics.ListCreateAPIView):
             return [AllowAny()]
         return [IsAdmin()]
 
+    def get_serializer_class(self):                                                                                                                                           
+        if self.request and self.request.method == 'POST':                                                                                                                    
+            return RoomTypeSerializer                                                                                                                                         
+        return RoomTypeAvailabilitySerializer           
+
     
-    @extend_schema(parameters=ROOM_QUERY_PARAMS[0:3])
+    @extend_schema(parameters=ROOM_QUERY_PARAMS[0:4])
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
@@ -115,19 +121,32 @@ class RoomTypesListView(generics.ListCreateAPIView):
         check_in = request.query_params.get('check_in')
         check_out = request.query_params.get('check_out')
         room_type = request.query_params.get('type')
+        guest_count_param = request.query_params.get('guest_count') 
 
-        room_types_availability = get_room_types_availability(
-            check_in=check_in, check_out=check_out, room_type=room_type
-        )
+        try:
+            guest_count = int(guest_count_param) if guest_count_param is not None else 1
+            if guest_count < 1:
+                return Response({'error': 'guest_count must be at least 1'}, status=status.HTTP_400_BAD_REQUEST)   
+        
+            room_types_availability = get_room_types_availability(
+                check_in=check_in, check_out=check_out, room_type=room_type, guest_count=guest_count
+            )
+            
+        except ValueError:
+            return Response({'error': 'guest_count must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
         data = []                                                                                                                            
-        for item in room_types_availability:                                                                                                          
+        for item in room_types_availability:       
             serialized = self.get_serializer(item['room_type']).data                                                                         
             serialized.update({                                                                                                              
                 'total_rooms': item['total_rooms'],                                                                                          
                 'booked_rooms': item['booked_rooms'],                                                                                        
                 'locked_rooms': item['locked_rooms'],                                                                                        
                 'available_rooms': item['available_rooms'],                                                                                  
-                'maintenance_rooms': item['maintenance_rooms'],                                                                              
+                'maintenance_rooms': item['maintenance_rooms'],
+                'suggested_number_of_rooms_to_book':  item['suggested_number_of_rooms_to_book'],
+                'should_add_extra_guest': item['should_add_extra_guest'],
+                'pair_with_other_rooms': item['pair_with_other_rooms'],
+
             })                                                                                                                               
             data.append(serialized)  
 

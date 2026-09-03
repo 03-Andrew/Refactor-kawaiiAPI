@@ -3,6 +3,8 @@ from datetime import date
 from collections import Counter
 from django.db.models import Count, Q
 
+import math
+
 from bookings.exceptions import RoomTypeNotFoundError, RoomUnavailableError, RedisUnavailable
 from bookings.models import Booking, BookingStatus, Room, RoomStatus, RoomType
 from bookings.services.lock import (
@@ -10,12 +12,13 @@ from bookings.services.lock import (
     bulk_acquire
 )
 
-def get_room_type_capacities(room_type_ids):
+def get_room_type_counts(room_type_ids):
     """Return {id: {name, total, maintenance}} — 1 annotated query."""
     qs = RoomType.objects.filter(id__in=room_type_ids).annotate(
         total=Count('room'),
         maintenance=Count('room', filter=Q(room__status=RoomStatus.MAINTENANCE)),
     )
+
     return {
         rt.id: {'name': rt.name, 'total': rt.total, 'maintenance': rt.maintenance}
         for rt in qs
@@ -68,14 +71,14 @@ def validate_rooms_availability(*, rooms, holder_id=None, exclude_booking_id=Non
     errors = []
     room_type_ids = {room['room_type'] for room in rooms}
 
-    capacities = get_room_type_capacities(room_type_ids)
-    missing = room_type_ids - set(capacities)
+    counts = get_room_type_counts(room_type_ids)
+    missing = room_type_ids - set(counts)
     if missing:
         raise RoomTypeNotFoundError(f"Room type IDs not found: {list(missing)}")
 
     rooms_by_type: dict[int, list] = {}
     for room in rooms:
-        if room['room_type'] in capacities:
+        if room['room_type'] in counts:
             rooms_by_type.setdefault(room['room_type'], []).append(room)
 
     booking_counts = get_overlap_counts(rooms_by_type, exclude_booking_id=exclude_booking_id)
@@ -89,10 +92,10 @@ def validate_rooms_availability(*, rooms, holder_id=None, exclude_booking_id=Non
 
     for room_data in rooms:
         rt_id = room_data['room_type']
-        if rt_id not in capacities:
+        if rt_id not in counts:
             continue
 
-        cap = capacities[rt_id]
+        cap = counts[rt_id]
         check_in = str(room_data['check_in'])
         check_out = str(room_data['check_out'])
         key = (rt_id, check_in, check_out)
@@ -134,11 +137,12 @@ def get_room_type_available(room_type_id, check_in, check_out,
     detail keys: name, total, maintenance, booked, locked, db_available, available.
     2 queries (1 annotated RoomType + 1 booking count).
     """
-    all_capacities = get_room_type_capacities([room_type_id])
-    if room_type_id not in all_capacities:
+    all_room_type_counts = get_room_type_counts([room_type_id])
+    if room_type_id not in all_room_type_counts:
         raise RoomTypeNotFoundError(f"Room type {room_type_id} not found")
 
-    room_capacity = all_capacities[room_type_id]
+    room_capacity = all_room_type_counts[room_type_id]
+
     booked = Booking.objects.filter(
         room_type_id=room_type_id,
         status__in=[BookingStatus.APPROVED, BookingStatus.PENDING],
@@ -172,6 +176,7 @@ def get_room_type_available(room_type_id, check_in, check_out,
     }
 
 
+
 def find_available_room(room_type, check_in, check_out):
     """Return first available Room of given type for the date range, or None."""
     booked_rooms = Booking.objects.filter(
@@ -189,7 +194,7 @@ def find_available_room(room_type, check_in, check_out):
 def get_room_type_basic_info():
     return  RoomType.objects.prefetch_related("inclusions").all()
 
-def get_room_types_availability(*, check_in=None, check_out=None, room_type=None):
+def get_room_types_availability(*, guest_count=1, check_in=None, check_out=None, room_type=None):
     queryset = RoomType.objects.all()
 
     if room_type:
@@ -232,6 +237,21 @@ def get_room_types_availability(*, check_in=None, check_out=None, room_type=None
     for rt in queryset:
         locked = locked_counts.get((rt.id, check_in, check_out),0) if has_dates else 0
         available = rt.total_count - rt.booked_count - rt.maintenance_count - locked
+        max_capacity = rt.good_for + (rt.max_extra_guest or 0)
+
+        suggested_count_to_book = 1
+        should_add_extra_guest = False
+        pair_with_other_rooms = False
+
+        if guest_count > max_capacity:
+            suggested_count_to_book = math.ceil(guest_count/max_capacity)
+
+        total_base_cap = suggested_count_to_book * rt.good_for                                                                                                                    
+        if guest_count > total_base_cap:                                                                                                                                  
+            should_add_extra_guest = True   
+
+        if 0 < available < suggested_count_to_book:
+            pair_with_other_rooms = True
 
         results.append({
             'room_type': rt,
@@ -239,7 +259,10 @@ def get_room_types_availability(*, check_in=None, check_out=None, room_type=None
             'booked_rooms': rt.booked_count,
             'locked_rooms': locked,
             'available_rooms': max(0, available),
-            'maintenance_rooms': rt.maintenance_count
+            'maintenance_rooms': rt.maintenance_count,
+            'suggested_number_of_rooms_to_book': suggested_count_to_book,
+            'should_add_extra_guest': should_add_extra_guest,
+            'pair_with_other_rooms': pair_with_other_rooms
         })
 
     return results

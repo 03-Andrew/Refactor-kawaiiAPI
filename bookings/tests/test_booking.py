@@ -17,9 +17,16 @@ from bookings.views.bookings import (
     ApproveBooking, CancelBooking,
     CreateDayTourGuest, CreateOnlineBooking, CreateStayInBooking,
 )
+from bookings.views.rooms import RoomTypesListView
 from transactions.models import Billing, Customer, Amenities, AmenitiesAvailed, GuestList, ActivitiesAvailed, Activity, BillingStatus
 
 from django.contrib.auth import get_user_model
+
+
+from django.conf import settings as django_settings
+from django.test import override_settings
+
+
 # ── Shared base ────────────────────────────────────────────────────────────────
 User = get_user_model()
 class BookingTestBase(TestCase):
@@ -39,8 +46,7 @@ class BookingTestBase(TestCase):
             description="A test room type",
             price=2500.00,
             good_for=2,
-            max_children=1,
-            max_adult=2,
+            max_extra_guest=1
         )
 
         room_numbers = ["101", "102", "103", "104", "106"]
@@ -110,8 +116,8 @@ class BookingCreationTests(BookingTestBase):
 
     @patch('bookings.turnstile.requests.post')
     def test_create_online_booking(self, mock_post):
-        check_in = "2026-09-01"
-        check_out = "2026-09-05"
+        check_in = "2026-10-01"
+        check_out = "2026-10-05"
 
         request_data = {
             "customer": {
@@ -139,7 +145,6 @@ class BookingCreationTests(BookingTestBase):
         request = self.factory.post(
             '/api/bookings/online/', request_data, content_type='application/json',
         )
-
         response = CreateOnlineBooking.as_view()(request)
         self.assertEqual(response.status_code, 201)
         self.assertIn('customer', response.data)
@@ -149,8 +154,8 @@ class BookingCreationTests(BookingTestBase):
         self.assertEqual(response.data['bookings'][0]['room'], None)
 
     def test_create_stay_in_booking(self):
-        check_in = "2026-09-01"
-        check_out = "2026-09-05"
+        check_in = "2026-10-01"
+        check_out = "2026-10-05"
 
         request_data = {
             "customer": {
@@ -178,8 +183,8 @@ class BookingCreationTests(BookingTestBase):
         self.assertIn(response.status_code, [200, 201])
 
     def test_create_stay_in_booking_unauthorized_role(self):
-        check_in = "2026-09-01"
-        check_out = "2026-09-05"
+        check_in = "2026-10-01"
+        check_out = "2026-10-05"
 
         request_data = {
             "customer": {
@@ -426,7 +431,7 @@ class ApproveBookingTests(BookingTestBase):
         """POST /approve with room of different type returns 400."""
         booking_id, _ = self._create_online_booking("wrong-type@test.com")
 
-        other_type = RoomType.objects.create(name="Other", price=1000, max_adult=2)
+        other_type = RoomType.objects.create(name="Other", price=1000, max_extra_guest=1)
         other_room = Room.objects.create(
             number="999", type=other_type, status=RoomStatus.AVAILABLE,
         )
@@ -574,9 +579,6 @@ class CancelBookingTests(BookingTestBase):
 
 # ── Idempotency key ────────────────────────────────────────────────────────────
 
-from django.conf import settings as django_settings
-from django.test import override_settings
-
 class IdempotencyKeyTests(BookingTestBase):
     """
     Tests for idempotency key enforcement on POST /api/bookings/online/.
@@ -702,4 +704,233 @@ class IdempotencyKeyTests(BookingTestBase):
             Booking.objects.count(), count_after_first,
             "A fresh idempotency key must create a new booking row",
         )
+
+
+class FetchAvailableRoomsTests(BookingTestBase):
+    """Tests for GET /api/room-types/ (fetching available rooms with recommendations)."""
+
+    def test_fetch_available_rooms_happy_path(self):
+        """Happy Path: Standard search with dates and guest count within base capacity."""
+        request = self.factory.get(
+            '/api/room-types/',
+            {'check_in': '2026-10-01', 'check_out': '2026-10-05', 'guest_count': '2'},
+        )
+        response = RoomTypesListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+
+        room_type_data = response.data[0]
+        self.assertEqual(room_type_data['id'], self.room_type.id)
+        self.assertEqual(room_type_data['name'], "Test Room Type")
+        self.assertEqual(room_type_data['total_rooms'], 5)
+        self.assertEqual(room_type_data['available_rooms'], 5)
+        self.assertEqual(room_type_data['booked_rooms'], 0)
+        self.assertEqual(room_type_data['locked_rooms'], 0)
+        self.assertEqual(room_type_data['maintenance_rooms'], 0)
+        # Recommendation assertions
+        self.assertEqual(room_type_data['suggested_number_of_rooms_to_book'], 1)
+        self.assertFalse(room_type_data['should_add_extra_guest'])
+        self.assertFalse(room_type_data['pair_with_other_rooms'])
+
+    def test_fetch_available_rooms_large_group_suggests_multiple_rooms_and_extra_guest(self):
+        """Edge Case 1: Large party exceeding max single-room capacity requires multiple rooms + extra guest."""
+        # RoomType has good_for=2, max_extra_guest=1 -> max capacity = 3
+        # For 5 guests: suggested = ceil(5/3) = 2 rooms
+        # 2 rooms have total base capacity 2*2 = 4 < 5 -> should_add_extra_guest = True
+        request = self.factory.get(
+            '/api/room-types/',
+            {'check_in': '2026-10-01', 'check_out': '2026-10-05', 'guest_count': '5'},
+        )
+        response = RoomTypesListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        room_type_data = response.data[0]
+        self.assertEqual(room_type_data['suggested_number_of_rooms_to_book'], 2)
+        self.assertTrue(room_type_data['should_add_extra_guest'])
+        # 5 rooms available >= 2 suggested -> no need to pair with other room types
+        self.assertFalse(room_type_data['pair_with_other_rooms'])
+
+    def test_fetch_available_rooms_limited_inventory_triggers_pair_with_other_rooms(self):
+        """Edge Case 2: Available rooms exist but are fewer than suggested -> pair_with_other_rooms is True."""
+        customer = Customer.objects.create(
+            first_name="Existing",
+            last_name="Guest",
+            email="existing@example.com",
+            contact_number="09123456789",
+        )
+        bill = Billing.objects.create(customer=customer)
+
+        # Book 4 out of 5 rooms for the overlapping period
+        for room in self.rooms[:4]:
+            Booking.objects.create(
+                customer_bill=bill,
+                room=room,
+                room_type=self.room_type,
+                check_in="2026-10-01",
+                check_out="2026-10-05",
+                adult_count=2,
+                status=BookingStatus.APPROVED,
+            )
+
+        # Party of 5 needs 2 rooms, but only 1 room is available
+        request = self.factory.get(
+            '/api/room-types/',
+            {'check_in': '2026-10-01', 'check_out': '2026-10-05', 'guest_count': '5'},
+        )
+        response = RoomTypesListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        room_type_data = response.data[0]
+        self.assertEqual(room_type_data['total_rooms'], 5)
+        self.assertEqual(room_type_data['booked_rooms'], 4)
+        self.assertEqual(room_type_data['available_rooms'], 1)
+        self.assertEqual(room_type_data['suggested_number_of_rooms_to_book'], 2)
+        # 0 < available (1) < suggested (2) -> triggers pair_with_other_rooms
+        self.assertTrue(room_type_data['pair_with_other_rooms'])
+
+    def test_fetch_available_rooms_missing_and_invalid_guest_count(self):
+        """Edge Case 3: Missing guest_count safely defaults to 1; invalid guest_count returns 400."""
+        # 1. Missing guest_count parameter -> defaults to 1 guest safely without 500 error
+        request_no_guest = self.factory.get(
+            '/api/room-types/',
+            {'check_in': '2026-10-01', 'check_out': '2026-10-05'},
+        )
+        response = RoomTypesListView.as_view()(request_no_guest)
+        self.assertEqual(response.status_code, 200)
+        room_type_data = response.data[0]
+        self.assertEqual(room_type_data['suggested_number_of_rooms_to_book'], 1)
+        self.assertFalse(room_type_data['should_add_extra_guest'])
+        self.assertFalse(room_type_data['pair_with_other_rooms'])
+
+        # 2. Non-integer guest_count -> 400 Bad Request
+        request_invalid_str = self.factory.get(
+            '/api/room-types/',
+            {'check_in': '2026-10-01', 'check_out': '2026-10-05', 'guest_count': 'three'},
+        )
+        resp_invalid = RoomTypesListView.as_view()(request_invalid_str)
+        self.assertEqual(resp_invalid.status_code, 400)
+
+        # 3. Non-positive guest_count -> 400 Bad Request
+        request_zero = self.factory.get(
+            '/api/room-types/',
+            {'check_in': '2026-10-01', 'check_out': '2026-10-05', 'guest_count': '0'},
+        )
+        resp_zero = RoomTypesListView.as_view()(request_zero)
+        self.assertEqual(resp_zero.status_code, 400)
+
+    def test_counts_maintenance_and_overlapping_bookings(self):
+        """Verify total_rooms, maintenance_rooms, booked_rooms, and available_rooms count math."""
+        # 1 room under maintenance
+        self.rooms[0].status = RoomStatus.MAINTENANCE
+        self.rooms[0].save()
+
+        customer = Customer.objects.create(
+            first_name="Count",
+            last_name="Tester",
+            email="counts@example.com",
+            contact_number="09123456789",
+        )
+        bill = Billing.objects.create(customer=customer)
+
+        # 1 APPROVED booking overlapping dates
+        Booking.objects.create(
+            customer_bill=bill,
+            room=self.rooms[1],
+            room_type=self.room_type,
+            check_in="2026-10-01",
+            check_out="2026-10-05",
+            adult_count=2,
+            status=BookingStatus.APPROVED,
+        )
+        # 1 PENDING booking overlapping dates
+        Booking.objects.create(
+            customer_bill=bill,
+            room=self.rooms[2],
+            room_type=self.room_type,
+            check_in="2026-10-01",
+            check_out="2026-10-05",
+            adult_count=2,
+            status=BookingStatus.PENDING,
+        )
+
+        request = self.factory.get(
+            '/api/room-types/',
+            {'check_in': '2026-10-01', 'check_out': '2026-10-05', 'guest_count': '2'},
+        )
+        response = RoomTypesListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        data = response.data[0]
+
+        # Total 5, 1 maintenance, 2 booked (1 approved + 1 pending), 0 locked -> 2 available
+        self.assertEqual(data['total_rooms'], 5)
+        self.assertEqual(data['maintenance_rooms'], 1)
+        self.assertEqual(data['booked_rooms'], 2)
+        self.assertEqual(data['locked_rooms'], 0)
+        self.assertEqual(data['available_rooms'], 2)
+
+    @patch('bookings.services.availability.bulk_get_locked_counts')
+    def test_counts_locked_rooms_and_date_status_filtering(self, mock_locks):
+        """Verify locked_rooms count and that cancelled/non-overlapping bookings are excluded."""
+        mock_locks.return_value = {
+            (self.room_type.id, '2026-10-01', '2026-10-05'): 1
+        }
+
+        customer = Customer.objects.create(
+            first_name="Filter",
+            last_name="Tester",
+            email="filter@example.com",
+            contact_number="09123456789",
+        )
+        bill = Billing.objects.create(customer=customer)
+
+        # 1 overlapping APPROVED booking -> SHOULD count as booked
+        Booking.objects.create(
+            customer_bill=bill,
+            room=self.rooms[0],
+            room_type=self.room_type,
+            check_in="2026-10-01",
+            check_out="2026-10-05",
+            adult_count=2,
+            status=BookingStatus.APPROVED,
+        )
+        # 1 overlapping CANCELLED booking -> SHOULD NOT count as booked
+        Booking.objects.create(
+            customer_bill=bill,
+            room=self.rooms[1],
+            room_type=self.room_type,
+            check_in="2026-10-01",
+            check_out="2026-10-05",
+            adult_count=2,
+            status=BookingStatus.CANCELLED,
+        )
+        # 1 non-overlapping future booking -> SHOULD NOT count as booked
+        Booking.objects.create(
+            customer_bill=bill,
+            room=self.rooms[2],
+            room_type=self.room_type,
+            check_in="2026-11-01",
+            check_out="2026-11-05",
+            adult_count=2,
+            status=BookingStatus.APPROVED,
+        )
+
+        request = self.factory.get(
+            '/api/room-types/',
+            {'check_in': '2026-10-01', 'check_out': '2026-10-05', 'guest_count': '2'},
+        )
+        response = RoomTypesListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        data = response.data[0]
+
+        # Total 5, 0 maintenance, 1 active booked (cancelled and future ignored), 1 locked -> 3 available
+        self.assertEqual(data['total_rooms'], 5)
+        self.assertEqual(data['maintenance_rooms'], 0)
+        self.assertEqual(data['booked_rooms'], 1)
+        self.assertEqual(data['locked_rooms'], 1)
+        self.assertEqual(data['available_rooms'], 3)
+
+
 

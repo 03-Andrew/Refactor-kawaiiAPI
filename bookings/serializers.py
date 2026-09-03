@@ -140,11 +140,26 @@ class InclusionSerializer(serializers.ModelSerializer):
         fields = ['inclusion']
 
 class RoomTypeSerializer(serializers.ModelSerializer):
-    inclusions = InclusionSerializer(many=True, required=False)
+    # inclusions = InclusionSerializer(many=True, required=False)
 
     class Meta:
         model = RoomType
-        fields = ['id', 'name', 'price', 'description', 'good_for', 'max_children', 'max_adult', 'inclusions']
+        fields = ['id', 'name', 'price', 'description', 'good_for', 'max_extra_guest']
+
+class RoomTypeAvailabilitySerializer(serializers.ModelSerializer):
+    total_rooms = serializers.IntegerField(read_only=True)
+    booked_rooms = serializers.IntegerField(read_only=True)
+    locked_rooms = serializers.IntegerField(read_only=True)
+    available_rooms = serializers.IntegerField(read_only=True)
+    maintenance_rooms = serializers.IntegerField(read_only=True)
+    suggested_number_of_rooms_to_book = serializers.IntegerField(read_only=True)
+    should_add_extra_guest = serializers.BooleanField(read_only=True)
+    pair_with_other_rooms = serializers.BooleanField(read_only=True)
+    class Meta:
+        model = RoomType
+        fields = ['id', 'name', 'price', 'description', 'good_for', "total_rooms", "max_extra_guest",
+                  "booked_rooms", "locked_rooms",  "available_rooms",  "maintenance_rooms",
+                  'suggested_number_of_rooms_to_book','should_add_extra_guest', 'pair_with_other_rooms']
 
 class RoomSerializer(serializers.ModelSerializer):
     type = RoomTypeSerializer(read_only=True)

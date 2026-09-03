@@ -21,7 +21,7 @@ class PaymongoWebhookTasksTests(TestCase):
         self.room_type = RoomType.objects.create(
             name="Deluxe Villa",
             price=3000.00,
-            max_adult=2,
+            max_extra_guest=1,
             good_for=2,
         )
         self.booking = Booking.objects.create(
