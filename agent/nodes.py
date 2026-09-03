@@ -92,6 +92,10 @@ llm  = ChatGoogleGenerativeAI(
     max_retries=2,    
 )
 
+def get_recent_messages(state: BookingState, window_size: int = 6) -> list:                                                                                                   
+    """Return the last N messages to maintain natural conversational context while capping token usage."""                                                                    
+    messages = state.get("messages") or []                                                                                                                                    
+    return messages[-window_size:]     
 
 def release_locks(state: BookingState):
     """Release holder locks"""
@@ -342,10 +346,7 @@ def search_available_rooms(state: BookingState):
                             - Use single newlines only.
                         """
         },
-        {
-            "role": "user",
-            "content": user_content
-        }
+        *get_recent_messages(state, window_size=6)
     ]
     reply = llm.invoke(prompt)
     return {
@@ -508,10 +509,7 @@ def collect_customer_info(state: BookingState):
             Determine if the user wants to change their contact info, modify dates/guest count, or cancel. If so, 
             set action to 'change_room', 'modify_dates_or_guests', or 'cancel' respectively. Otherwise, set action to 'continue'."""
         },
-        {
-            "role": "user",
-            "content": user_input
-        }
+        *get_recent_messages(state, window_size=6)
     ])
 
     print(result.action)
