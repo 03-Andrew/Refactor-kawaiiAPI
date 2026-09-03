@@ -42,7 +42,7 @@ class ReportsNPlusOneTest(TestCase):
         )
         self.room_type = RoomType.objects.create(
             name="Standard", description="A standard room",
-            price=2500.00, good_for=2, max_children=1, max_adult=2,
+            price=2500.00, good_for=2, max_extra_guest=1,
         )
         self.room = Room.objects.create(
             number="101", type=self.room_type, status=RoomStatus.AVAILABLE,

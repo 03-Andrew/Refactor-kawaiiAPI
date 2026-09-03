@@ -14,9 +14,8 @@ class RoomType(models.Model):
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(null=True, blank=True)
-    good_for = models.PositiveSmallIntegerField(null=True)
-    max_children = models.PositiveSmallIntegerField(null = True)
-    max_adult = models.PositiveSmallIntegerField()
+    good_for = models.PositiveSmallIntegerField(default=2)
+    max_extra_guest = models.PositiveSmallIntegerField(default=1)
     inclusions = models.ManyToManyField(Inclusions)
 
     def __str__(self):
@@ -81,7 +80,7 @@ class Booking(models.Model):
     def clean(self):
         if self.check_in >= self.check_out:
             raise ValidationError("Check-in date must be before check-out date.")
-        if self.number_of_guests > self.room_type.max_adult + (self.room_type.max_children or 0):
+        if self.number_of_guests > self.room_type.good_for + self.room_type.max_exta_guest:
             raise ValidationError("Number of guests exceeds the allowed limit for this room type.")
 
     

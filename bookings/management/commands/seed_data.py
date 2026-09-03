@@ -43,8 +43,7 @@ class Command(BaseCommand):
                 'price': 2500.00,
                 'description': 'Cozy room with basic amenities. Garden view.',
                 'good_for': 2,
-                'max_children': 1,
-                'max_adult': 2,
+                'max_extra': 1,
                 'inclusions': ['Air Conditioning', 'Free WiFi', 'Hot & Cold Shower', 'Towels', 'Toiletries Kit'],
             },
             {
@@ -52,8 +51,7 @@ class Command(BaseCommand):
                 'price': 4500.00,
                 'description': 'Spacious room with premium amenities. Pool view.',
                 'good_for': 4,
-                'max_children': 2,
-                'max_adult': 2,
+                'max_extra': 1,
                 'inclusions': ['Air Conditioning', 'Flat Screen TV', 'Free WiFi', 'Hot & Cold Shower', 'Towels', 'Toiletries Kit', 'Slippers', 'Mini Bar', 'Pool Access'],
             },
             {
@@ -61,8 +59,7 @@ class Command(BaseCommand):
                 'price': 6000.00,
                 'description': 'Large room for families. Two queen beds. Garden view.',
                 'good_for': 6,
-                'max_children': 3,
-                'max_adult': 3,
+                'max_extra': 2,
                 'inclusions': ['Air Conditioning', 'Flat Screen TV', 'Free WiFi', 'Hot & Cold Shower', 'Towels', 'Toiletries Kit', 'Slippers', 'Coffee Maker', 'Breakfast Buffet', 'Pool Access'],
             },
         ]
