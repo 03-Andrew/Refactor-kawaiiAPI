@@ -21,7 +21,8 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, AnyM
 class BookingState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
 
-    stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking"] = "greet"
+    stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking", "await_payment"] = "greet"
+    billing_id: int | None = None
     check_in: date | None = None
     check_out: date | None = None
     adult_count: int | None = None
@@ -70,7 +71,7 @@ class RoomCacheSchema(BaseModel):
     last_updated: datetime | None = None
 
 class InitalGreetingState(BaseStageInput):
-    stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking"] = "greet"
+    stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking", "await_payment"] = "greet"
     message: str | None = Field(default=None, description="Message to the user after greeting, structure it with new lines, and bold important information using markdown syntax")
     room_types_to_display: list[int] = Field(default=[], description="List of available room type IDs")
 

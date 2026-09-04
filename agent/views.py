@@ -51,7 +51,7 @@ class AgentChatAPIView(APIView):
                     content = content[0].get("text", "")
                 reply = content
 
-            print(state)  # Debugging: Print the state after invoking with resume
+            # print(state)  # Debugging: Print the state after invoking with resume
 
 
             booking_details = {
