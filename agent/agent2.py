@@ -16,7 +16,8 @@ import django
 from datetime import date, datetime
 from collections import Counter
 import json
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, AnyMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+import uuid
 
 load_dotenv()
 
@@ -31,9 +32,43 @@ if not apps.ready:
 from agent.states import BookingState
 from agent.nodes import (
     select_and_hold_rooms, search_available_rooms, collect_boat_transfer, 
-    collect_customer_info, display_booking_summary, cancel_booking, greet_user,
-    confirm_booking, book, route_booking_confirmation, route_stage
+    collect_customer_info, greet_user, cancel_booking,
+    confirm_booking, book, route_booking_confirmation, await_payment
 )
+
+def route_room_selection(state: BookingState):
+    print("RUNNING route_room_selection")
+    if state['status'] == "success":
+        print("SUCCESS")
+        return "success"
+    if state['status'] == 'unavailable':
+        print("BRUH")
+        return "unavailable"
+    return "error"
+
+def route_stage(state: BookingState):
+    stage = state.get('stage') or 'greet'                                                                                                                              
+                                                                                                                                                                                        
+    if stage in [         
+        'greet',
+        'search_available_rooms',                                                                                                                                                       
+        'select_and_hold_rooms',                                                                                                                                                        
+        'collect_customer_info',                                                                                                                                                        
+        'collect_boat_transfer',                                                                                                                                                        
+        'confirm_booking',
+        'await_payment',
+    ]:                                                                                                                                                                                  
+        return stage                                                                                                                                                                    
+                                                                                                                                                                                        
+    return END  
+
+def route_greet(state: BookingState):
+    """After greet_user runs, chain directly into search_available_rooms if the user already provided booking intent."""
+    stage = state.get('stage') or 'greet'
+    if stage == 'search_available_rooms':
+        return 'search_available_rooms'
+    return END
+
 
 
 graph = StateGraph(BookingState)
@@ -45,7 +80,8 @@ graph.add_node('collect_customer_info', collect_customer_info)
 graph.add_node('collect_boat_transfer', collect_boat_transfer)
 graph.add_node('confirm_booking', confirm_booking)
 graph.add_node('book', book)
-# graph.add_node('cancel_booking', cancel_booking)
+graph.add_node('cancel_booking', cancel_booking)
+graph.add_node('await_payment', await_payment)
 
 graph.add_conditional_edges(
     START,
@@ -56,10 +92,15 @@ graph.add_conditional_edges(
         'select_and_hold_rooms': 'select_and_hold_rooms',
         'collect_customer_info': 'collect_customer_info',
         'collect_boat_transfer': 'collect_boat_transfer',
-        'confirm_booking': 'confirm_booking'
+        'confirm_booking': 'confirm_booking',
+        'await_payment': 'await_payment',
     }
 )
 
+graph.add_conditional_edges('greet', route_greet, {
+    'search_available_rooms': 'search_available_rooms',
+    END: END,
+})
 graph.add_edge('search_available_rooms', END)
 graph.add_edge('select_and_hold_rooms', END)
 graph.add_edge("collect_customer_info", END)
@@ -69,22 +110,23 @@ graph.add_conditional_edges(
     route_booking_confirmation,
     {
         'book': 'book',
-        'cancel_booking': END,
+        'cancel_booking': 'cancel_booking',
     }
 )
+graph.add_edge("cancel_booking", END)
 graph.add_edge("book", END)
+graph.add_edge("await_payment", END)
 
 checkpointer = MemorySaver()
 APP = graph.compile(checkpointer=checkpointer)
 
+# for testing only
 def run_chatbot():
-    import uuid
-    import json
     thread_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": thread_id}}
 
     print("--- Resort Booking Assistant ---")
-    print("Type 'exit' to quit.\n")
+    print("Type 'exit' to quit.")
 
     while True:
         user_input = input("Message: ").strip()
