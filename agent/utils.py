@@ -54,6 +54,10 @@ def get_room_types() -> list[RoomTypeDetails]:
     ROOM_CACHE.last_updated = datetime.now()
     return ROOM_CACHE.data
 
+def get_room_names() -> list[str]:
+    return [r["name"] for r in get_room_types()]
+
+
 def convert_to_24h(time_str: str | None) -> str | None:
     if not time_str or not isinstance(time_str, str):
         return None
@@ -143,7 +147,8 @@ def handle_common_back_action(state: BookingState, result: BaseStageInput):
 
         if matched_room:
             msg = (
-                f"You've chosen to change your room selection to **{matched_room['name']}**. Here are the available room types for your selected dates:\n{room_options}\nPlease specify the room you'd like to reserve. If you want to add more rooms, you can specify them as well."
+                f"Switched your selection to **{matched_room['name']}** (₱{float(matched_room['price']):,.2f}/night).\n\n"
+                f"Would you like to **hold** this room for 10 minutes, or add another room?"
             )
             return {
                 "holder_id": None,
