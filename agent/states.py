@@ -80,6 +80,10 @@ class DateAndGuestCountInput(BaseStageInput):
     check_out: str | None = None
     adult_count: int | None = None
     children_count: int | None = None
+    desired_room_type: str | None = Field(
+        default=None,
+        description="Match the user's requested room to the official room name (e.g. if they say 'delux', resolve to 'Deluxe'). Set None if no room mentioned or if it does not match any known room."
+    )
 
 
 class SelectedRoomsInput(BaseStageInput):

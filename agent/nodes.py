@@ -36,18 +36,19 @@ from bookings.exceptions import RedisUnavailable, RoomTypeNotFoundError
 from bookings.models import RoomType
 from paymongo.views import create_checkout_link
 
-from .utils import release_locks, get_room_type_availability, get_room_types, get_recent_messages, convert_to_24h, handle_common_back_action, display_booking_summary
+from .utils import release_locks, get_room_type_availability, get_room_types, get_recent_messages, convert_to_24h, handle_common_back_action, display_booking_summary, get_room_names
 
 from agent.states import (
     BookingState, BaseStageInput, DateAndGuestCountInput, SelectedRoomsInput, 
     GuestInfo, AvailBoat, ConfirmBooking, RoomTypeDetails, InitalGreetingState, RoomCacheSchema
 )
-from datetime import datetime
+from datetime import datetime 
 
 ROOM_CACHE = RoomCacheSchema()
+
 llm  = ChatGoogleGenerativeAI(
     model="gemini-3.1-flash-lite",
-    temperature=1.0,  # Gemini 3.0+ defaults to 1.0
+    temperature=0, 
     max_tokens=None,
     timeout=None,
     max_retries=2,    
@@ -56,12 +57,8 @@ llm  = ChatGoogleGenerativeAI(
 FORMATTING_PROMPT = """
 Formatting rules (always follow these):
 - Separate sections with blank line.
-- Use bullet points (•) for list items, not dashes.
-- Bold (** **) all section headers and key labels.
-- Use ₱ for Philippine Peso amounts, formatted with commas (e.g. ₱4,500.00).
 - Never output a wall of text — keep each section visually distinct.
 - Do not use markdown tables; use bullet lists instead.
-- Keep tone friendly, concise, and professional.
 """
 
 def greet_user(state: BookingState):
@@ -75,7 +72,7 @@ def greet_user(state: BookingState):
             "role": "system",
             "content": f"""You are a friendly and helpful resort booking assistant. if the user greets you, greet them back and ask what they want to do. 
             If they want to book a room ask for their check-in and check-out dates, number of adults and children, then set stage to 'search_available_rooms', else set it to 'greet'.
-            If they ask about room details without availability, provide the room details using this ({get_room_types()}) and set stage to 'greet'. """
+            If they ask about room details without availability, provide the room details using this ({get_room_types()}) and set stage to 'greet'."""
         },
         {
             "role": "user",
@@ -98,13 +95,14 @@ def search_available_rooms(state: BookingState):
     result = extractor.invoke([
         {
             "role": "system",
-            "content": f"""Collect adult count, children count, checkin date and checkout date. 
-            The date today is {now.strftime("%A")}: {now}, use that to calculate relative dates (e.g. 'tomorrow' or 'next Friday'). 
-            Check_in and check_out dates are string types with format of (YYYY-MM-DD). If a value is not mentioned just set it to none or 0 for the children count
-            validate dates first, checkin should not be before checkout, if so reask dates
+            "content": f"""Collect adult count, children count, checkin date, checkout date and desired_room_type (if the user mentioned a specific room name like 'deluxe room')
+            The date today is {now.strftime("%Y-%m-%d")}, use that to calculate relative dates. 
+            Check_in and check_out dates are string types with format of (YYYY-MM-DD). If not mentioned just set it to none (0 for the children count)
+            validate dates first, checkin should not be after checkout, if so reask dates 
             """
-        }, *state["messages"]
+        }, *get_recent_messages(state=state)
     ])
+
 
     check_in = result.check_in or state.get("check_in")
     check_out = result.check_out or state.get("check_out")
@@ -149,6 +147,43 @@ def search_available_rooms(state: BookingState):
 
         }
 
+    if result.desired_room_type:
+        desired = result.desired_room_type.lower()
+        matched_room = next(
+            (r for r in rooms if desired in r["name"].lower() and r["available_rooms"] > 0),
+            None     
+        )
+        if matched_room:
+            msg=(                                                                                                                                                                                                         
+                    f"**{matched_room['name']} is available!** (₱{matched_room['price']:,.2f} / night)\n\n"                                                                                                                     
+                    f"Would you like to **hold** this room for 10 minutes, or add more rooms?"                                                                                                                                  
+                )
+            
+            return {                                                                                                                                                                                                        
+                    "check_in": check_in,                                                                                                                                                                                       
+                    "check_out": check_out,                                                                                                                                                                                     
+                    "adult_count": adult_count,                                                                                                                                                                                 
+                    "children_count": children_count,                                                                                                                                                                           
+                    "room_type_ids": [matched_room["id"]],   # <--- Stored in state                                                                                                                                             
+                    "messages": [AIMessage(content=msg)],                                                                                                                                                                       
+                    "stage": "select_and_hold_rooms"         # <--- Advances to lock node                                                                                                                                       
+                }  
+        else:     
+            msg = (                                                                                                                                                                                                         
+                f"Sorry, **{result.desired_room_type}** is not available for your selected dates.\n"                                                                                                                        
+                f"Here are the rooms that are available:\n"                                                                                                                                                                 
+                + "\n".join([f"• **{r['name']}** (₱{r['price']:,.2f})" for r in rooms])                                                                                                                                     
+                + "\n\nWhich room would you like to reserve instead?"                                                                                                                                                       
+            )                                                                                                                                                                                                               
+            return {                                                                                                                                                                                                        
+                "check_in": check_in,                                                                                                                                                                                       
+                "check_out": check_out,                                                                                                                                                                                     
+                "adult_count": adult_count,                                                                                                                                                                                 
+                "children_count": children_count,                                                                                                                                                                           
+                "messages": [AIMessage(content=msg)],                                                                                                                                                                       
+                "stage": "search_available_rooms"                                                                                                                                                                           
+            }         
+
     last_message = state['messages'][-1]
     user_content = getattr(last_message, 'content', last_message.get('content', '') if isinstance(last_message, dict) else str(last_message))
     prompt = [
@@ -157,11 +192,7 @@ def search_available_rooms(state: BookingState):
             "content": f"""Display the room information to the cusomer using these data {rooms}. If count is less than capacity 
                            (good for), recommend multiple rooms for that single type only if available count allows
                            Ask which room type they would like to reserve.
-
-                           Formatting instructions:
-                            - Keep formatting tight and compact.
-                            - Do not use blank lines between list items or sections.
-                            - Use single newlines only.
+                           {FORMATTING_PROMPT}
                         """
         },
         *get_recent_messages(state, window_size=6)
