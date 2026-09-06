@@ -51,7 +51,7 @@ Each node sets `stage` in its return dict to drive the **next** invocation routi
 # nodes.py:87
 llm = ChatGoogleGenerativeAI(
     model="gemini-3.1-flash-lite",
-    temperature=1.0,  # probabilistic — consider 0 for extraction nodes
+    temperature=0,  # probabilistic — consider 0 for extraction nodes
     max_retries=2,
 )
 ```
