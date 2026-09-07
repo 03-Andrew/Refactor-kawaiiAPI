@@ -30,9 +30,11 @@ from agent.states import (
 
 
 from bookings.models import RoomType
+from langsmith import traceable
 
 ROOM_CACHE = RoomCacheSchema()
 
+@traceable
 def get_room_types() -> list[RoomTypeDetails]:
     current_time = datetime.now()
     if ROOM_CACHE.data is not None and ROOM_CACHE.last_updated is not None:
@@ -54,10 +56,11 @@ def get_room_types() -> list[RoomTypeDetails]:
     ROOM_CACHE.last_updated = datetime.now()
     return ROOM_CACHE.data
 
+@traceable
 def get_room_names() -> list[str]:
     return [r["name"] for r in get_room_types()]
 
-
+@traceable
 def convert_to_24h(time_str: str | None) -> str | None:
     if not time_str or not isinstance(time_str, str):
         return None
@@ -77,12 +80,13 @@ def convert_to_24h(time_str: str | None) -> str | None:
             continue
     return None
 
-
+@traceable
 def get_recent_messages(state: BookingState, window_size: int = 6) -> list:                                                                                                   
     """Return the last N messages to maintain natural conversational context while capping token usage."""                                                                    
     messages = state.get("messages") or []                                                                                                                                    
     return messages[-window_size:]     
 
+@traceable
 def release_locks(state: BookingState):
     """Release holder locks"""
     holder_id = state.get("holder_id")
@@ -95,6 +99,7 @@ def release_locks(state: BookingState):
     except Exception as e:
         print(f"Error occurred while releasing locks: {e}")
 
+@traceable
 def get_room_type_availability(*, check_in=None, check_out=None, adult_count=None, children_count=None, room_type=None):
     """Retrieve available room types and their availability counts between check_in and check_out dates (YYYY-MM-DD)."""
     guest_count = adult_count+children_count
@@ -113,7 +118,7 @@ def get_room_type_availability(*, check_in=None, check_out=None, adult_count=Non
         }
         for rt in get_room_types_availability(check_in=check_in, check_out=check_out, room_type=room_type, guest_count=guest_count)
     ] 
-
+@traceable
 def handle_common_back_action(state: BookingState, result: BaseStageInput):
     if result.action == "change_room":
         if state.get("holder_id"):
@@ -242,7 +247,7 @@ def handle_common_back_action(state: BookingState, result: BaseStageInput):
     
 
 
-
+@traceable
 def display_booking_summary(state: BookingState):
     """Display comprehensive booking details before final booking confirmation."""
     print("RUNNING display_booking_summary")
