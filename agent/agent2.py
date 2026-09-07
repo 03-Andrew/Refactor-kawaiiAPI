@@ -33,7 +33,7 @@ from agent.states import BookingState
 from agent.nodes import (
     select_and_hold_rooms, search_available_rooms, collect_boat_transfer, 
     collect_customer_info, greet_user, cancel_booking,
-    confirm_booking, book, route_booking_confirmation, await_payment
+    confirm_booking, book, route_booking_confirmation, await_payment, room_inquiry, classify_intent
 )
 
 def route_room_selection(state: BookingState):
@@ -47,10 +47,12 @@ def route_room_selection(state: BookingState):
     return "error"
 
 def route_stage(state: BookingState):
-    stage = state.get('stage') or 'greet'                                                                                                                              
-                                                                                                                                                                                        
-    if stage in [         
-        'greet',
+    stage = state.get('stage') or 'greet'                                                                                                         
+
+    if stage == 'greet':                                                                                                                                                                                                    
+        return 'classify_intent'             
+                                                                                                                                                        
+    if stage in [
         'search_available_rooms',                                                                                                                                                       
         'select_and_hold_rooms',                                                                                                                                                        
         'collect_customer_info',                                                                                                                                                        
@@ -69,10 +71,20 @@ def route_greet(state: BookingState):
         return 'search_available_rooms'
     return END
 
+def route_classified_intent(state: BookingState):                                                                                                                                                                           
+    intent = state.get("intent")                                                                                                                                                                                            
+    if intent == "book":                                                                                                                                                                                                    
+        return "search_available_rooms"                                                                                                                                                                                     
+    elif intent == "room_inquiry":                                                                                                                                                                                          
+        return "room_inquiry"                                                                                                                                                                                               
+    return "greet"                                                                                                                                                                                                          
+                          
 
 
 graph = StateGraph(BookingState)
 
+graph.add_node('classify_intent', classify_intent)
+graph.add_node('room_inquiry', room_inquiry)
 graph.add_node('greet', greet_user)
 graph.add_node('search_available_rooms', search_available_rooms)
 graph.add_node('select_and_hold_rooms', select_and_hold_rooms)
@@ -87,7 +99,7 @@ graph.add_conditional_edges(
     START,
     route_stage,
     {
-        'greet': 'greet',
+        'classify_intent': 'classify_intent',
         'search_available_rooms': 'search_available_rooms',
         'select_and_hold_rooms': 'select_and_hold_rooms',
         'collect_customer_info': 'collect_customer_info',
@@ -97,10 +109,18 @@ graph.add_conditional_edges(
     }
 )
 
-graph.add_conditional_edges('greet', route_greet, {
-    'search_available_rooms': 'search_available_rooms',
-    END: END,
-})
+graph.add_conditional_edges(
+    'classify_intent',
+    route_classified_intent,
+    {                                                                                                                                                                                                                       
+        'search_available_rooms': 'search_available_rooms',                                                                                                                                                                 
+        'room_inquiry': 'room_inquiry',                                                                                                                                                                                     
+        'greet': 'greet',                                                                                                                                                                                                   
+    }     
+)
+
+graph.add_edge('room_inquiry', END)
+graph.add_edge('greet', END)
 graph.add_edge('search_available_rooms', END)
 graph.add_edge('select_and_hold_rooms', END)
 graph.add_edge("collect_customer_info", END)

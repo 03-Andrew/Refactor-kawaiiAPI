@@ -40,14 +40,26 @@ from .utils import release_locks, get_room_type_availability, get_room_types, ge
 
 from agent.states import (
     BookingState, BaseStageInput, DateAndGuestCountInput, SelectedRoomsInput, 
-    GuestInfo, AvailBoat, ConfirmBooking, RoomTypeDetails, InitalGreetingState, RoomCacheSchema
+    GuestInfo, AvailBoat, ConfirmBooking, RoomTypeDetails, InitalGreetingState, RoomCacheSchema,
+    DateAndGuestCountInputWithUserInfo, IntentClassification
 )
 from datetime import datetime 
+from langsmith import traceable
 
 ROOM_CACHE = RoomCacheSchema()
 
+customer_info_input = """
+                      Extract the customer's contact details from their input:
+                        - first_name: First / given name (e.g. Wilbert)
+                        - last_name: Last name / surname (e.g. Smith)
+                        - email: Email address (e.g. andrew@gmail.com)
+                        - phone_number: Contact / mobile phone number (e.g. 09771203453)
+                        
+                        If a field is not mentioned in the input, leave it as null/None.
+                      """
+
 llm  = ChatGoogleGenerativeAI(
-    model="gemini-3.1-flash-lite",
+    model="gemini-3.7-flash",
     temperature=0, 
     max_tokens=None,
     timeout=None,
@@ -55,42 +67,89 @@ llm  = ChatGoogleGenerativeAI(
 )
 
 FORMATTING_PROMPT = """
-Formatting rules (always follow these):
-- Separate sections with blank line.
-- Never output a wall of text — keep each section visually distinct.
-- Do not use markdown tables; use bullet lists instead.
-"""
+                    Formatting rules (always follow these):
+                    - Separate sections with blank line.
+                    - Never output a wall of text — keep each section visually distinct.
+                    - Do not use markdown tables; use bullet lists instead.
+                    """
 
+@traceable                                                                                                                                                                                                                  
+def classify_intent(state: BookingState):                                                                                                                                                                                   
+    """Quickly classifies user intent at the start of a conversation."""                                                                                                                                                    
+    last_message = state['messages'][-1]                                                                                                                                                                                    
+    user_input = getattr(last_message, 'content', str(last_message))                                                                                                                                                        
+                                                                                                                                                                                                                            
+    classifier = llm.with_structured_output(IntentClassification)                                                                                                                                                           
+    result = classifier.invoke([                                                                                                                                                                                            
+        {                                                                                                                                                                                                                   
+            "role": "system",                                                                                                                                                                                               
+            "content": "Classify the user's intent: 'book' (wants to book, check availability, or gave dates/guest counts), "                                                                                               
+                       "'room_inquiry' (asking about room types, prices, amenities, details), or 'greet' (general greeting/chat)."                                                                                          
+        },                                                                                                                                                                                                                  
+        {"role": "user", "content": user_input}                                                                                                                                                                             
+    ])                                                                                                                                                                                                                      
+                                                                                                                                                                                                                            
+    return {"intent": result.intent} 
+
+@traceable
 def greet_user(state: BookingState):
     """Initial greeting to the user."""
-
+    print("RUNNING Greet User")
     last_message = state['messages'][-1]
     user_input = getattr(last_message, 'content', last_message.get('content', '') if isinstance(last_message, dict) else str(last_message))
     extractor = llm.with_structured_output(InitalGreetingState)
-    response = extractor.invoke([
+    result = extractor.invoke([
         {
             "role": "system",
-            "content": f"""You are a friendly and helpful resort booking assistant. if the user greets you, greet them back and ask what they want to do. 
-            If they want to book a room ask for their check-in and check-out dates, number of adults and children, then set stage to 'search_available_rooms', else set it to 'greet'.
-            If they ask about room details without availability, provide the room details using this ({get_room_types()}) and set stage to 'greet'."""
+            "content": f"""You are a friendly and helpful resort booking assistant. if the user greets you, greet them back and ask what they want to do"""
         },
         {
             "role": "user",
             "content": user_input
         }
     ])
-    
+
+    # first_name = result.first_name or state.get("first_name")
+    # last_name = result.last_name or state.get("last_name")
+    # email = result.email or state.get("email")
+    # phone_number = result.phone_number or state.get("phone_number")
+
+
     return {
-        "messages": [{"role": "assistant", "content": response.message}],
-        "stage": response.stage,
-        "room_types_to_display": getattr(response, "room_types_to_display", [])
+        "messages": [{"role": "assistant", "content": result.message}],
+        "stage": result.stage,
+        "room_types_to_display": getattr(result, "room_types_to_display", []),
     }
 
+@traceable                                                                                                                                                                                                                  
+def room_inquiry(state: BookingState):                                                                                                                                                                                      
+    """Answers user inquiries specifically about room details, prices, and amenities."""                                                                                                                                    
+    room_data = get_room_types()                                                                                                                                                                                            
+    last_message = state['messages'][-1]                                                                                                                                                                                    
+    user_input = getattr(last_message, 'content', str(last_message))                                                                                                                                                        
+                                                                                                                                                                                                                            
+    prompt = [                                                                                                                                                                                                              
+        {                                                                                                                                                                                                                   
+            "role": "system",                                                                                                                                                                                               
+            "content": f"""You are a helpful resort assistant. Answer the guest's questions about our room types using this catalog: {room_data}.                                                                           
+            Be friendly, clear, and concise. Highlight amenities and prices when relevant.                                                                                                                                  
+            Invite them to provide their dates and guest count if they'd like to check availability or book.                                                                                                                
+            {FORMATTING_PROMPT}"""                                                                                                                                                                                          
+        },                                                                                                                                                                                                                  
+        *get_recent_messages(state, window_size=4)                                                                                                                                                                          
+    ]                                                                                                                                                                                                                       
+    reply = llm.invoke(prompt)                                                                                                                                                                                              
+    return {                                                                                                                                                                                                                
+        "messages": [AIMessage(content=reply.content)],                                                                                                                                                                     
+        "stage": "greet"                                                                                                                                                                                                    
+    }                       
+
+@traceable
 def search_available_rooms(state: BookingState):
     """Collects user adult and children count with their desired checkin and checkout dates"""
     print("RUNNING COLLECT_DATES_AND_COUNT")
     last_message = state['messages'][-1]
-    extractor = llm.with_structured_output(DateAndGuestCountInput)
+    extractor = llm.with_structured_output(DateAndGuestCountInputWithUserInfo)
     now = datetime.now()
     result = extractor.invoke([
         {
@@ -98,7 +157,7 @@ def search_available_rooms(state: BookingState):
             "content": f"""Collect adult count, children count, checkin date, checkout date and desired_room_type (if the user mentioned a specific room name like 'deluxe room')
             The date today is {now.strftime("%Y-%m-%d")}, use that to calculate relative dates. 
             Check_in and check_out dates are string types with format of (YYYY-MM-DD). If not mentioned just set it to none (0 for the children count)
-            validate dates first, checkin should not be after checkout, if so reask dates 
+            validate dates first, checkin should not be after checkout, if so reask dates. If mentioned {customer_info_input}
             """
         }, *get_recent_messages(state=state)
     ])
@@ -108,6 +167,11 @@ def search_available_rooms(state: BookingState):
     check_out = result.check_out or state.get("check_out")
     adult_count = result.adult_count or state.get("adult_count")
     children_count = result.children_count if result.children_count is not None else state.get("children_count", 0)
+    first_name = result.first_name or state.get("first_name")
+    last_name = result.last_name or state.get("last_name")
+    email = result.email or state.get("email")
+    phone_number = result.phone_number or state.get("phone_number")
+
 
     missing = []
     if not check_in: missing.append("check-in date")
@@ -123,6 +187,10 @@ def search_available_rooms(state: BookingState):
             "check_out": check_out,
             "adult_count": adult_count,
             "children_count": children_count,
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": email,
+            "phone_number": phone_number,
             "messages": [{"role": "assistant", "content": msg}],
             "stage": 'search_available_rooms'
         }
@@ -142,6 +210,10 @@ def search_available_rooms(state: BookingState):
             "check_out": check_out,
             "adult_count": adult_count,
             "children_count": children_count,
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": email,
+            "phone_number": phone_number,
             "messages": [{"role": "assistant", "content": msg}],
             "stage": 'search_available_rooms'
 
@@ -163,7 +235,11 @@ def search_available_rooms(state: BookingState):
                     "check_in": check_in,                                                                                                                                                                                       
                     "check_out": check_out,                                                                                                                                                                                     
                     "adult_count": adult_count,                                                                                                                                                                                 
-                    "children_count": children_count,                                                                                                                                                                           
+                    "children_count": children_count,  
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "email": email,
+                    "phone_number": phone_number,                                                                                                                                                                         
                     "room_type_ids": [matched_room["id"]],   # <--- Stored in state                                                                                                                                             
                     "messages": [AIMessage(content=msg)],                                                                                                                                                                       
                     "stage": "select_and_hold_rooms"         # <--- Advances to lock node                                                                                                                                       
@@ -179,34 +255,48 @@ def search_available_rooms(state: BookingState):
                 "check_in": check_in,                                                                                                                                                                                       
                 "check_out": check_out,                                                                                                                                                                                     
                 "adult_count": adult_count,                                                                                                                                                                                 
-                "children_count": children_count,                                                                                                                                                                           
+                "children_count": children_count, 
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "phone_number": phone_number,                                                                                                                                                                          
                 "messages": [AIMessage(content=msg)],                                                                                                                                                                       
                 "stage": "search_available_rooms"                                                                                                                                                                           
             }         
 
-    last_message = state['messages'][-1]
-    user_content = getattr(last_message, 'content', last_message.get('content', '') if isinstance(last_message, dict) else str(last_message))
-    prompt = [
-        {
-            "role": "system",
-            "content": f"""Display the room information to the cusomer using these data {rooms}. If count is less than capacity 
-                           (good for), recommend multiple rooms for that single type only if available count allows
-                           Ask which room type they would like to reserve.
-                           {FORMATTING_PROMPT}
-                        """
-        },
-        *get_recent_messages(state, window_size=6)
+    guest_summary = f"{adult_count} adult{'s' if adult_count > 1 else ''}"
+    if children_count:
+        guest_summary += f", {children_count} child{'ren' if children_count > 1 else ''}"
+
+    lines = [
+        f"Here are the available rooms for **{check_in}** to **{check_out}** ({guest_summary}):\n"
     ]
-    reply = llm.invoke(prompt)
+    for r in rooms:
+        line = f"• **{r['name']}** — ₱{r['price']:,.2f} / night (Capacity: {r['good_for']} guests (max extra guest: {r['max_extra_guest']}) | Available: {r['available_rooms']})"
+        suggested = r.get("suggested_number_of_rooms_to_book") or 1
+        if suggested > 1:
+            line += f"\n  - *Recommended: {suggested} rooms to comfortably accommodate your party*"
+        lines.append(line)
+
+    lines.append("\nWhich room type would you like to reserve?")
+    reply_msg = "\n".join(lines)
+
     return {
         "check_in": check_in,
         "check_out": check_out,
         "adult_count": adult_count,
         "children_count": children_count,
-        "messages": [{"role": "assistant", "content": reply.content}],
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": email,
+        "phone_number": phone_number,
+        "room_types_to_display": [r["id"] for r in rooms],
+        "messages": [AIMessage(content=reply_msg)],
         "stage": 'select_and_hold_rooms'
     }
 
+
+@traceable
 def select_and_hold_rooms(state: BookingState):
     """Allows user to select/add rooms and confirms before applying the 10-minute Redis lock."""
     print("RUNNING select_and_hold_rooms")
@@ -321,20 +411,49 @@ def select_and_hold_rooms(state: BookingState):
             "stage": "select_and_hold_rooms"
         }       
 
+    first_name = state.get('first_name')
+    last_name = state.get('last_name')
+    phone_number = state.get('phone_number')
+    email = state.get('email')
+
+    missing = []
+    if not first_name: missing.append('first name')
+    if not last_name: missing.append('last name')
+    if not email: missing.append('email')
+    if not phone_number: missing.append('phone number')
+
+    if missing:
+        msg = (
+            "**Rooms Selected & Held:**"
+            + "\n".join(formatted_rooms)
+            + f"\n *These rooms are now held for you for 10 minutes.*\n"
+            f"Please provide your {', '.join(missing)} to proceed with the booking."
+        )
+
+        return {
+            "status": "success",                                                                                                                                                            
+            "room_type_ids": all_room_type_ids,                                                                                                                                                 
+            "holder_id": bulk_lock["holder_id"],        
+            "messages": [AIMessage(content=msg)],
+            "stage": "collect_customer_info"
+        }   
+
+        
     held_msg = (
         "**Rooms Selected & Held:**"
         + "\n".join(formatted_rooms)
         + f"\n *These rooms are now held for you for 10 minutes.*\n"
-        "Please provide your **first name, last name, email, and phone number** to proceed with the reservation."
+        "Would you like to avail of boat transfer? If yes, please select a time (6 AM, 8 AM, 10 AM, 12 PM, 3 PM, 5 PM), or reply no."
     )
     return {                                                                                                                                                                            
         "status": "success",                                                                                                                                                            
         "room_type_ids": all_room_type_ids,                                                                                                                                                 
         "holder_id": bulk_lock["holder_id"],                                                                                                                                            
         "messages": [AIMessage(content=held_msg)],
-        "stage": "collect_customer_info"                                                                                                                                                                            
+        "stage": "collect_boat_transfer"                                                                                                                                                                            
     }     
 
+@traceable
 def collect_customer_info(state: BookingState):
     """After selecting rooms, users are asked to provide their contact information."""
     print("RUNNING COLLECT_CUSTOMER_INFO")
@@ -385,7 +504,9 @@ def collect_customer_info(state: BookingState):
             "phone_number": phone_number,
             "messages": [AIMessage(content=msg)],
             "stage": "collect_customer_info"
-        }
+        }   
+
+    print(state)
 
     return {
         "first_name": first_name,
@@ -398,6 +519,7 @@ def collect_customer_info(state: BookingState):
         "stage": "collect_boat_transfer"
     }
 
+@traceable
 def collect_boat_transfer(state: BookingState):
     print("RUNNING collect_boat_transfer")
 
@@ -405,8 +527,7 @@ def collect_boat_transfer(state: BookingState):
         {
             "role": "system",
             "content": """Determine whether the user wants to avail boat transfer.
-            If yes, set avail_boat_transfer=True and extract the boat transfer time.
-            If no, set avail_boat_transfer=False and boat_transfer_time=None. 
+            If yes, set avail_boat_transfer=True and extract the boat transfer time. If no, set avail_boat_transfer=False, otherwise leave it None and boat_transfer_time=None. 
             Dont assume time input, if not provided leave blank, if time not in selected timeslots place leave blank and ask the user to input correct time
             Determine if the user wants to change their selection, modify dates/guest count, or cancel. 
             If so, set action to 'change_room', 'modify_dates_or_guests', or 'cancel' respectively. Otherwise, set action to 'continue'."""
@@ -428,7 +549,7 @@ def collect_boat_transfer(state: BookingState):
     }  
 
 
-    if not avail_boat:
+    if avail_boat is False:
         summary_message = display_booking_summary(fresh_state)
         return {
             "avail_boat_transfer": False,
@@ -436,25 +557,32 @@ def collect_boat_transfer(state: BookingState):
             "stage": "confirm_booking",
             "messages": [AIMessage(content=summary_message)]
         } 
-
-    if not boat_time:
+    elif avail_boat:
+        if not boat_time:
+            return {
+                "avail_boat_transfer": True,
+                "head_count": (state.get("adult_count") or 1) + (state.get("children_count") or 0),
+                "boat_transfer_time": None,
+                "stage": "collect_boat_transfer",
+                "messages": [AIMessage(content="Time input might be invalid or empty, here are available times (6 AM, 8 AM, 10 AM, 12 PM, 3 PM, 5 PM)")]
+            }
+        else:
+            summary_message = display_booking_summary(fresh_state)
+            return {
+                "avail_boat_transfer": True,
+                "head_count": (state.get("adult_count") or 1) + (state.get("children_count") or 0),
+                "boat_transfer_time": boat_time,
+                "stage": "confirm_booking",
+                
+                "messages": [AIMessage(content=summary_message)]
+            }
+    else:
         return {
-            "avail_boat_transfer": True,
-            "head_count": (state.get("adult_count") or 1) + (state.get("children_count") or 0),
-            "boat_transfer_time": None,
-            "stage": "collect_boat_transfer",
-            "messages": [AIMessage(content="Time input might be invalid or empty, here are available times (6 AM, 8 AM, 10 AM, 12 PM, 3 PM, 5 PM)")]
-        }
+                "stage": "collect_boat_transfer",
+                "messages": [AIMessage(content="Please let us know if you would like to avail of the boat transfer (Yes or No). Available times: (6 AM, 8 AM, 10 AM, 12 PM, 3 PM, 5 PM)")]
+            }
 
-    summary_message = display_booking_summary(fresh_state)
-    return {
-        "avail_boat_transfer": True,
-        "head_count": (state.get("adult_count") or 1) + (state.get("children_count") or 0),
-        "boat_transfer_time": boat_time,
-        "stage": "confirm_booking",
-        "messages": [AIMessage(content=summary_message)]
-    } 
-
+@traceable
 def confirm_booking(state: BookingState):
     """HITL step: Waits for user confirmation on the booking details."""
     print("RUNNING confirm_booking")
@@ -485,6 +613,7 @@ def confirm_booking(state: BookingState):
         "confirmed": result.confirmed
     }
 
+@traceable
 def route_booking_confirmation(state: BookingState):
     print("RUNNING route_booking_confirmation")
     if state.get("confirmed"):
@@ -492,6 +621,7 @@ def route_booking_confirmation(state: BookingState):
     else:
         return END
 
+@traceable
 def book(state: BookingState):
     """Final booking step that formats the payload and calls create_online_booking."""
     print("RUNNING book")
@@ -598,6 +728,7 @@ def book(state: BookingState):
             ]
         }
 
+@traceable
 def await_payment(state: BookingState):
     """Checks if the billing has been paid after the user notifies us."""
     print("RUNNING await_payment")
@@ -652,6 +783,7 @@ def await_payment(state: BookingState):
             ]
         }
 
+@traceable
 def cancel_booking(state: BookingState):
     print("RUNNING cancel_booking")
     release_locks(state)
