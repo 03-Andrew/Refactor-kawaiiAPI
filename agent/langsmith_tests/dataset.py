@@ -62,10 +62,10 @@ extract_and_search_rooms = [
             ]
         },
         "outputs": {
-            "stage": "search_available_rooms",
-            "missing_information": [
-                "adult_count"
-            ]
+            "check_in": "2026-11-10",
+            "check_out": "2026-11-12",
+            "adult_count": None,
+            "children_count": 0,
         }
     },
     {
@@ -78,10 +78,10 @@ extract_and_search_rooms = [
             ]
         }, 
         "outputs": {
-            "check_in": "2026-10-03",
-            "check_out": "2026-10-05",
-            "adult_count": 4,
-            "children_count": 2,
+            "check_in": "2026-10-11",
+            "check_out": "2026-10-14",
+            "adult_count": 2,
+            "children_count": 0,
             "first_name": "Wilbert",
             "last_name": "Smith",
             "email": "smith@test.com",
@@ -90,9 +90,28 @@ extract_and_search_rooms = [
     },
 ]
 
+mutli_turn_chat = [
+    {
+        "inputs":{
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "I'd like to book September 21 to 23 for 2 adults and 1 child"
+                }
+            ]
+        },
+        "outputs": {
+            "check_in": "2026-09-21",
+            "check_out": "2026-09-23",
+            "adult_count": 2,
+            "children_count": 1
+        }
+    },
+]
+
 client = Client()
 
-dataset_name = "Customer input and date lookup 2"
+dataset_name = "Customer input and date lookup v1"
 
 dataset = client.create_dataset(
     dataset_name=dataset_name, description="Parse user inputs"

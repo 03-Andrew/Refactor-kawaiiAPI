@@ -59,7 +59,7 @@ customer_info_input = """
                       """
 
 llm  = ChatGoogleGenerativeAI(
-    model="gemini-3.7-flash",
+    model="gemini-3.1-flash-lite",
     temperature=0, 
     max_tokens=None,
     timeout=None,
@@ -101,7 +101,7 @@ def greet_user(state: BookingState):
     result = extractor.invoke([
         {
             "role": "system",
-            "content": f"""You are a friendly and helpful resort booking assistant. if the user greets you, greet them back and ask what they want to do"""
+            "content": f"""You are a friendly and helpful resort booking assistant. if the user greets you, greet them back, ask them if they want to book a room"""
         },
         {
             "role": "user",

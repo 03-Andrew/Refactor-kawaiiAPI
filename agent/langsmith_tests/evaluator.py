@@ -21,7 +21,7 @@ load_dotenv()
 
 # 1. Create and/or select your dataset
 client = Client()
-dataset_name = "Customer input and date lookup 2"
+dataset_name = "Customer input and date lookup v1"
 
 # 2. Define an evaluator
 def evaluate_extraction(outputs: dict, reference_outputs: dict) -> dict:
