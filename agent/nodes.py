@@ -154,7 +154,7 @@ def search_available_rooms(state: BookingState):
     result = extractor.invoke([
         {
             "role": "system",
-            "content": f"""Collect adult count, children count, checkin date, checkout date and desired_room_type (if the user mentioned a specific room name like 'deluxe room')
+            "content": f"""Collect adult count, children count, checkin date (first date mentoned), checkout date (first date mentoned) and desired_room_type (if the user mentioned a specific room name like 'deluxe room')
             The date today is {now.strftime("%Y-%m-%d")}, use that to calculate relative dates. 
             Check_in and check_out dates are string types with format of (YYYY-MM-DD). If not mentioned just set it to none (0 for the children count)
             validate dates first, checkin should not be after checkout, if so reask dates. If mentioned {customer_info_input}
@@ -172,6 +172,25 @@ def search_available_rooms(state: BookingState):
     email = result.email or state.get("email")
     phone_number = result.phone_number or state.get("phone_number")
 
+    check_in_date = datetime.strptime(check_in, "%Y-%m-%d") if check_in else None
+    check_out_date = datetime.strptime(check_out, "%Y-%m-%d") if check_out else None
+
+    state_results = {
+        "check_in":check_in,
+        "check_out":check_out,                   
+        "adult_count": adult_count,
+        "children_count": children_count,  
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": email,
+        "phone_number": phone_number,    
+    }
+
+    if check_in_date and check_out_date and (check_in_date > check_out_date):
+        msg = f"Dates are invalid, please provide valid dates."
+        state_results["messages"] = [AIMessage(content=msg)]
+        state_results["stage"] = 'search_available_rooms'
+        return state_results
 
     missing = []
     if not check_in: missing.append("check-in date")
@@ -182,18 +201,9 @@ def search_available_rooms(state: BookingState):
     # If anything is missing, ask for it and STOP (do not call DB)
     if missing:
         msg = f"To check availability, please provide your {', '.join(missing)}."
-        return {
-            "check_in": check_in,
-            "check_out": check_out,
-            "adult_count": adult_count,
-            "children_count": children_count,
-            "first_name": first_name,
-            "last_name": last_name,
-            "email": email,
-            "phone_number": phone_number,
-            "messages": [{"role": "assistant", "content": msg}],
-            "stage": 'search_available_rooms'
-        }
+        state_results["messages"] = [AIMessage(content=msg)]
+        state_results["stage"] = 'search_available_rooms'
+        return state_results
 
 
     rooms = get_room_type_availability(
@@ -205,19 +215,9 @@ def search_available_rooms(state: BookingState):
 
     if not rooms:
         msg = f"Sorry, there are no available rooms between {check_in} and {check_out}."
-        return {
-            "check_in": check_in,
-            "check_out": check_out,
-            "adult_count": adult_count,
-            "children_count": children_count,
-            "first_name": first_name,
-            "last_name": last_name,
-            "email": email,
-            "phone_number": phone_number,
-            "messages": [{"role": "assistant", "content": msg}],
-            "stage": 'search_available_rooms'
-
-        }
+        state_results["messages"] = [AIMessage(content=msg)]
+        state_results["stage"] = 'search_available_rooms'
+        return state_results
 
     if result.desired_room_type:
         desired = result.desired_room_type.lower()
@@ -230,39 +230,22 @@ def search_available_rooms(state: BookingState):
                     f"**{matched_room['name']} is available!** (₱{matched_room['price']:,.2f} / night)\n\n"                                                                                                                     
                     f"Would you like to **hold** this room for 10 minutes, or add more rooms?"                                                                                                                                  
                 )
-            
-            return {                                                                                                                                                                                                        
-                    "check_in": check_in,                                                                                                                                                                                       
-                    "check_out": check_out,                                                                                                                                                                                     
-                    "adult_count": adult_count,                                                                                                                                                                                 
-                    "children_count": children_count,  
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "email": email,
-                    "phone_number": phone_number,                                                                                                                                                                         
-                    "room_type_ids": [matched_room["id"]],   # <--- Stored in state                                                                                                                                             
-                    "messages": [AIMessage(content=msg)],                                                                                                                                                                       
-                    "stage": "select_and_hold_rooms"         # <--- Advances to lock node                                                                                                                                       
-                }  
+            state_results["messages"] = [AIMessage(content=msg)]
+            state_results["stage"] = 'select_and_hold_rooms'
+            state_results["room_type_ids"] = [matched_room["id"]]
+            return state_results
+        
         else:     
             msg = (                                                                                                                                                                                                         
                 f"Sorry, **{result.desired_room_type}** is not available for your selected dates.\n"                                                                                                                        
                 f"Here are the rooms that are available:\n"                                                                                                                                                                 
                 + "\n".join([f"• **{r['name']}** (₱{r['price']:,.2f})" for r in rooms])                                                                                                                                     
                 + "\n\nWhich room would you like to reserve instead?"                                                                                                                                                       
-            )                                                                                                                                                                                                               
-            return {                                                                                                                                                                                                        
-                "check_in": check_in,                                                                                                                                                                                       
-                "check_out": check_out,                                                                                                                                                                                     
-                "adult_count": adult_count,                                                                                                                                                                                 
-                "children_count": children_count, 
-                "first_name": first_name,
-                "last_name": last_name,
-                "email": email,
-                "phone_number": phone_number,                                                                                                                                                                          
-                "messages": [AIMessage(content=msg)],                                                                                                                                                                       
-                "stage": "search_available_rooms"                                                                                                                                                                           
-            }         
+            )
+            state_results["messages"] = [AIMessage(content=msg)]
+            state_results["stage"] = 'search_available_rooms'
+            return state_results
+                                                                                                                                                                                                                     
 
     guest_summary = f"{adult_count} adult{'s' if adult_count > 1 else ''}"
     if children_count:
@@ -281,19 +264,10 @@ def search_available_rooms(state: BookingState):
     lines.append("\nWhich room type would you like to reserve?")
     reply_msg = "\n".join(lines)
 
-    return {
-        "check_in": check_in,
-        "check_out": check_out,
-        "adult_count": adult_count,
-        "children_count": children_count,
-        "first_name": first_name,
-        "last_name": last_name,
-        "email": email,
-        "phone_number": phone_number,
-        "room_types_to_display": [r["id"] for r in rooms],
-        "messages": [AIMessage(content=reply_msg)],
-        "stage": 'select_and_hold_rooms'
-    }
+    state_results["messages"] = [AIMessage(content=reply_msg)]
+    state_results["stage"] = 'select_and_hold_rooms'
+    state_results["room_types_to_display"] = [r["id"] for r in rooms]
+    return state_results
 
 
 @traceable
@@ -505,8 +479,6 @@ def collect_customer_info(state: BookingState):
             "messages": [AIMessage(content=msg)],
             "stage": "collect_customer_info"
         }   
-
-    print(state)
 
     return {
         "first_name": first_name,
