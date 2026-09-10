@@ -4,14 +4,16 @@ from langchain_unstructured import UnstructuredLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
+from pathlib import Path
 
 load_dotenv()
 
 embeddings = OpenAIEmbeddings(
     model="text-embedding-3-small"
 )
+dir_path = Path("agent") /  "rag" 
+pdf_path = dir_path / "resort_policies.pdf"
 
-pdf_path = "agent/rag/resort_policies.pdf"
 
 
 if not os.path.exists(pdf_path):
@@ -36,8 +38,7 @@ text_splitter = RecursiveCharacterTextSplitter(
 
 pages_split = text_splitter.split_documents(pages)
 
-# persist_dir = r"C:\Users\Lenovo\Documents\Andrew\Refactor_proj\Refactor-kawaiiAPI\agent\rag"
-persist_dir = "./agent/rag/chroma"
+persist_dir = dir_path / "chroma"
 collection_name = "policy"
 
 

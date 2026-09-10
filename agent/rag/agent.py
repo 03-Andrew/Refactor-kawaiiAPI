@@ -12,7 +12,7 @@ from md_loader import vectorstore
 load_dotenv()
 
 llm  = ChatOpenAI(
-    model="gpt-5-nano",
+    model="gpt-4o-mini",
     temperature=0, 
     max_retries=2,    
 )
