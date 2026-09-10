@@ -11,3 +11,4 @@ md_drafts/
 *.tfstate.backup
 .terraform.lock.hcl 
 *.tfvars
+chroma
