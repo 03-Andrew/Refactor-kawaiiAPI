@@ -33,8 +33,10 @@ from agent.states import BookingState
 from agent.nodes import (
     select_and_hold_rooms, search_available_rooms, collect_boat_transfer, 
     collect_customer_info, greet_user, cancel_booking,
-    confirm_booking, book, route_booking_confirmation, await_payment, room_inquiry, classify_intent
+    confirm_booking, book, route_booking_confirmation, await_payment, classify_intent
 )
+
+from rag.agent import embed_and_retrieve_documents, call_llm
 
 def route_room_selection(state: BookingState):
     print("RUNNING route_room_selection")
@@ -75,8 +77,8 @@ def route_classified_intent(state: BookingState):
     intent = state.get("intent")                                                                                                                                                                                            
     if intent == "book":                                                                                                                                                                                                    
         return "search_available_rooms"                                                                                                                                                                                     
-    elif intent == "room_inquiry":                                                                                                                                                                                          
-        return "room_inquiry"                                                                                                                                                                                               
+    elif intent == "rag_node":                                                                                                                                                                                          
+        return "rag_node"                                                                                                                                                                                               
     return "greet"                                                                                                                                                                                                          
                           
 
@@ -84,7 +86,8 @@ def route_classified_intent(state: BookingState):
 graph = StateGraph(BookingState)
 
 graph.add_node('classify_intent', classify_intent)
-graph.add_node('room_inquiry', room_inquiry)
+graph.add_node("rag_node", embed_and_retrieve_documents)
+graph.add_node("rag_llm", call_llm)
 graph.add_node('greet', greet_user)
 graph.add_node('search_available_rooms', search_available_rooms)
 graph.add_node('select_and_hold_rooms', select_and_hold_rooms)
@@ -109,17 +112,20 @@ graph.add_conditional_edges(
     }
 )
 
+
+
 graph.add_conditional_edges(
     'classify_intent',
     route_classified_intent,
     {                                                                                                                                                                                                                       
         'search_available_rooms': 'search_available_rooms',                                                                                                                                                                 
-        'room_inquiry': 'room_inquiry',                                                                                                                                                                                     
+        'rag_node': 'rag_node',                                                                                                                                                                                     
         'greet': 'greet',                                                                                                                                                                                                   
     }     
 )
 
-graph.add_edge('room_inquiry', END)
+graph.add_edge("rag_node", "rag_llm")
+graph.add_edge('rag_llm', END)
 graph.add_edge('greet', END)
 graph.add_edge('search_available_rooms', END)
 graph.add_edge('select_and_hold_rooms', END)

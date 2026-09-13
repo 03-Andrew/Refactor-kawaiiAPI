@@ -84,7 +84,7 @@ def classify_intent(state: BookingState):
         {                                                                                                                                                                                                                   
             "role": "system",                                                                                                                                                                                               
             "content": "Classify the user's intent: 'book' (wants to book, check availability, or gave dates/guest counts), "                                                                                               
-                       "'room_inquiry' (asking about room types, prices, amenities, details), or 'greet' (general greeting/chat)."                                                                                          
+                       "'rag_node' (asking about room types, prices, amenities, details), or 'greet' (general greeting/chat)."                                                                                          
         },                                                                                                                                                                                                                  
         {"role": "user", "content": user_input}                                                                                                                                                                             
     ])                                                                                                                                                                                                                      
@@ -121,28 +121,28 @@ def greet_user(state: BookingState):
         "room_types_to_display": getattr(result, "room_types_to_display", []),
     }
 
-@traceable                                                                                                                                                                                                                  
-def room_inquiry(state: BookingState):                                                                                                                                                                                      
-    """Answers user inquiries specifically about room details, prices, and amenities."""                                                                                                                                    
-    room_data = get_room_types()                                                                                                                                                                                            
-    last_message = state['messages'][-1]                                                                                                                                                                                    
-    user_input = getattr(last_message, 'content', str(last_message))                                                                                                                                                        
+# @traceable                                                                                                                                                                                                                  
+# def room_inquiry(state: BookingState):                                                                                                                                                                                      
+#     """Answers user inquiries specifically about room details, prices, and amenities."""                                                                                                                                    
+#     room_data = get_room_types()                                                                                                                                                                                            
+#     last_message = state['messages'][-1]                                                                                                                                                                                    
+#     user_input = getattr(last_message, 'content', str(last_message))                                                                                                                                                        
                                                                                                                                                                                                                             
-    prompt = [                                                                                                                                                                                                              
-        {                                                                                                                                                                                                                   
-            "role": "system",                                                                                                                                                                                               
-            "content": f"""You are a helpful resort assistant. Answer the guest's questions about our room types using this catalog: {room_data}.                                                                           
-            Be friendly, clear, and concise. Highlight amenities and prices when relevant.                                                                                                                                  
-            Invite them to provide their dates and guest count if they'd like to check availability or book.                                                                                                                
-            {FORMATTING_PROMPT}"""                                                                                                                                                                                          
-        },                                                                                                                                                                                                                  
-        *get_recent_messages(state, window_size=4)                                                                                                                                                                          
-    ]                                                                                                                                                                                                                       
-    reply = llm.invoke(prompt)                                                                                                                                                                                              
-    return {                                                                                                                                                                                                                
-        "messages": [AIMessage(content=reply.content)],                                                                                                                                                                     
-        "stage": "greet"                                                                                                                                                                                                    
-    }                       
+#     prompt = [                                                                                                                                                                                                              
+#         {                                                                                                                                                                                                                   
+#             "role": "system",                                                                                                                                                                                               
+#             "content": f"""You are a helpful resort assistant. Answer the guest's questions about our room types using this catalog: {room_data}.                                                                           
+#             Be friendly, clear, and concise. Highlight amenities and prices when relevant.                                                                                                                                  
+#             Invite them to provide their dates and guest count if they'd like to check availability or book.                                                                                                                
+#             {FORMATTING_PROMPT}"""                                                                                                                                                                                          
+#         },                                                                                                                                                                                                                  
+#         *get_recent_messages(state, window_size=4)                                                                                                                                                                          
+#     ]                                                                                                                                                                                                                       
+#     reply = llm.invoke(prompt)                                                                                                                                                                                              
+#     return {                                                                                                                                                                                                                
+#         "messages": [AIMessage(content=reply.content)],                                                                                                                                                                     
+#         "stage": "greet"                                                                                                                                                                                                    
+#     }                       
 
 @traceable
 def search_available_rooms(state: BookingState):
