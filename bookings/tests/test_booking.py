@@ -753,6 +753,13 @@ class FetchAvailableRoomsTests(BookingTestBase):
 
     def test_fetch_available_rooms_limited_inventory_triggers_pair_with_other_rooms(self):
         """Edge Case 2: Available rooms exist but are fewer than suggested -> pair_with_other_rooms is True."""
+        other_room_type = RoomType.objects.create(
+            name="Deluxe Room",
+            price=4500.00,
+            good_for=4,
+            max_extra_guest=1
+        )
+        Room.objects.create(number="201", type=other_room_type, status=RoomStatus.AVAILABLE)
         customer = Customer.objects.create(
             first_name="Existing",
             last_name="Guest",
@@ -781,13 +788,14 @@ class FetchAvailableRoomsTests(BookingTestBase):
         response = RoomTypesListView.as_view()(request)
 
         self.assertEqual(response.status_code, 200)
-        room_type_data = response.data[0]
-        self.assertEqual(room_type_data['total_rooms'], 5)
-        self.assertEqual(room_type_data['booked_rooms'], 4)
-        self.assertEqual(room_type_data['available_rooms'], 1)
-        self.assertEqual(room_type_data['suggested_number_of_rooms_to_book'], 2)
+        test_room_data = [r for r in response.data if r['id'] == self.room_type.id][0]
+        # room_type_data = response.data[0]
+        self.assertEqual(test_room_data['total_rooms'], 5)
+        self.assertEqual(test_room_data['booked_rooms'], 4)
+        self.assertEqual(test_room_data['available_rooms'], 1)
+        self.assertEqual(test_room_data['suggested_number_of_rooms_to_book'], 2)
         # 0 < available (1) < suggested (2) -> triggers pair_with_other_rooms
-        self.assertTrue(room_type_data['pair_with_other_rooms'])
+        self.assertTrue(test_room_data['pair_with_other_rooms'])
 
     def test_fetch_available_rooms_missing_and_invalid_guest_count(self):
         """Edge Case 3: Missing guest_count safely defaults to 1; invalid guest_count returns 400."""

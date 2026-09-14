@@ -22,11 +22,8 @@ from langchain_core.documents import Document
 class BookingState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     intent: Literal["book", "greet", "rag_node"] = "greet"
-
-    documents: List[Document]
     rag_answer: str
-
-
+    
     stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking", "await_payment"] = "greet"
     billing_id: int | None = None
     check_in: date | None = None
