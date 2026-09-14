@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import sys
+from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from typing import Annotated, Literal
 from typing_extensions import TypedDict, List
@@ -58,11 +59,18 @@ customer_info_input = """
                         If a field is not mentioned in the input, leave it as null/None.
                       """
 
-llm  = ChatGoogleGenerativeAI(
+llm_classifier  = ChatGoogleGenerativeAI(
     model="gemini-3.1-flash-lite",
     temperature=0, 
     max_tokens=None,
     timeout=None,
+    max_retries=2,    
+)
+
+
+llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    temperature=0, 
     max_retries=2,    
 )
 
@@ -73,22 +81,38 @@ FORMATTING_PROMPT = """
                     - Do not use markdown tables; use bullet lists instead.
                     """
 
-@traceable                                                                                                                                                                                                                  
+@traceable                                                                                                                                                                                   
 def classify_intent(state: BookingState):                                                                                                                                                                                   
-    """Quickly classifies user intent at the start of a conversation."""                                                                                                                                                    
-    last_message = state['messages'][-1]                                                                                                                                                                                    
-    user_input = getattr(last_message, 'content', str(last_message))                                                                                                                                                        
-                                                                                                                                                                                                                            
+    """Quickly classifies user intent considering current stage and conversation context."""                                                                                                                                                    
+    messages = state.get('messages', [])
+    last_message = messages[-1] if messages else ""
+    user_input = getattr(last_message, 'content', str(last_message))
+    stage = state.get('stage') or 'greet'
+
+    # Get the previous assistant prompt if available for context
+    last_bot_prompt = ""
+    for msg in reversed(messages[:-1]):
+        if isinstance(msg, AIMessage) or (isinstance(msg, dict) and msg.get('role') == 'assistant'):
+            last_bot_prompt = getattr(msg, 'content', str(msg))
+            break
+
     classifier = llm.with_structured_output(IntentClassification)                                                                                                                                                           
-    result = classifier.invoke([                                                                                                                                                                                            
-        {                                                                                                                                                                                                                   
-            "role": "system",                                                                                                                                                                                               
-            "content": "Classify the user's intent: 'book' (wants to book, check availability, or gave dates/guest counts), "                                                                                               
-                       "'rag_node' (asking about room types, prices, amenities, details), or 'greet' (general greeting/chat)."                                                                                          
-        },                                                                                                                                                                                                                  
-        {"role": "user", "content": user_input}                                                                                                                                                                             
-    ])                                                                                                                                                                                                                      
-                                                                                                                                                                                                                            
+    result = classifier.invoke([
+        {
+            "role": "system",
+            "content": (
+                f"Classify user intent for a resort booking bot.\n"
+                f"Stage: '{stage}' | Last bot prompt: '{last_bot_prompt}'\n\n"
+                "Categories:\n"
+                "- 'book': Booking details, dates, or directly answering the stage prompt (e.g. room name, contact info, yes/no).\n"
+                "- 'rag_node': User is ASKING a question (policies, amenities, rules, prices).\n"
+                "- 'greet': Pleasantries or hello.\n\n"
+                "Rule: Answering the bot prompt is always 'book'. Asking a question is 'rag_node'."
+            )
+        },
+        {"role": "user", "content": user_input}
+    ])                                                                                                                                                                                                                  
+                                                                                                                                                                                             
     return {"intent": result.intent} 
 
 @traceable
@@ -119,30 +143,7 @@ def greet_user(state: BookingState):
         "messages": [{"role": "assistant", "content": result.message}],
         "stage": result.stage,
         "room_types_to_display": getattr(result, "room_types_to_display", []),
-    }
-
-# @traceable                                                                                                                                                                                                                  
-# def room_inquiry(state: BookingState):                                                                                                                                                                                      
-#     """Answers user inquiries specifically about room details, prices, and amenities."""                                                                                                                                    
-#     room_data = get_room_types()                                                                                                                                                                                            
-#     last_message = state['messages'][-1]                                                                                                                                                                                    
-#     user_input = getattr(last_message, 'content', str(last_message))                                                                                                                                                        
-                                                                                                                                                                                                                            
-#     prompt = [                                                                                                                                                                                                              
-#         {                                                                                                                                                                                                                   
-#             "role": "system",                                                                                                                                                                                               
-#             "content": f"""You are a helpful resort assistant. Answer the guest's questions about our room types using this catalog: {room_data}.                                                                           
-#             Be friendly, clear, and concise. Highlight amenities and prices when relevant.                                                                                                                                  
-#             Invite them to provide their dates and guest count if they'd like to check availability or book.                                                                                                                
-#             {FORMATTING_PROMPT}"""                                                                                                                                                                                          
-#         },                                                                                                                                                                                                                  
-#         *get_recent_messages(state, window_size=4)                                                                                                                                                                          
-#     ]                                                                                                                                                                                                                       
-#     reply = llm.invoke(prompt)                                                                                                                                                                                              
-#     return {                                                                                                                                                                                                                
-#         "messages": [AIMessage(content=reply.content)],                                                                                                                                                                     
-#         "stage": "greet"                                                                                                                                                                                                    
-#     }                       
+    }          
 
 @traceable
 def search_available_rooms(state: BookingState):

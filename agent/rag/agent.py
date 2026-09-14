@@ -7,7 +7,6 @@ from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 from .md_loader import vectorstore, embeddings
 
-                                                                                                                                                                                      
 import sys
 from pathlib import Path
   
@@ -15,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
   
 from agent.states import BookingState as State
+from langchain.tools import tool
 
 load_dotenv()
 
@@ -24,22 +24,14 @@ llm = ChatOpenAI(
     max_retries=2,    
 )
 
-def embed_and_retrieve_documents(state: State):
-    """Step 2: Retrieval node - Retrieve chunks from ChromaDB using the embedding"""
-    question = state["messages"][-1].content
-
-    print(f"\n[Embedder] Embedding query: '{question}'")
-    query_embedding = embeddings.embed_query(question)
-
-    docs = vectorstore.similarity_search_by_vector(query_embedding, k=6)
-    print(f"[Retrieval] Retrieved {len(docs)} documents")
-    return {"documents": docs}
-
-
-def call_llm(state: State):
+def rag_node(state: State):
     """Step 3: LLM node - Generate answer grounded in the retrieved context"""
     question = state["messages"][-1].content
-    docs = state.get("documents", [])
+    print(f"\n[Embedder] Embedding query: '{question}'")
+
+    query_embedding = embeddings.embed_query(question)
+    docs = vectorstore.similarity_search_by_vector(query_embedding, k=4)
+
 
     context_text = "\n\n".join(
         [f"--- Match {i+1} ---\n{doc.page_content}" for i, doc in enumerate(docs)]
@@ -54,26 +46,33 @@ def call_llm(state: State):
         Retrieved Context:
         {context_text}"""
 
+    current_stage = state.get("stage")
+    stage_reminders = {
+         "search_available_rooms": "\n*(Regarding your reservation: Please enter check in and check out dates with the count of children and adult guests to view booking)*",
+         "select_and_hold_rooms": "\n*(Regarding your reservation: Which room type would you like to select?)*",
+         "collect_customer_info": "\n*(Regarding your reservation: Please provide your name, email, and phone number to continue.)*",
+         "collect_boat_transfer": "\n*(Regarding your reservation: Would you like to avail of our scheduled boat transfer?)*",
+    }
+    reminder = stage_reminders.get(current_stage, "greet")   
+
     messages = [
         SystemMessage(content=system_prompt),
         HumanMessage(content=question)
     ]
     response = llm.invoke(messages)
-    
+    final_content = f"{response.content}{reminder}"                                                                                                                               
     return {
-        "messages": [response],
-        "rag_answer": response.content
+        "messages": [AIMessage(content=final_content)],
+        "rag_answer": response.content,
+        "stage": current_stage
     }
-
 
 # Construct direct RAG Graph: query -> embedder -> retrieval -> llm -> END
 graph = StateGraph(State)
-graph.add_node("embed_and_retrieval", embed_and_retrieve_documents)
-graph.add_node("llm", call_llm)
+graph.add_node("rag_node", rag_node)
 
-graph.set_entry_point("embed_and_retrieval")
-graph.add_edge("embed_and_retrieval", "llm")
-graph.add_edge("llm", END)
+graph.set_entry_point("rag_node")
+graph.add_edge("rag_node", END)
 
 app = graph.compile()
 

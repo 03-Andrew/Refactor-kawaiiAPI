@@ -36,7 +36,7 @@ from agent.nodes import (
     confirm_booking, book, route_booking_confirmation, await_payment, classify_intent
 )
 
-from rag.agent import embed_and_retrieve_documents, call_llm
+from agent.rag.agent import rag_node
 
 def route_room_selection(state: BookingState):
     print("RUNNING route_room_selection")
@@ -49,7 +49,7 @@ def route_room_selection(state: BookingState):
     return "error"
 
 def route_stage(state: BookingState):
-    stage = state.get('stage') or 'greet'                                                                                                         
+    stage = state.get('stage') or 'greet'
 
     if stage == 'greet':                                                                                                                                                                                                    
         return 'classify_intent'             
@@ -75,19 +75,16 @@ def route_greet(state: BookingState):
 
 def route_classified_intent(state: BookingState):                                                                                                                                                                           
     intent = state.get("intent")                                                                                                                                                                                            
-    if intent == "book":                                                                                                                                                                                                    
-        return "search_available_rooms"                                                                                                                                                                                     
-    elif intent == "rag_node":                                                                                                                                                                                          
-        return "rag_node"                                                                                                                                                                                               
-    return "greet"                                                                                                                                                                                                          
-                          
+    if intent == "rag_node":                                                                                                                                                                                          
+        return "rag_node"    
+                                                                                                                                                                                               
+    return state.get("stage") or "greet"                                                                                                                                                                                                          
 
 
 graph = StateGraph(BookingState)
 
 graph.add_node('classify_intent', classify_intent)
-graph.add_node("rag_node", embed_and_retrieve_documents)
-graph.add_node("rag_llm", call_llm)
+graph.add_node("rag_node", rag_node)
 graph.add_node('greet', greet_user)
 graph.add_node('search_available_rooms', search_available_rooms)
 graph.add_node('select_and_hold_rooms', select_and_hold_rooms)
@@ -98,11 +95,13 @@ graph.add_node('book', book)
 graph.add_node('cancel_booking', cancel_booking)
 graph.add_node('await_payment', await_payment)
 
+graph.add_edge(START, 'classify_intent')
 graph.add_conditional_edges(
-    START,
-    route_stage,
+    'classify_intent',
+    route_classified_intent,
     {
-        'classify_intent': 'classify_intent',
+        'rag_node': 'rag_node',
+        'greet': 'greet',                                                                                                                                                                       
         'search_available_rooms': 'search_available_rooms',
         'select_and_hold_rooms': 'select_and_hold_rooms',
         'collect_customer_info': 'collect_customer_info',
@@ -111,21 +110,15 @@ graph.add_conditional_edges(
         'await_payment': 'await_payment',
     }
 )
-
-
-
 graph.add_conditional_edges(
-    'classify_intent',
-    route_classified_intent,
-    {                                                                                                                                                                                                                       
-        'search_available_rooms': 'search_available_rooms',                                                                                                                                                                 
-        'rag_node': 'rag_node',                                                                                                                                                                                     
-        'greet': 'greet',                                                                                                                                                                                                   
-    }     
+    'greet',
+    route_greet,
+    {
+        'search_available_rooms': 'search_available_rooms',
+        END: END
+    }
 )
-
-graph.add_edge("rag_node", "rag_llm")
-graph.add_edge('rag_llm', END)
+graph.add_edge('rag_node', END)
 graph.add_edge('greet', END)
 graph.add_edge('search_available_rooms', END)
 graph.add_edge('select_and_hold_rooms', END)

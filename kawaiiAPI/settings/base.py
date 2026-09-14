@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'paymongo',
     'reports',
     'agent',
+
+    'silk',
 ]
 
 
@@ -55,6 +57,7 @@ CORS_ALLOW_HEADERS = (
 )
 
 MIDDLEWARE = [
+    'silk.middleware.SilkyMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -237,7 +240,7 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '20/minute',
+        'anon': '50/minute',
         'user': '100/minute',
     },
 }
