@@ -88,7 +88,7 @@ START
 | **Concurrency & Async** | Redis, Celery (PayMongo webhooks, email dispatch) |
 | **Database & Cache** | PostgreSQL (AWS RDS), SQLite (dev), Redis Key-Value TTL Cache |
 | **Payments** | PayMongo API (Payment Intents, Webhooks, HMAC verification) |
-| **Infrastructure & DevOps** | Docker, Docker Compose, AWS EC2, AWS VPC, AWS RDS, Nginx |
+| **Infrastructure & DevOps** | Terraform (IaC), Docker, Docker Compose, AWS EC2, AWS VPC, AWS RDS, Nginx |
 | **Authentication & Docs** | SimpleJWT, drf-spectacular (OpenAPI 3.0 / Swagger / ReDoc) |
 
 ---
@@ -108,6 +108,11 @@ START
 ├── bookings/               # Room inventory, availability services & reservations
 │   ├── services/           # Decoupled business logic (locking, search, checkout)
 │   └── models.py           # Room, RoomType, Booking models
+├── infra/                  # Terraform Infrastructure as Code (AWS VPC, EC2, RDS PostgreSQL, SGs)
+│   ├── vpc.tf              # AWS VPC, public/private subnets, internet gateway
+│   ├── ec2.tf              # EC2 application instance provisioning
+│   ├── rds.tf              # AWS RDS PostgreSQL instance & subnet group
+│   └── sg.tf               # Security groups & ingress/egress rules
 ├── transactions/           # Billing, guest records, food orders, additional charges
 ├── receptionist/           # Front-desk reservation endpoints, check-in flows
 ├── paymongo/               # PayMongo integration, payment links, Celery webhooks
