@@ -100,7 +100,11 @@ START
 │   ├── agent2.py           # Active LangGraph state graph definition
 │   ├── nodes.py            # Graph node implementations & routing logic
 │   ├── states.py           # Pydantic schemas & TypedDict BookingState
-│   └── views.py            # Chat API endpoint invoking the compiled graph
+│   ├── views.py            # Chat API endpoint invoking the compiled graph
+│   └── rag/                # RAG knowledge base & policy retrieval system
+│       ├── agent.py        # RAG query execution & vector search pipeline
+│       ├── md_loader.py    # Markdown header chunking & ChromaDB vector ingestion
+│       └── resort_policies.md # Mock policy & FAQ knowledge base (used for testing only)
 ├── bookings/               # Room inventory, availability services & reservations
 │   ├── services/           # Decoupled business logic (locking, search, checkout)
 │   └── models.py           # Room, RoomType, Booking models
