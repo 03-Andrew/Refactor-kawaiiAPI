@@ -17,11 +17,13 @@ from datetime import date, datetime
 from collections import Counter
 import json
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, AnyMessage
+from langchain_core.documents import Document
 
 class BookingState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
-    intent: Literal["book", "greet", "room_inquiry"] = "greet"
-
+    intent: Literal["book", "greet", "rag_node"] = "greet"
+    rag_answer: str
+    
     stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking", "await_payment"] = "greet"
     billing_id: int | None = None
     check_in: date | None = None
@@ -50,10 +52,10 @@ class BookingState(TypedDict):
     room_types_to_display: list[int] = []
 
 class IntentClassification(BaseModel):                                                                                                                                                                                      
-    intent: Literal["book", "greet", "room_inquiry"] = Field(                                                                                                                                                               
+    intent: Literal["book", "greet", "rag_node"] = Field(                                                                                                                                                               
     description=(                                                                                                                                                                                                       
         "'book' if user wants to reserve, check dates/availability, or provided dates/guests; "                                                                                                                         
-        "'room_inquiry' if user is asking about rooms, amenities, prices, or descriptions; "                                                                                                                            
+        "'rag_node' if user is asking about policies or any FaQ; "                                                                                                                            
         "'greet' if user is just saying hello or asking general assistance."                                                                                                                                            
             )                                                                                                                                                                                                                   
         )    

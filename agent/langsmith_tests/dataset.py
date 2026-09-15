@@ -212,6 +212,181 @@ multi_turn_chat = [
     }
 ]
 
+stage_and_intent_cases = [
+    # 1. Pure Greetings
+    {
+        "inputs": {
+            "messages": ["Hello! Good morning."]
+        },
+        "outputs": {
+            "intent": "greet",
+            "stage": "greet"
+        }
+    },
+    {
+        "inputs": {
+            "messages": ["Hi there, I have a few questions"]
+        },
+        "outputs": {
+            "intent": "greet",
+            "stage": "greet"
+        }
+    },
+
+    # 2. Pure FAQ / Policy at START
+    {
+        "inputs": {
+            "messages": ["What is your cancellation and refund policy?"]
+        },
+        "outputs": {
+            "intent": "rag_node",
+            "stage": "greet"
+        }
+    },
+    {
+        "inputs": {
+            "messages": ["Are pets allowed in the resort?"]
+        },
+        "outputs": {
+            "intent": "rag_node",
+            "stage": "greet"
+        }
+    },
+    {
+        "inputs": {
+            "messages": ["How much is the cheapest room per night?"]
+        },
+        "outputs": {
+            "intent": "rag_node",
+            "stage": "greet"
+        }
+    },
+    {
+        "inputs": {
+            "messages": ["Can we bring our own alcoholic drinks? How much is corkage?"]
+        },
+        "outputs": {
+            "intent": "rag_node",
+            "stage": "greet"
+        }
+    },
+    {
+        "inputs": {
+            "messages": ["What time is standard check in and check out?"]
+        },
+        "outputs": {
+            "intent": "rag_node",
+            "stage": "greet"
+        }
+    },
+
+    # 3. Direct Booking Intent at START
+    {
+        "inputs": {
+            "messages": ["I'd like to book a room for 2 adults from October 10 to 12"]
+        },
+        "outputs": {
+            "intent": "book",
+            "stage": "select_and_hold_rooms"
+        }
+    },
+
+    # 4. Mid-Flow FAQ Interruption during Boat Transfer Stage
+    {
+        "inputs": {
+            "messages": [
+                "I want to book for 2 adults this October 20 to 22",
+                "I'll take the Deluxe room",
+                "hold",
+                "Wilbert Smith, wilbert@gmail.com, 09171234567",
+                "Wait, can I bring my dog to the resort?"
+            ]
+        },
+        "outputs": {
+            "intent": "rag_node",
+            "stage": "collect_boat_transfer"
+        }
+    },
+    {
+        "inputs": {
+            "messages": [
+                "Book 2 adults from October 20 to 22",
+                "Deluxe room",
+                "hold",
+                "Wilbert Smith, wilbert@gmail.com, 09171234567",
+                "Is boat transfer free for Deluxe rooms?"
+            ]
+        },
+        "outputs": {
+            "intent": "rag_node",
+            "stage": "collect_boat_transfer"
+        }
+    },
+
+    # 5. Normal Stage Answer during Boat Transfer (Must NOT be flagged as FAQ)
+    {
+        "inputs": {
+            "messages": [
+                "Book 2 adults from October 20 to 22",
+                "Deluxe room",
+                "hold",
+                "Wilbert Smith, wilbert@gmail.com, 09171234567",
+                "Yes, please schedule it for 8 AM"
+            ]
+        },
+        "outputs": {
+            "intent": "book",
+            "stage": "confirm_booking"
+        }
+    },
+    {
+        "inputs": {
+            "messages": [
+                "Book 2 adults from October 20 to 22",
+                "Deluxe room",
+                "hold",
+                "Wilbert Smith, wilbert@gmail.com, 09171234567",
+                "No"
+            ]
+        },
+        "outputs": {
+            "intent": "book",
+            "stage": "confirm_booking"
+        }
+    },
+
+    # 6. Mid-Flow FAQ Interruption during Room Selection Stage
+    {
+        "inputs": {
+            "messages": [
+                "I need a room for 4 adults from November 1 to November 3",
+                "What amenities are included in the Family Room?"
+            ]
+        },
+        "outputs": {
+            "intent": "rag_node",
+            "stage": "select_and_hold_rooms"
+        }
+    },
+
+    # 7. Mid-Flow FAQ Interruption during Customer Info Stage
+    {
+        "inputs": {
+            "messages": [
+                "I need a room for 2 adults from October 15 to 17",
+                "Deluxe Room",
+                "hold",
+                "Do you have high speed WiFi in the rooms?"
+            ]
+        },
+        "outputs": {
+            "intent": "rag_node",
+            "stage": "collect_customer_info"
+        }
+    },
+
+]
+
 client = Client()
 
 def upload_datasets():
@@ -244,6 +419,21 @@ def upload_datasets():
         print(f"Created multi-turn dataset: {multi_turn_name}")
     else:
         print(f"Dataset '{multi_turn_name}' already exists.")
+
+    # 3. Stage and Intent check dataset
+    stage_intent_name = "Customer stage and intent check v1"
+    if not client.has_dataset(dataset_name=stage_intent_name):
+        ds3 = client.create_dataset(
+            dataset_name=stage_intent_name,
+            description="Evaluate intent classification and stage persistence across greetings, FAQs, and booking stages"
+        )
+        client.create_examples(
+            dataset_id=ds3.id,
+            examples=stage_and_intent_cases
+        )
+        print(f"Created stage and intent dataset: {stage_intent_name}")
+    else:
+        print(f"Dataset '{stage_intent_name}' already exists.")
 
 if __name__ == "__main__":
     upload_datasets()
