@@ -1,6 +1,6 @@
 # Resort Booking Platform: Backend Overhaul & AI Reservation System
 
-> Comprehensive backend refactoring, query optimization, and conversational AI booking layer for high-concurrency resort reservations.
+> Comprehensive backend refactoring, query optimization, and conversational AI booking layer
 
 ---
 
