@@ -85,66 +85,17 @@ All rates and fees in this document are quoted in Philippine Peso (PHP) and are 
 
 ---
 
-### Oceanfront Pool Villa
-
-- **Rate:** PHP 12,000 per night
-- **Standard occupancy:** 4 guests
-- **Maximum extra guests:** 1 guest (PHP 1,500 per night extra charge)
-- **Maximum total occupancy:** 5 guests
-- **View:** Unobstructed Oceanfront view
-- **Beds:** One King Bed and Two Single Beds
-- **Description:** Exclusive standalone villa featuring a private plunge pool, outdoor sun deck, and dedicated butler assistance.
-
-**Included in Oceanfront Pool Villa:**
-- Private 15-sqm Plunge Pool & Sun Loungers
-- Air Conditioning in all rooms
-- 65-inch OLED Smart TV with Soundbar
-- Complimentary High-Speed Fiber WiFi
-- Luxury En-Suite Bathroom with Freestanding Bathtub & Outdoor Rain Shower
-- Luxury Organic Toiletries & Plush Bathrobes
-- Fully Stocked Welcome Mini Bar (Complimentary on 1st night)
-- Premium Espresso Machine & Artisanal Teas
-- Daily Breakfast Buffet for 4 registered guests
-- Dedicated Butler Service (8:00 AM – 8:00 PM)
-- Complimentary Roundtrip Boat Transfer for 4 guests
-
----
-
-### Presidential Suite
-
-- **Rate:** PHP 18,000 per night
-- **Standard occupancy:** 4 guests
-- **Maximum extra guests:** 2 guests (PHP 1,500 per night per extra guest)
-- **Maximum total occupancy:** 6 guests
-- **View:** Panoramic 180-degree ocean and sunset view
-- **Beds:** Two Master King Bedrooms
-- **Description:** Top-floor luxury penthouse with separate living room, dining area, private jacuzzi, and panoramic terrace.
-
-**Included in Presidential Suite:**
-- Private Outdoor Heated Jacuzzi
-- Large Living Room & 8-Seater Dining Area
-- Two Master Bathrooms with Marble Bathtubs
-- In-Suite Wine Chiller
-- Daily Breakfast Buffet for all registered guests
-- Unlimited Complimentary Laundry Service (up to 5 kg/day)
-- Complimentary Roundtrip Airport & Boat Transfers for up to 6 guests
-- Priority Reservations at Resort Restaurants & Spa
-
----
-
 ## 3. Extra Guest Policy and Additional Charges
 
 1. **Extra Guest Fee:** 
    - The fee for an additional guest is **PHP 1,500 per person per night**.
    - This fee covers a rollaway bed or mattress setup, complete linen and towel set, toiletries kit, and access to resort facilities.
-   - For room types where breakfast is included (Family Room, Oceanfront Villa, Presidential Suite), the extra guest fee **includes daily breakfast buffet**.
+   - For room types where breakfast is included (Family Room), the extra guest fee **includes daily breakfast buffet**.
 2. **Occupancy Limits:** 
    - Extra guests are strictly permitted only up to the maximum occupancy defined for each room type:
      - Standard Room: Max 1 extra guest (Total 3)
      - Deluxe Room: Max 1 extra guest (Total 5)
      - Family Room: Max 2 extra guests (Total 8)
-     - Oceanfront Pool Villa: Max 1 extra guest (Total 5)
-     - Presidential Suite: Max 2 extra guests (Total 6)
 3. **Children Policy:**
    - Children aged **0 to 5 years old** stay **free of charge** when sharing existing bedding with parents (maximum 2 free children per room).
    - Children aged **6 to 11 years old** sharing existing bedding are charged **PHP 500 per night** (covers breakfast buffet and facility access; no separate bed).
@@ -310,8 +261,6 @@ The resort operates a total of **26 accommodation units**:
 - **Standard Rooms:** 10 units (Rooms 101–110)
 - **Deluxe Rooms:** 8 units (Rooms 201–208)
 - **Family Rooms:** 5 units (Rooms 301–305)
-- **Oceanfront Pool Villas:** 2 units (Villas V1 & V2)
-- **Presidential Suite:** 1 unit (Penthouse Suite 401)
 
 ### Payment Terms
 - **Accepted Payment Methods:** Cash (PHP), Visa, Mastercard, American Express, GCash, Maya, and Direct Bank Wire Transfer.
@@ -382,8 +331,6 @@ The Standard Room is the lowest-priced room at **PHP 2,500 per night** for 2 gue
 - Standard Room: PHP 2,500/night (2 pax)
 - Deluxe Room: PHP 4,500/night (4 pax)
 - Family Room: PHP 6,000/night (6 pax, includes breakfast)
-- Oceanfront Pool Villa: PHP 12,000/night (4 pax, private pool, butler, transfers, breakfast)
-- Presidential Suite: PHP 18,000/night (4 pax, jacuzzi, panoramic terrace, breakfast)
 
 ### Can I bring outside food and drinks?
 Packaged dry snacks and non-perishables are allowed. Cooked dishes and outside catering are prohibited. Corkage fees apply for alcohol: PHP 500 per wine bottle and PHP 1,000 per liquor bottle.
@@ -403,8 +350,6 @@ Standard check-in is **2:00 PM** and check-out is **12:00 PM**. Early check-in (
 | **Rooms** | Standard Room | PHP 2,500 / night | 2 pax, garden view |
 | **Rooms** | Deluxe Room | PHP 4,500 / night | 4 pax, pool view, balcony |
 | **Rooms** | Family Room | PHP 6,000 / night | 6 pax, includes breakfast |
-| **Rooms** | Oceanfront Pool Villa | PHP 12,000 / night | 4 pax, private pool, breakfast, butler |
-| **Rooms** | Presidential Suite | PHP 18,000 / night | 4 pax, jacuzzi, panoramic terrace |
 | **Guests** | Extra Guest Fee | PHP 1,500 / night | Per person, covers bed, amenities, breakfast (if applicable) |
 | **Guests** | Child (0–5 yrs) | Free | Sharing bed with parents (max 2) |
 | **Guests** | Child (6–11 yrs) | PHP 500 / night | Sharing bed, includes breakfast |
