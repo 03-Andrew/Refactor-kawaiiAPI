@@ -29,6 +29,19 @@ from django.test import override_settings
 
 # ── Shared base ────────────────────────────────────────────────────────────────
 User = get_user_model()
+
+@override_settings(
+    REST_FRAMEWORK={
+        'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+        'PAGE_SIZE': 100,
+        'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+        'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+        'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
+        'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework_simplejwt.authentication.JWTAuthentication'],
+        'DEFAULT_THROTTLE_CLASSES': [],
+        'DEFAULT_THROTTLE_RATES': {},
+    },
+)
 class BookingTestBase(TestCase):
     """Shared fixtures and helpers used by all booking test classes."""
 
