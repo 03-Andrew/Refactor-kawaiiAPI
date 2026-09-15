@@ -13,7 +13,7 @@ Originally developed with monolithic fat views, N+1 query bottlenecks, and doubl
 - **Query Optimization & Database Overhaul**: Replaced legacy N+1 query patterns with batch prefetching and query optimization across 10 core booking and availability endpoints, cutting worst-case query counts from 2,103 down to 12 (a 78% to 99.5% reduction on benchmark tests).
 - **Concurrency & Double-Booking Protection**: Implemented a distributed locking mechanism using **Redis** with automated TTL expiry to hold room inventory and eliminate race conditions during checkout.
 - **Asynchronous Task Queuing**: Offloaded PayMongo payment webhook processing, payment verification, and automated booking confirmation emails to **Celery** workers backed by Redis.
-- **Conversational AI Booking Pipeline & RAG Concierge**: Built a multi-turn conversational reservation agent on top of the booking backend using **LangGraph** and **Google Gemini** / **OpenAI**, featuring structured Pydantic extraction, conversational backtracking, and a RAG FAQ concierge utilizing **structure-aware Markdown header chunking**.
+- **Conversational AI Booking Pipeline & RAG Policy Assistant**: Built a multi-turn conversational reservation agent on top of the booking backend using **LangGraph** and **Google Gemini** / **OpenAI**, featuring structured Pydantic extraction, conversational backtracking, and a RAG FAQ & policy retrieval system utilizing **structure-aware Markdown header chunking**.
 - **Observability & Multi-Turn State Testing**: Integrated **LangSmith** for real-time agent trace visualization, latency monitoring, token accounting, and multi-turn state regression testing across reservation flows.
 - **Production-Ready AWS Architecture**: Containerized services with **Docker Compose**, designed a dedicated **AWS VPC** architecture with separated public/private subnets, EC2 application hosting, AWS RDS PostgreSQL, and Nginx reverse proxy configuration.
 
@@ -64,7 +64,7 @@ START
         ├─► select_and_hold_rooms    ──► [ Redis Distributed Room Lock ]
         ├─► collect_customer_info
         ├─► collect_boat_transfer
-        ├─► rag_concierge_faq        ──► [ Structure-Aware Markdown Chunking ]
+        ├─► rag_node (FAQ / Policies)──► [ Structure-Aware Markdown Chunking ]
         └─► confirm_booking
                 └─► route_booking_confirmation()
                         ├─► create_online_booking ──► END
@@ -74,7 +74,7 @@ START
 ### Key Agent Capabilities:
 - **Pydantic Structured Output**: Guarantees deterministic state schema transformations across multi-turn chats.
 - **Conversational Backtracking**: Guests can backtrack, switch dates, modify guest counts, or release held rooms at any stage via `handle_common_back_action()`.
-- **RAG FAQ Concierge**: Structure-aware chunking parses markdown headers (`#`, `##`, tables) to preserve semantic policy boundaries for resort rules, amenities, and boat transfers.
+- **RAG Policy & FAQ QA**: Structure-aware chunking parses markdown headers (`#`, `##`, tables) to preserve semantic policy boundaries for resort rules, amenities, and boat transfers.
 - **LangSmith Tracing**: Full multi-turn evaluation, latency monitoring, and state inspection.
 
 ---
@@ -96,7 +96,7 @@ START
 ## Project Structure
 
 ```
-├── agent/                  # LangGraph AI Booking Agent & RAG Concierge
+├── agent/                  # LangGraph AI Booking Agent & RAG Policy System
 │   ├── agent2.py           # Active LangGraph state graph definition
 │   ├── nodes.py            # Graph node implementations & routing logic
 │   ├── states.py           # Pydantic schemas & TypedDict BookingState
