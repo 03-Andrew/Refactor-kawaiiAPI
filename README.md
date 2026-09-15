@@ -5,10 +5,11 @@
 ---
 
 ## Project Overview
+This project represents the **evolution of an end-to-end resort reservation and guest management system** originally developed by a collaborative engineering team (team of 5).
 
-This project is a comprehensive **backend refactor and architectural overhaul** of a resort booking and reservation platform built with **Django REST Framework**, **LangGraph**, **Celery**, and **Redis**, backed by **PostgreSQL** on **AWS**.
+A comprehensive **backend refactor and architectural overhaul** of a resort booking and reservation platform built with **Django REST Framework**, **LangGraph**, **Celery**, and **Redis**, backed by **PostgreSQL** on **AWS**.
 
-Originally developed with monolithic fat views, N+1 query bottlenecks, and double-booking race conditions during high-concurrency booking windows, the reservation engine was systematically overhauled:
+Originally developed with monolithic fat views, N+1 query bottlenecks, and double-booking race conditions during high-concurrency booking windows, the reservation engine was overhauled:
 - **Query Optimization & Database Overhaul**: Replaced legacy N+1 query patterns with batch prefetching and query optimization across 10 core booking and availability endpoints, cutting worst-case query counts from 2,103 down to 12 (a 78% to 99.5% reduction on benchmark tests).
 - **Concurrency & Double-Booking Protection**: Implemented a distributed locking mechanism using **Redis** with automated TTL expiry to hold room inventory and eliminate race conditions during checkout.
 - **Asynchronous Task Queuing**: Offloaded PayMongo payment webhook processing, payment verification, and automated booking confirmation emails to **Celery** workers backed by Redis.
