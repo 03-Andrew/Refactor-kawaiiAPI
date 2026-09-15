@@ -133,27 +133,37 @@ START
 Create a `.env` file in the root directory:
 
 ```env
-DEBUG=True
-SECRET_KEY=your-secure-django-secret-key
-DATABASE_URL=postgres://user:password@localhost:5432/resort_db
-REDIS_URL=redis://localhost:6379/1
-CELERY_BROKER_URL=redis://localhost:6379/2
+# --- Django Core Configuration ---
+SECRET_KEY=''                       # Django secret key (e.g. run: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())')
+DEBUG='True'                        # Set to 'True' for local development, 'False' for production
+DATABASE_URL=''                     # PostgreSQL connection URL (e.g. postgres://user:password@localhost:5432/kawaii_db)
 
-# AI Agent & LangSmith Configuration
-GEMINI_API_KEY=your-gemini-api-key
-OPENAI_API_KEY=your-openai-api-key
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=your-langsmith-api-key
-LANGCHAIN_PROJECT=resort-booking-agent
+# --- Cloudflare Turnstile Bot Protection ---
+TURNSTILE_SECRET_KEY=''             # Cloudflare Turnstile secret key for captcha verification
 
-# PayMongo & SMTP Configuration
-PAYMONGO_SECRET_KEY=your-paymongo-secret-key
-PAYMONGO_WEBHOOK_SECRET=your-paymongo-webhook-secret
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USE_TLS=True
-EMAIL_HOST_USER=your-email@gmail.com
-EMAIL_HOST_PASSWORD=your-app-password
+# --- PayMongo Payment Gateway ---
+PAYMONGO_SECRET_KEY=''              # PayMongo secret API key (starts with sk_test_... or sk_live_...)
+PAYMONGO_WEBHOOK_SECRET=''          # PayMongo webhook secret key for HMAC signature verification (whsk_...)
+PAYMONGO_PUBLIC_KEY=''              # PayMongo public API key (starts with pk_test_... or pk_live_...)
+
+# --- Email / SMTP Configuration ---
+EMAIL_HOST='smtp.gmail.com'         # SMTP host (default: smtp.gmail.com)
+EMAIL_HOST_USER=''                  # Gmail / SMTP username (e.g. your-email@gmail.com)
+EMAIL_HOST_PASSWORD=''              # Gmail App Password (16 characters, 2FA enabled)
+EMAIL_PORT=587                      # SMTP port (587 for TLS, 465 for SSL)
+EMAIL_USE_TLS='True'                # Enable TLS encryption ('True' or 'False')
+EMAIL_BACKEND='django.core.mail.backends.smtp.EmailBackend' # Django email backend path
+
+# --- LLM & AI Agent Provider Keys ---
+GOOGLE_API_KEY=''                   # Google Gemini API key (from Google AI Studio)
+OPENAI_API_KEY=''                   # OpenAI API key (sk-..., used for RAG embeddings / LLM)
+
+# --- LangSmith Observability & Tracing ---
+LANGSMITH_TRACING=true              # Enable LangSmith tracing (true / false)
+LANGSMITH_ENDPOINT='https://apac.api.smith.langchain.com' # LangSmith API endpoint (APAC or default US: https://api.smith.langchain.com)
+LANGSMITH_API_KEY=''                # LangSmith personal API key (lsv2_pt_...)
+LANGSMITH_PROJECT=''                # LangSmith project name for grouping traces
+LANGSMITH_TRACING_V2=true           # Enable LangSmith V2 tracing pipeline
 ```
 
 ### 3. Run with Docker Compose (Recommended)
