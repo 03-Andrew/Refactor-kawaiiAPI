@@ -5,7 +5,7 @@
 ---
 
 ## Project Overview
-This project represents the **evolution of an end-to-end resort reservation and guest management system** originally developed by a collaborative engineering team (team of 5).
+This project represents the **evolution of an end-to-end resort reservation and guest management system** originally developed by a collaborative team (team of 5).
 
 A comprehensive **backend refactor and architectural overhaul** of a resort booking and reservation platform built with **Django REST Framework**, **LangGraph**, **Celery**, and **Redis**, backed by **PostgreSQL** on **AWS**.
 
