@@ -21,10 +21,10 @@ from langchain_core.documents import Document
 
 class BookingState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
-    intent: Literal["book", "greet", "rag_node"] = "greet"
+    intent: Literal["book", "greet", "look_up", "rag_node"] = "greet"
     rag_answer: str
     
-    stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking", "await_payment"] = "greet"
+    stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking", "await_payment", "look_up"] = "greet"
     billing_id: int | None = None
     check_in: date | None = None
     check_out: date | None = None
@@ -52,11 +52,12 @@ class BookingState(TypedDict):
     room_types_to_display: list[int] = []
 
 class IntentClassification(BaseModel):                                                                                                                                                                                      
-    intent: Literal["book", "greet", "rag_node"] = Field(                                                                                                                                                               
+    intent: Literal["book", "greet", "look_up", "rag_node", ""] = Field(                                                                                                                                                               
     description=(                                                                                                                                                                                                       
         "'book' if user wants to reserve, check dates/availability, or provided dates/guests; "                                                                                                                         
         "'rag_node' if user is asking about policies or any FaQ; "                                                                                                                            
-        "'greet' if user is just saying hello or asking general assistance."                                                                                                                                            
+        "'greet' if user is just saying hello or asking general assistance."  
+        "'look_up' if user wants to view their existing booking"                                                                                                                                          
             )                                                                                                                                                                                                                   
         )    
 
@@ -132,3 +133,7 @@ class BoatTime(BaseModel):
 
 class ConfirmBooking(BaseStageInput):
     confirmed: bool = False
+
+class BookingLookUp(BaseModel):
+    email: str | None = None
+    reference_id: str | None = None

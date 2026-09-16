@@ -32,7 +32,7 @@ django.setup()
 
 from bookings.services.availability import get_room_types_availability, get_room_type_basic_info, bulk_lock_room_type
 from bookings.services.lock import release_holder_locks
-from bookings.services.booking import create_online_booking
+from bookings.services.booking import create_online_booking, booking_look_up
 from bookings.exceptions import RedisUnavailable, RoomTypeNotFoundError
 from bookings.models import RoomType
 from paymongo.views import create_checkout_link
@@ -42,7 +42,7 @@ from .utils import release_locks, get_room_type_availability, get_room_types, ge
 from agent.states import (
     BookingState, BaseStageInput, DateAndGuestCountInput, SelectedRoomsInput, 
     GuestInfo, AvailBoat, ConfirmBooking, RoomTypeDetails, InitalGreetingState, RoomCacheSchema,
-    DateAndGuestCountInputWithUserInfo, IntentClassification
+    DateAndGuestCountInputWithUserInfo, IntentClassification, BookingLookUp
 )
 from datetime import datetime 
 from langsmith import traceable
@@ -767,4 +767,76 @@ def cancel_booking(state: BookingState):
                 content="Your booking has been cancelled. Please let us know if you'd like to start over or make changes to your stay."
             )
         ]
+    }
+
+@traceable
+def look_up_booking(state: BookingState):
+    last_message = state['messages'][-1]
+    user_input = getattr(last_message, "content", str(last_message))
+
+    result = llm.with_structured_output(BookingLookUp).invoke([
+        {
+            "role": "system",
+            "content": (
+                "Extract email and reference id for booking lookup"
+            )
+        },
+        {"role": "user", "content": user_input} 
+    ])
+
+    email = result.email
+    reference_id = result.reference_id
+
+    print(email == None)
+    print(reference_id == None)
+    
+    missing = []
+    if not email: missing.append("email")
+    if not reference_id: missing.append("reference id")
+
+    if missing:
+        msg = f"To check booking, please provide: {', '.join(missing)}."
+        return {
+            "messages": [AIMessage(content=msg)],
+            "stage": 'look_up'
+        }
+
+    booking = booking_look_up(email=email, reference_id=reference_id)
+
+
+    if not booking:
+        msg = f"Booking with reference id: {reference_id} and email: {email} not found"
+        return {
+            "messages": [AIMessage(content=msg)],
+            "stage": "greet"
+        }
+
+    
+    msg = (
+        f"### Reservation Details (Ref: **{reference_id}**)\n\n"
+        "#### Customer Information\n"
+        f"* **Name:** {booking.customer_bill.customer.full_name}\n"
+        f"* **Status:** `{booking.status}`\n\n"
+        
+        "#### Stay Information\n"
+        f"* **Room Type:** {booking.room_type.name if booking.room_type else 'N/A'} "
+        f"(Room: {booking.room.room_number if booking.room else 'Not Assigned'})\n"
+        f"* **Check-In:** `{booking.check_in}`\n"
+        f"* **Check-Out:** `{booking.check_out}`\n"
+        f"* **Nights:** {booking.number_of_nights}\n\n"
+        
+        "#### Guest Count\n"
+        f"* **Adults:** {booking.adult_count}\n"
+        f"* **Children:** {booking.children_count}\n"
+        f"* **Extra Guests:** {booking.extra_guest}\n"
+        f"* **Total Guests:** {booking.number_of_guests}\n\n"
+        
+        "#### Financial Summary\n"
+        f"* **Total Cost:** ₱{booking.total_cost}\n\n"
+        "---\n"
+        f"*Generated at: {booking.created_at.strftime('%Y-%m-%d %H:%M') if booking.created_at else 'N/A'}*"
+    )
+
+    return {
+        "messages": [AIMessage(content=msg)],
     }

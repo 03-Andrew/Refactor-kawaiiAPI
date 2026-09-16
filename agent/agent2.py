@@ -33,7 +33,7 @@ from agent.states import BookingState
 from agent.nodes import (
     select_and_hold_rooms, search_available_rooms, collect_boat_transfer, 
     collect_customer_info, greet_user, cancel_booking,
-    confirm_booking, book, route_booking_confirmation, await_payment, classify_intent
+    confirm_booking, book, route_booking_confirmation, await_payment, classify_intent, look_up_booking
 )
 
 from agent.rag.agent import rag_node
@@ -76,7 +76,10 @@ def route_greet(state: BookingState):
 def route_classified_intent(state: BookingState):                                                                                                                                                                           
     intent = state.get("intent")                                                                                                                                                                                            
     if intent == "rag_node":                                                                                                                                                                                          
-        return "rag_node"    
+        return "rag_node"  
+
+    if intent == "look_up":
+        return "look_up"  
                                                                                                                                                                                                
     return state.get("stage") or "greet"                                                                                                                                                                                                          
 
@@ -84,6 +87,7 @@ def route_classified_intent(state: BookingState):
 graph = StateGraph(BookingState)
 
 graph.add_node('classify_intent', classify_intent)
+graph.add_node('look_up', look_up_booking)
 graph.add_node("rag_node", rag_node)
 graph.add_node('greet', greet_user)
 graph.add_node('search_available_rooms', search_available_rooms)
@@ -108,6 +112,7 @@ graph.add_conditional_edges(
         'collect_boat_transfer': 'collect_boat_transfer',
         'confirm_booking': 'confirm_booking',
         'await_payment': 'await_payment',
+        'look_up': 'look_up',
     }
 )
 graph.add_conditional_edges(
@@ -121,6 +126,7 @@ graph.add_conditional_edges(
 graph.add_edge('rag_node', END)
 graph.add_edge('greet', END)
 graph.add_edge('search_available_rooms', END)
+graph.add_edge('look_up', END)
 graph.add_edge('select_and_hold_rooms', END)
 graph.add_edge("collect_customer_info", END)
 graph.add_edge("collect_boat_transfer", END)
