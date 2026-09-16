@@ -196,4 +196,9 @@ def update_booking(*, booking, data):
     booking.refresh_from_db()
     return booking
 
+def booking_look_up(email: str, reference_id: str):
+    return Booking.objects.filter(Q(reference_id=reference_id) & Q(customer_bill__customer__email=email)).select_related(
+            'customer_bill__customer', 'room_type', 'room', "room__type"
+        ).first()
+
 

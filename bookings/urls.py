@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/bookings/online/', bookings.CreateOnlineBooking.as_view(), name='create_online_booking'),
     path('api/bookings/daytour/', bookings.CreateDayTourGuest.as_view(), name='create_day_tour'),
 
+    path('api/bookings/<str:email>/<str:reference_id>', bookings.BookingDetails.as_view(), name='get_booking_via_email_ref_id'),
     path('api/bookings/<int:pk>/', bookings.BookingDetail.as_view(), name='edit_booking'),
     path('api/bookings/<int:pk>/approve/', bookings.ApproveBooking.as_view(), name='approve_booking'),
     path('api/bookings/<int:pk>/cancel/', bookings.CancelBooking.as_view(), name='cancel_booking'),

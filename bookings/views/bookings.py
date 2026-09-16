@@ -25,6 +25,8 @@ from bookings.serializers import (
     SingleLockRoomTypeSerializer
 )
 
+from django.db.models import Q
+
 from bookings.exceptions import RoomTypeNotFoundError, RoomUnavailableError, RedisUnavailable
 from bookings.services.availability import (
     get_room_type_available, lock_room_type, bulk_lock_room_type
@@ -32,7 +34,7 @@ from bookings.services.availability import (
 from bookings.services.booking import (
     approve_booking, cancel_booking,
     create_online_booking, create_day_tour_guests,
-    create_onsite_booking, update_booking
+    create_onsite_booking, update_booking, booking_look_up
 )
 from bookings.services.lock import (
     acquire_room_type_lock, bulk_acquire, release_room_type_lock, release_holder_locks
@@ -258,6 +260,29 @@ class CreateOnlineBooking(APIView):
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 
+class BookingDetails(APIView):
+    serializer_class = BookingSerializer
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+
+    @extend_schema(
+        tags=['Bookings'],
+        description='List exact bookings using Email and reference id.',
+    )
+    def get(self, request, *args, **kwargs):
+        reference_id  = self.kwargs.get('reference_id')
+        email = self.kwargs.get('email')
+    
+        if not reference_id or not email:
+            return Response({'error': "Please include email and reference id"}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = booking_look_up(email=email, reference_id=reference_id)
+
+        if not data:
+            return Response({'error': "not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        return Response(BookingSerializer(data).data, status=status.HTTP_200_OK)
 
 class ListBookings(generics.ListAPIView):
     serializer_class = BookingSerializer

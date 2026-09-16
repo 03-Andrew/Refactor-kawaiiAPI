@@ -1,7 +1,10 @@
 from django.db import models
 from transactions.models import Billing
 from django.core.exceptions import ValidationError
-
+import random
+def generate_booking_ref():
+    allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'
+    return ''.join(random.choices(allowed_chars, k=6))
 
 class Inclusions(models.Model):
     inclusion = models.CharField(max_length=100)
@@ -43,6 +46,7 @@ class BookingStatus(models.TextChoices):
 
 class Booking(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.PROTECT,  related_name='bookings')
+    reference_id = models.CharField(max_length=8, unique=True, db_index=True, editable=False)
     room = models.ForeignKey(Room, on_delete=models.PROTECT, null=True, blank=True, related_name='bookings')
     room_type = models.ForeignKey(RoomType, on_delete=models.PROTECT, related_name='bookings')
     check_in = models.DateField()
@@ -82,6 +86,16 @@ class Booking(models.Model):
             raise ValidationError("Check-in date must be before check-out date.")
         if self.number_of_guests > self.room_type.good_for + self.room_type.max_exta_guest:
             raise ValidationError("Number of guests exceeds the allowed limit for this room type.")
+
+    def save(self, *args, **kwargs):
+        if not self.reference_id:
+            self.reference_id = generate_booking_ref()
+
+            while Booking.objects.filter(reference_id=self.reference_id).exists():
+                self.reference_id = generate_booking_ref()
+
+        super().save(*args,**kwargs)
+
 
     
     
