@@ -1,6 +1,11 @@
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+import random
+
+def generate_billing_ref():
+    allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'
+    return 'BL-' + ''.join(random.choices(allowed_chars, k=6))
 
 # Create your models here.
 class Customer(models.Model):
@@ -28,7 +33,16 @@ class Billing(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=BillingStatus.choices, default=BillingStatus.PROCESSING)
-    
+    billing_reference = models.CharField(max_length=12, unique=True, db_index=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        if not self.billing_reference:
+            ref = generate_billing_ref()
+            while Billing.objects.filter(billing_reference=ref).exists():
+                ref = generate_billing_ref()
+            self.billing_reference = ref
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Bill {self.id} for {self.customer}"
 
@@ -147,7 +161,7 @@ class ExtraItemsAvailed(models.Model):
     count = models.SmallIntegerField()
 
 
-class AdditonalPayment(models.Model):
+class AdditionalPayment(models.Model):
     customer_bill = models.ForeignKey(Billing, on_delete=models.CASCADE, related_name="additional_payment")
     reason = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)

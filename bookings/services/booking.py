@@ -196,9 +196,44 @@ def update_booking(*, booking, data):
     booking.refresh_from_db()
     return booking
 
+def lookup_billing(billing_reference: str, email: str):
+    """
+    Look up a Billing by billing_reference + customer email.
+    Both must match — returns None if either is wrong (intentional: avoids
+    leaking whether a billing reference exists).
+
+    Returns a Billing instance with bookings, room_type, room, and
+    customer_bill__customer fully prefetched (3 queries total).
+    """
+    from django.db.models import Prefetch
+
+    billing = (
+        Billing.objects
+        .filter(billing_reference=billing_reference)
+        .select_related('customer')
+        .prefetch_related(
+            Prefetch(
+                'bookings',
+                queryset=Booking.objects.select_related('room_type', 'room', 'customer_bill__customer'),
+            )
+        )
+        .first()
+    )
+
+    if not billing:
+        return None
+
+    if billing.customer.email.lower() != email.strip().lower():
+        return None
+
+    return billing
+
+
 def booking_look_up(email: str, reference_id: str):
+    """Deprecated: use lookup_billing() instead."""
     return Booking.objects.filter(Q(reference_id=reference_id) & Q(customer_bill__customer__email=email)).select_related(
             'customer_bill__customer', 'room_type', 'room', "room__type"
         ).first()
+
 
 

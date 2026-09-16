@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from bookings.models import Booking
-from .models import FoodBill, AdditonalPayment, Billing, Customer, Payment, GuestList ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Food, PaymentForChoices
+from .models import FoodBill, AdditionalPayment, Billing, Customer, Payment, GuestList ,Amenities, AmenitiesAvailed, Activity, ActivitiesAvailed, Food, PaymentForChoices
 from bookings.serializers import BookingSerializer
 
 class ActivitiesSerializer(serializers.ModelSerializer):
@@ -49,7 +49,7 @@ class FoodBillSummarySerializer(serializers.ModelSerializer):
 
 class AdditionalPaymentSerializer(serializers.ModelSerializer):
     class Meta:
-        model = AdditonalPayment
+        model = AdditionalPayment
         fields = '__all__'
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -129,7 +129,7 @@ class PaymentDetailSerializer(serializers.ModelSerializer):
                 return str(activities.activity)
 
         elif obj.paymentFor == PaymentForChoices.ADDITIONAL:
-            additional = AdditonalPayment.objects.filter(id=obj.object_id).first()
+            additional = AdditionalPayment.objects.filter(id=obj.object_id).first()
             if additional:
                 return str(additional.reason)
 
@@ -181,7 +181,22 @@ class BillingDetailSerializer(serializers.ModelSerializer):
     
     def get_runningBalance(self, obj):
         return obj.running_balance 
-    
+
+
+class BillingLookupSerializer(serializers.ModelSerializer):
+    """
+    Public-facing billing lookup serializer.
+    Requires email + billing_reference verification (handled in the view).
+    Returns only the room bookings under the billing.
+    Does NOT expose customer PII, food bills, amenities, activities, or payment details.
+    """
+    bookings = BookingSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Billing
+        fields = ['billing_reference', 'status', 'bookings']
+
+
 class FoodListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Food
@@ -237,7 +252,7 @@ class CreatePaymentSerializer(serializers.Serializer):
             "selectedActivities": (ActivitiesAvailed, "Activities"),
             "selectedAmenities": (AmenitiesAvailed, "Amenities"),
             "selectedFoodBills": (FoodBill, "Food"),
-            "selectedAdditionalPayments": (AdditonalPayment, "Additional"),
+            "selectedAdditionalPayments": (AdditionalPayment, "Additional"),
         }
 
         created_payments = []

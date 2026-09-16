@@ -136,4 +136,4 @@ class ConfirmBooking(BaseStageInput):
 
 class BookingLookUp(BaseModel):
     email: str | None = None
-    reference_id: str | None = None
+    billing_reference: str | None = None

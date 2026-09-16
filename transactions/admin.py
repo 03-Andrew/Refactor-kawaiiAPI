@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Billing, Customer, FoodBill, Amenities, AmenitiesAvailed, AdditonalPayment, GuestList, Activity, ActivitiesAvailed, PaymentMethod, Payment, PaymentStatus, ExtraItems, ExtraItemsAvailed, Food, FoodType
+from .models import Billing, Customer, FoodBill, Amenities, AmenitiesAvailed, AdditionalPayment, GuestList, Activity, ActivitiesAvailed, PaymentMethod, Payment, PaymentStatus, ExtraItems, ExtraItemsAvailed, Food, FoodType
 
 class AllFieldsAdmin(admin.ModelAdmin):
     def get_list_display(self, request):
@@ -79,7 +79,7 @@ admin.site.register(ActivitiesAvailed, AllFieldsAdmin)
 admin.site.register(PaymentMethod, AllFieldsAdmin)
 admin.site.register(PaymentStatus, AllFieldsAdmin)
 admin.site.register(Payment, AllFieldsAdmin)
-admin.site.register(AdditonalPayment, AllFieldsAdmin)
+admin.site.register(AdditionalPayment, AllFieldsAdmin)
 admin.site.register(ExtraItemsAvailed, AllFieldsAdmin)
 admin.site.register(ExtraItems, AllFieldsAdmin)
 admin.site.register(Food, AllFieldsAdmin)

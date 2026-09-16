@@ -32,7 +32,7 @@ django.setup()
 
 from bookings.services.availability import get_room_types_availability, get_room_type_basic_info, bulk_lock_room_type
 from bookings.services.lock import release_holder_locks
-from bookings.services.booking import create_online_booking, booking_look_up
+from bookings.services.booking import create_online_booking, lookup_billing
 from bookings.exceptions import RedisUnavailable, RoomTypeNotFoundError
 from bookings.models import RoomType
 from paymongo.views import create_checkout_link
@@ -778,63 +778,64 @@ def look_up_booking(state: BookingState):
         {
             "role": "system",
             "content": (
-                "Extract email and reference id for booking lookup"
+                "Extract the customer's email address and billing reference number "
+                "(format: BL-XXXXXX) from the user message for booking lookup."
             )
         },
-        {"role": "user", "content": user_input} 
+        {"role": "user", "content": user_input}
     ])
 
     email = result.email
-    reference_id = result.reference_id
+    billing_reference = result.billing_reference
 
-    print(email == None)
-    print(reference_id == None)
-    
     missing = []
     if not email: missing.append("email")
-    if not reference_id: missing.append("reference id")
+    if not billing_reference: missing.append("billing reference number (e.g. BL-ABC123)")
 
     if missing:
-        msg = f"To check booking, please provide: {', '.join(missing)}."
+        msg = f"To look up your booking, please provide: {', '.join(missing)}."
         return {
             "messages": [AIMessage(content=msg)],
             "stage": 'look_up'
         }
 
-    booking = booking_look_up(email=email, reference_id=reference_id)
+    billing = lookup_billing(billing_reference=billing_reference, email=email)
 
-
-    if not booking:
-        msg = f"Booking with reference id: {reference_id} and email: {email} not found"
+    if not billing:
+        msg = (
+            f"No booking found for billing reference **{billing_reference}** "
+            f"with email **{email}**. Please double-check and try again."
+        )
         return {
             "messages": [AIMessage(content=msg)],
-            "stage": "greet"
+            "stage": "look_up"
         }
 
-    
+    bookings = billing.bookings.all()
+
+    booking_lines = []
+    for i, booking in enumerate(bookings, start=1):
+        booking_lines.append(
+            f"**Booking {i}** (Ref: `{booking.reference_id}`)\n"
+            f"* **Room Type:** {booking.room_type.name if booking.room_type else 'N/A'} "
+            f"(Room: {booking.room.room_number if booking.room else 'Not Assigned'})\n"
+            f"* **Check-In:** `{booking.check_in}` → **Check-Out:** `{booking.check_out}` "
+            f"({booking.number_of_nights} night{'s' if booking.number_of_nights != 1 else ''})\n"
+            f"* **Guests:** {booking.adult_count} adult(s), {booking.children_count} child(ren)"
+            + (f", {booking.extra_guest} extra" if booking.extra_guest else "") + "\n"
+            f"* **Status:** `{booking.status}`\n"
+            f"* **Cost:** ₱{booking.total_cost}"
+        )
+
+    bookings_section = "\n\n".join(booking_lines) if booking_lines else "_No bookings found under this billing._"
+
     msg = (
-        f"### Reservation Details (Ref: **{reference_id}**)\n\n"
-        "#### Customer Information\n"
-        f"* **Name:** {booking.customer_bill.customer.full_name}\n"
-        f"* **Status:** `{booking.status}`\n\n"
-        
-        "#### Stay Information\n"
-        f"* **Room Type:** {booking.room_type.name if booking.room_type else 'N/A'} "
-        f"(Room: {booking.room.room_number if booking.room else 'Not Assigned'})\n"
-        f"* **Check-In:** `{booking.check_in}`\n"
-        f"* **Check-Out:** `{booking.check_out}`\n"
-        f"* **Nights:** {booking.number_of_nights}\n\n"
-        
-        "#### Guest Count\n"
-        f"* **Adults:** {booking.adult_count}\n"
-        f"* **Children:** {booking.children_count}\n"
-        f"* **Extra Guests:** {booking.extra_guest}\n"
-        f"* **Total Guests:** {booking.number_of_guests}\n\n"
-        
-        "#### Financial Summary\n"
-        f"* **Total Cost:** ₱{booking.total_cost}\n\n"
+        f"### Reservation Details (Billing Ref: **{billing.billing_reference}**)\n\n"
+        f"**Billing Status:** `{billing.status}`\n\n"
+        "---\n\n"
+        f"{bookings_section}\n\n"
         "---\n"
-        f"*Generated at: {booking.created_at.strftime('%Y-%m-%d %H:%M') if booking.created_at else 'N/A'}*"
+        f"*Billing created: {billing.created_at.strftime('%Y-%m-%d %H:%M') if billing.created_at else 'N/A'}*"
     )
 
     return {

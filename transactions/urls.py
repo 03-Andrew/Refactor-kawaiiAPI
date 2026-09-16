@@ -5,6 +5,7 @@ urlpatterns = [
     path("api/billings/", views.BillingList.as_view(), name="billings"),
     path("api/billings/<int:pk>/", views.BillingSingleEntity.as_view(), name="single-billing"),
     path("api/billings/details/<int:pk>/", views.BillingDetails.as_view(), name="billing-details"),
+    path("api/billings/lookup/<str:billing_reference>/<str:email>/", views.BillingLookupView.as_view(), name="billing-lookup"),
     
     path("api/customer/", views.CustomerList.as_view(), name="customers"),
     path("api/customer/<int:pk>", views.CustomerSingleEntity.as_view()),
