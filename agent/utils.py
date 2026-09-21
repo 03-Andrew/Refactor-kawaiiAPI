@@ -22,7 +22,7 @@ from bookings.services.availability import get_room_types_availability, get_room
 from bookings.services.lock import release_holder_locks
 from bookings.services.booking import create_online_booking
 from paymongo.views import create_checkout_link
-
+from transactions.models import Amenities
 from agent.states import (
     BookingState, BaseStageInput, DateAndGuestCountInput, SelectedRoomsInput, 
     GuestInfo, AvailBoat, ConfirmBooking, RoomTypeDetails, InitalGreetingState, RoomCacheSchema
@@ -291,11 +291,26 @@ def display_booking_summary(state: BookingState):
             f"  • {room['name']} × {quantity}  —  ₱{price_per_night:,.2f}/night × {nights} night{'s' if nights > 1 else ''} = ₱{subtotal:,.2f}"
         )
 
+    # Extra guest cost
+    extra_guest_count = state.get("extra_guest_count") or 0
+    extra_guest_cost = extra_guest_count * 1500 * nights
+    total_cost = total_room_cost + extra_guest_cost
+
+    extra_guest_block = ""
+    if extra_guest_count > 0:
+        extra_guest_block = (
+            f"👥 **Extra Guests**\n"
+            f"  • {extra_guest_count} extra guest(s) × ₱1,500 × {nights} night{'s' if nights > 1 else ''} = ₱{extra_guest_cost:,.2f}\n"
+        )
+
     # Boat transfer info
     if state.get("avail_boat_transfer"):
         boat_time = state.get("boat_transfer_time") or "Not selected"
         head_count = state.get("head_count") or ((state.get("adult_count") or 0) + (state.get("children_count") or 0))
-        boat_info = f"✅ Yes  |  Time: {boat_time}  |  Pax: {head_count}"
+        boat_rate = Amenities.objects.get(amenity="Boat Transfer").rate_per_head 
+        boat_fee = float(boat_rate * head_count)
+        boat_info = f"✅ Yes  |  Time: {boat_time}  | Fee: {boat_fee} ({boat_rate} * {head_count})"
+        total_cost += boat_fee
     else:
         boat_info = "❌ No"
 
@@ -324,10 +339,11 @@ def display_booking_summary(state: BookingState):
         f"  • Guests:     {adults} Adult(s),  {children} Child(ren)\n"
         f"🛏️ **Rooms Reserved**\n"
         f"{rooms_block}\n"
+        f"{extra_guest_block}"
         f"⛵ **Boat Transfer**\n"
         f"  {boat_info}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 **Estimated Total:  ₱{total_room_cost:,.2f}**\n"
+        f"💰 **Estimated Total:  ₱{total_cost:,.2f}**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"Please reply **yes** to confirm and finalize your booking, or **no** to cancel."
     )

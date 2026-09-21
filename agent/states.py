@@ -21,7 +21,7 @@ from langchain_core.documents import Document
 
 class BookingState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
-    intent: Literal["book", "greet", "look_up", "rag_node"] = "greet"
+    intent: Literal["book", "greet", "look_up", "rag_node"] = None
     rag_answer: str
     
     stage: Literal["greet", "search_available_rooms", "select_and_hold_rooms", "collect_customer_info", "collect_boat_transfer", "confirm_booking", "await_payment", "look_up"] = "greet"
@@ -30,6 +30,7 @@ class BookingState(TypedDict):
     check_out: date | None = None
     adult_count: int | None = None
     children_count: int | None = None
+    extra_guest_count: int | None = None
 
     room_type_ids: list[int] = []
     confirmed: bool | None = None

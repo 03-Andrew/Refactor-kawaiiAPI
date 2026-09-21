@@ -53,7 +53,7 @@ def rag_node(state: State):
          "collect_customer_info": "\n*(Regarding your reservation: Please provide your name, email, and phone number to continue.)*",
          "collect_boat_transfer": "\n*(Regarding your reservation: Would you like to avail of our scheduled boat transfer?)*",
     }
-    reminder = stage_reminders.get(current_stage, "greet")   
+    reminder = stage_reminders.get(current_stage, "")   
 
     messages = [
         SystemMessage(content=system_prompt),

@@ -73,14 +73,13 @@ def route_greet(state: BookingState):
         return 'search_available_rooms'
     return END
 
-def route_classified_intent(state: BookingState):                                                                                                                                                                           
-    intent = state.get("intent")                                                                                                                                                                                            
-    if intent == "rag_node":                                                                                                                                                                                          
-        return "rag_node"  
+def route_classified_intent(state: BookingState):
+    intent = state.get("intent")
+    if intent == "rag_node": return "rag_node"
+    if intent == "look_up": return "look_up"
+    if intent == "book" and state.get("stage") in (None, "greet"):
+        return "search_available_rooms"
 
-    if intent == "look_up":
-        return "look_up"  
-                                                                                                                                                                                               
     return state.get("stage") or "greet"                                                                                                                                                                                                          
 
 
